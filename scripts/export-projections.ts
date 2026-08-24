@@ -11,6 +11,7 @@ interface BoardEntry {
   rank: number;
   bye: string;
   dollar: string;
+  pts?: number;
 }
 
 function round(n: number | undefined): string {
@@ -33,8 +34,8 @@ function loadBoard(season: number): Map<string, BoardEntry> {
   }
   const lines = readFileSync(boardPath, "utf-8").trim().split("\n");
   for (const line of lines.slice(1)) {
-    const [playerId, rank, bye, dollar] = line.split(",");
-    board.set(playerId, { rank: Number(rank), bye, dollar });
+    const [playerId, rank, bye, dollar, pts] = line.split(",");
+    board.set(playerId, { rank: Number(rank), bye, dollar, pts: pts ? Number(pts) : undefined });
   }
   return board;
 }
@@ -57,6 +58,7 @@ async function main() {
     "bye_week",
     "sleeper_proj_dollar",
     "season_pts_half_ppr",
+    "pts_source",
   ];
 
   const rows: string[] = [header.join(",")];
@@ -72,6 +74,9 @@ async function main() {
     const boardEntry = board.get(player.player_id);
     if (boardEntry) boardMatches++;
 
+    const pts = boardEntry?.pts !== undefined ? boardEntry.pts : proj?.pts_half_ppr;
+    const ptsSource = boardEntry?.pts !== undefined ? "board" : proj?.pts_half_ppr !== undefined ? "api" : "";
+
     const row = [
       player.player_id,
       sleeperPlayerFullName(player),
@@ -80,7 +85,8 @@ async function main() {
       boardEntry ? String(boardEntry.rank) : "",
       boardEntry?.bye ?? "",
       boardEntry?.dollar ?? "",
-      round(proj?.pts_half_ppr),
+      round(pts),
+      ptsSource,
     ];
     rows.push(row.map(csvCell).join(","));
   }

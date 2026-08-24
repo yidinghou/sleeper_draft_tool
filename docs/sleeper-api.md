@@ -215,20 +215,23 @@ This pattern keeps traffic low (~20 req/min for a 2-second poll interval) while 
 **IMPORTANT:** Sleeper's estimated auction dollar value (`sleeper_proj_dollar`, or `$PROJ` on the draft board) is **not available from the API**. It is computed client-side only, in the browser's React state on the draft-board page.
 
 **To obtain it:**
-1. Open `https://sleeper.com/draft/nfl/{draft_id}` in a browser while logged in to your Sleeper account.
-2. Use Claude in Chrome (or manual scraping) to extract the player-rank-to-dollar mapping from the virtualized draft-board list.
-3. Write the result to `data/sleeper-board-{season}.csv` with columns: `player_id,sleeper_rank,bye_week,sleeper_proj_dollar`.
-4. The projections-export script joins this CSV with API data on `player_id`.
+1. Open `https://sleeper.com/draft/nfl/{draft_id}` in a browser while logged in to your Sleeper account. Note: `{draft_id}` is not the same as `{league_id}` — look it up via `GET /league/{league_id}/drafts` if you only have the league ID.
+2. Use Claude in Chrome (or manual scraping) to extract the player-rank-to-dollar mapping from the virtualized draft-board list. The board also shows its own `PTS` column (its internal points projection, used to derive `$PROJ`) — scrape that too.
+3. Write the result to `data/sleeper-board-{season}.csv` with columns: `player_id,sleeper_rank,bye_week,sleeper_proj_dollar,sleeper_board_pts_half_ppr`.
+4. The projections-export script joins this CSV with API data on `player_id`, preferring the board's own PTS over the API's `pts_half_ppr` for any player present on the board (see `pts_source` column below) — this keeps rank/$/pts internally consistent as one snapshot, since the board computes $ from its own PTS, not from the API's.
+5. This file is a point-in-time snapshot (the board has no API, so freshness = whenever you last scraped) — commit it to the repo and re-scrape by hand as needed (e.g. closer to draft day).
 
 **Example `sleeper-board-{season}.csv`:**
 ```
-player_id,sleeper_rank,bye_week,sleeper_proj_dollar
-4623,1,6,58
-2580,2,10,57
-4890,3,8,55
+player_id,sleeper_rank,bye_week,sleeper_proj_dollar,sleeper_board_pts_half_ppr
+4623,1,6,58,292.9
+2580,2,10,57,299.9
+4890,3,8,55,351.5
 ```
 
 The `sleeper_rank` column should reflect the player's rank on the Sleeper draft board (which approximately tracks ADP, or `adp_2qb` if sorting by that), and `bye_week` is the player's bye week.
+
+**Why the board's PTS can differ from the API's `pts_half_ppr`:** both are Sleeper-generated, but from different snapshots/pipelines — the draft board computes its own projection client-side to derive `$PROJ`, while the API endpoint is refreshed independently. They're usually close but not identical (e.g. Josh Allen at $52/351.5 pts on the board vs. 361.5 pts from a same-day API call). Preferring the board's own PTS for board-listed players keeps the auction $ value and the point projection mutually consistent.
 
 ---
 
