@@ -190,6 +190,14 @@ def main() -> None:
         / config.teams
     )
 
+    # The two ends of the dial, as prices. Every blended price lies between
+    # its player's own pair, so the pair is the range the slider moves him
+    # through -- which end is the high one depends on the player: dropping
+    # w_floor lifts the marginal band and, since the pool is fixed, takes it
+    # from the top of the board.
+    vorp_prices = solved[1.0][1]
+    volr_prices = solved[0.0][1]
+
     rows = []
     for pid in ordered:
         p = by_id[pid]
@@ -204,6 +212,8 @@ def main() -> None:
                 "is_starter": pid in starters,
                 "vorp": round(p.points - vorp_bar[p.position], 1),
                 "volr": round(p.points - volr_bar[p.position], 1),
+                "vorp_dollar": vorp_prices[pid],
+                "volr_dollar": volr_prices[pid],
                 "sleeper_dollar": info.get("sleeper_dollar"),
             }
         )

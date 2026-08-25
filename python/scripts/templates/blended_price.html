@@ -348,6 +348,34 @@
   .pos.DEF { color: var(--pos-def); }
 
   .role { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
+
+  /* ---------- Inline VORP -> VOLR track ---------- */
+
+  td.blend { padding-left: 4px; padding-right: 4px; width: 108px; }
+
+  .blend-track {
+    position: relative;
+    height: 5px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent-vorp), var(--accent-volr));
+    opacity: 0.85;
+  }
+
+  .blend-track.flat { background: var(--border); }
+
+  .blend-dot {
+    position: absolute;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin-top: -4.5px;
+    margin-left: -4.5px;
+    border-radius: 50%;
+    background: var(--text-primary);
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+
+  tbody tr:hover .blend-dot { box-shadow: 0 0 0 2px var(--surface-raised); }
   .col-vorp { color: var(--accent-vorp); }
   .col-volr { color: var(--accent-volr); }
   .col-sleeper { color: var(--accent-sleeper); }
@@ -481,8 +509,9 @@
     { key: 'name', label: 'Player' },
     { key: 'position', label: 'Pos' },
     { key: 'points', label: 'Pts' },
-    { key: 'vorp', label: 'VORP' },
-    { key: 'volr', label: 'VOLR' },
+    { key: 'vorp_dollar', label: 'VORP $' },
+    { key: 'lean', label: 'blend' },
+    { key: 'volr_dollar', label: 'VOLR $' },
     { key: 'price', label: 'Price' },
     { key: 'sleeper_dollar', label: 'Sleeper $' },
     { key: 'delta', label: 'vs Sleeper' }
@@ -565,8 +594,16 @@
     // Rows.
     var rows = D.players.map(function (p, i) {
       var price = prices[i];
+      // How far the blended price sits from the VORP end toward the VOLR end.
+      // Which end is the expensive one depends on the player: dropping the
+      // weight lifts the marginal band and, the pool being fixed, pays for it
+      // out of the top of the board.
+      var range = p.volr_dollar - p.vorp_dollar;
+      var lean = range === 0 ? 0.5 : (price - p.vorp_dollar) / range;
       return {
         p: p, price: price,
+        lean: Math.max(0, Math.min(1, lean)),
+        flat: range === 0,
         delta: (p.sleeper_dollar === null || p.sleeper_dollar === undefined) ? null : price - p.sleeper_dollar
       };
     });
@@ -581,8 +618,9 @@
 
     var k = state.sort, dir = state.dir;
     rows.sort(function (a, b) {
-      var av = (k === 'price' || k === 'delta') ? a[k] : a.p[k];
-      var bv = (k === 'price' || k === 'delta') ? b[k] : b.p[k];
+      var onRow = (k === 'price' || k === 'delta' || k === 'lean');
+      var av = onRow ? a[k] : a.p[k];
+      var bv = onRow ? b[k] : b.p[k];
       if (av === null || av === undefined) return 1;
       if (bv === null || bv === undefined) return -1;
       if (av < bv) return -dir;
@@ -604,8 +642,10 @@
           ' <span class="role">' + (p.is_starter ? 'starter' : 'bench') + '</span></td>' +
         '<td><span class="pos ' + p.position + '">' + p.position + '</span></td>' +
         '<td>' + p.points.toFixed(1) + '</td>' +
-        '<td class="' + (p.vorp < 0 ? 'muted' : 'col-vorp') + '">' + p.vorp.toFixed(1) + '</td>' +
-        '<td class="col-volr">' + p.volr.toFixed(1) + '</td>' +
+        '<td class="col-vorp">$' + p.vorp_dollar + '</td>' +
+        '<td class="blend"><div class="blend-track' + (r.flat ? ' flat' : '') + '">' +
+          '<div class="blend-dot" style="left:' + (100 * r.lean) + '%"></div></div></td>' +
+        '<td class="col-volr">$' + p.volr_dollar + '</td>' +
         '<td class="price">$' + r.price + '</td>' +
         '<td class="col-sleeper">' + money(p.sleeper_dollar) + '</td>' +
         '<td class="delta ' + dc + '">' +
@@ -623,6 +663,9 @@
     });
 
     document.getElementById('footer').innerHTML =
+      '<span class="col-vorp">VORP $</span> and <span class="col-volr">VOLR $</span> are this ' +
+      'model\'s own two ends &mdash; the price each player gets at <b>1.00</b> and at <b>0.00</b> &mdash; ' +
+      'so the dot is exactly where the slider has moved him between them. ' +
       'Every drafted player at a position is measured against a bar that slides slower than ' +
       'his points do, so his margin &mdash; and his price &mdash; rises with his points. That is ' +
       'why seam crossings stay at zero at every weight: a property of the shape, not a tuning result. ' +
