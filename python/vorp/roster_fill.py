@@ -20,6 +20,11 @@ class RosterFillPlayer:
 class Slot:
     id: int
     eligible_positions: Tuple[str, ...]
+    #: Which seat owns this slot, when the caller is tracking seats (see
+    #: docs/spec/vorp/06). The matching ignores it entirely -- it exists so a
+    #: slot in the league-wide flat list can be traced back to its owner.
+    #: None for callers that only care about league-wide demand.
+    seat_id: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -60,11 +65,15 @@ def _try_assign(
     return False
 
 
-def solve_optimal_fill(players: Sequence[RosterFillPlayer], slots: Sequence[Slot]) -> Set[str]:
-    """Processing players by points descending and greedily seating each one
-    (via augmenting path) is optimal here because the set of simultaneously
-    placeable players forms a transversal matroid — see
-    docs/spec/vorp/01-calculating-replacement.md.
+def assign_to_slots(
+    players: Sequence[RosterFillPlayer], slots: Sequence[Slot]
+) -> Dict[int, str]:
+    """The fill, keeping *where* each player was seated: slot id -> player id.
+
+    `solve_optimal_fill` is this with the slot ids dropped. Callers that track
+    seats need the assignment itself -- which of a seat's slots are still open
+    is exactly this matching run over that one seat's slots, rather than a
+    separate greedy rule that would depend on buy order (docs/spec/vorp/06).
     """
     ordered = sorted(players, key=lambda p: (-p.points, p.player_id))
 
@@ -72,7 +81,16 @@ def solve_optimal_fill(players: Sequence[RosterFillPlayer], slots: Sequence[Slot
     for player in ordered:
         _try_assign(player, slots, slot_occupant, set())
 
-    return {p.player_id for p in slot_occupant.values()}
+    return {slot_id: player.player_id for slot_id, player in slot_occupant.items()}
+
+
+def solve_optimal_fill(players: Sequence[RosterFillPlayer], slots: Sequence[Slot]) -> Set[str]:
+    """Processing players by points descending and greedily seating each one
+    (via augmenting path) is optimal here because the set of simultaneously
+    placeable players forms a transversal matroid — see
+    docs/spec/vorp/01-calculating-replacement.md.
+    """
+    return set(assign_to_slots(players, slots).values())
 
 
 def summarize_by_position(

@@ -9,7 +9,10 @@ The model (see vorp/models.py, `progressive_blend`, and docs/spec/vorp/04):
     bar(p) = w(p) * replacement_level + (1 - w(p)) * last_rostered_level
     price  = apportion(teams * budget, max(0, points - bar(p)))
 
-The top `full_weight_share` of starters sit above the ramp entirely, priced
+`w_floor` is the only dial, and a human sets it -- on the slider in the
+exported page, or with --w-floor to choose where that slider starts.
+
+The top `FULL_WEIGHT_SHARE` of starters sit above the ramp entirely, priced
 against replacement level exactly as a starter should be. Below them the bar
 slides toward the last-rostered level, so a marginal starter and a strong
 bench pick land on one continuum instead of falling off a cliff between two
@@ -25,7 +28,7 @@ Writes data/blended-price-{season}.json plus a standalone .html and the
 .artifact.html fragment to publish.
 
 Usage: python scripts/blended_price.py [season] [--window=season|wk1_3]
-                                       [--w-floor=0.5] [--full-weight-share=0.75]
+                                       [--w-floor=0.5]
 """
 
 from __future__ import annotations
@@ -42,7 +45,7 @@ from vorp.bid_value import apportion_with_floor, floor_pressure  # noqa: E402
 from vorp.csv_loader import load_players_from_csv, projections_csv_path, REPO_ROOT  # noqa: E402
 from vorp.league_config import LEAGUE_CONFIG  # noqa: E402
 from vorp.models import (  # noqa: E402
-    DEFAULT_FULL_WEIGHT_SHARE,
+    FULL_WEIGHT_SHARE,
     DEFAULT_W_FLOOR,
     blend_weights,
 )
@@ -67,13 +70,7 @@ def main() -> None:
         "--w-floor",
         type=float,
         default=DEFAULT_W_FLOOR,
-        help="blend weight at the last-rostered level (1.0 = pure VORP)",
-    )
-    parser.add_argument(
-        "--full-weight-share",
-        type=float,
-        default=DEFAULT_FULL_WEIGHT_SHARE,
-        help="top share of starters priced entirely off replacement level",
+        help="where the slider starts; the one dial (1.0 = pure VORP)",
     )
     args = parser.parse_args()
 
@@ -83,9 +80,7 @@ def main() -> None:
     players = load_players_from_csv(csv_path, points_column=POINTS_COLUMNS[args.window])
     meta = load_player_meta(csv_path)
 
-    replacement, last_rostered, vorp_bar, volr_bar, ramps = blend_weights(
-        players, config, args.full_weight_share, args.w_floor
-    )
+    replacement, last_rostered, vorp_bar, volr_bar, ramps = blend_weights(players, config)
     by_id = {p.player_id: p for p in players}
     starters = set(replacement.selected_player_ids)
     drafted = set(last_rostered.selected_player_ids)
@@ -230,7 +225,7 @@ def main() -> None:
             "roster_size": config.roster_size,
         },
         "w_floor": default_w,
-        "full_weight_share": args.full_weight_share,
+        "full_weight_share": FULL_WEIGHT_SHARE,
         "weights": WEIGHTS,
         "counts": {
             "starters": len(starters),
