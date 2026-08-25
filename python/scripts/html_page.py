@@ -1,10 +1,9 @@
-"""Shared by the HTML exports: the document skeleton a local file needs and
-a published Artifact doesn't.
+"""Shared by the HTML exports: wraps a template fragment in the document
+skeleton a local file needs.
 
-Templates in `templates/` are document *fragments* -- title, style, markup,
-script, no <html>/<head>/<body> -- because that's what publishing as an
-Artifact expects; the host supplies the skeleton. Opening the same fragment
-as a local file needs it back, or the browser renders in quirks mode.
+Templates in `templates/` are fragments -- title, style, markup, script, no
+<html>/<head>/<body> -- so this adds those back, or the browser renders in
+quirks mode.
 """
 
 from __future__ import annotations
@@ -21,9 +20,8 @@ LOCAL_HTML_SKELETON = """<!doctype html>
 """
 
 
-def write_pair(fragment: str, data_dir, stem: str) -> None:
-    """Write the Artifact fragment and the standalone local page side by side."""
-    (data_dir / f"{stem}.artifact.html").write_text(fragment, encoding="utf-8")
+def write_local(fragment: str, data_dir, stem: str) -> None:
+    """Write the standalone local page."""
     (data_dir / f"{stem}.html").write_text(
         LOCAL_HTML_SKELETON.format(fragment=fragment), encoding="utf-8"
     )

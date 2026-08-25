@@ -14,8 +14,7 @@ leaving the room faster than value does makes everyone left cheaper, and the
 reverse makes them dearer.
 
 Writes, per scenario, data/draft-demo-{season}-{scenario}.json and the local
-.html (open directly in a browser); the .artifact.html fragment is written
-alongside but isn't meant to be published. Also writes the landing page,
+.html (open directly in a browser). Also writes the landing page,
 data/draft-demo-{season}.html, linking to all of them.
 
 Usage: python scripts/draft_demo.py [season] [--picks=60] [--w-floor=1.0]
@@ -42,7 +41,7 @@ from vorp.models import blend_weights  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from bid_value import POINTS_COLUMNS, load_player_meta  # noqa: E402
-from html_page import write_pair  # noqa: E402
+from html_page import write_local  # noqa: E402
 
 TEMPLATES = Path(__file__).resolve().parent / "templates"
 DEMO_TEMPLATE_PATH = TEMPLATES / "draft_demo.html"
@@ -331,7 +330,7 @@ def write_scenario_page(payload: Dict, config, args, board: List[str], meta, by_
 
     template = DEMO_TEMPLATE_PATH.read_text(encoding="utf-8")
     fragment = template.replace("__DATA__", json.dumps(full, separators=(",", ":")))
-    write_pair(fragment, REPO_ROOT / "data", stem)
+    write_local(fragment, REPO_ROOT / "data", stem)
 
     last = full["frames"][-1]
     print(
@@ -449,7 +448,7 @@ def main() -> None:
 
         template = INDEX_TEMPLATE_PATH.read_text(encoding="utf-8")
         fragment = template.replace("__DATA__", json.dumps(index_payload, separators=(",", ":")))
-        write_pair(fragment, REPO_ROOT / "data", stem)
+        write_local(fragment, REPO_ROOT / "data", stem)
         print(f"Wrote data/{stem}.html -- the landing page, linking to all {len(keys)} scenarios")
 
 

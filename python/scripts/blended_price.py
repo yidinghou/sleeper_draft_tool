@@ -24,8 +24,7 @@ two-lens dial could never manage.
     w_floor = 1.0   pure VORP: bench picks fall below the bar and take the floor.
     w_floor = 0.0   the marginal band blends all the way to the last-rostered bar.
 
-Writes data/blended-price-{season}.json plus a standalone .html and the
-.artifact.html fragment to publish.
+Writes data/blended-price-{season}.json plus a standalone .html.
 
 Usage: python scripts/blended_price.py [season] [--window=season|wk1_3]
                                        [--w-floor=0.5]
@@ -53,7 +52,7 @@ from vorp.models import (  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from bid_value import POINTS_COLUMNS, load_player_meta  # noqa: E402
-from html_page import write_pair  # noqa: E402
+from html_page import write_local  # noqa: E402
 
 HTML_TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "blended_price.html"
 
@@ -265,8 +264,8 @@ def main() -> None:
 
     template = HTML_TEMPLATE_PATH.read_text(encoding="utf-8")
     fragment = template.replace("__DATA__", json.dumps(payload, separators=(",", ":")))
-    write_pair(fragment, REPO_ROOT / "data", stem)
-    print(f"Wrote data/{stem}.artifact.html (publish) and data/{stem}.html (open)")
+    write_local(fragment, REPO_ROOT / "data", stem)
+    print(f"Wrote data/{stem}.html")
 
     s = solved[default_w][2]
     print(
