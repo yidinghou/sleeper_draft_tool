@@ -16,9 +16,9 @@ from typing import Callable, Dict, List, Optional, Set
 
 from .bid_value import apportion_with_floor, floor_pressure, _effective_bar
 from .last_rostered import calculate_last_rostered_levels
-from .league_config import FLEX_ELIGIBILITY, POSITIONS, STREAMING_POSITIONS, LeagueConfig
+from .league.config import FLEX_ELIGIBILITY, POSITIONS, STREAMING_POSITIONS, LeagueConfig
 from .replacement_level import calculate_replacement_levels
-from .roster_fill import RosterFillPlayer
+from .league.roster_fill import RosterFillPlayer
 
 Player = RosterFillPlayer
 

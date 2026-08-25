@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from .league_config import (
+from .config import (
     FLEX_ELIGIBILITY,
     POSITIONS,
     STREAMING_POSITIONS,

@@ -43,7 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from vorp.bid_value import apportion_with_floor, floor_pressure  # noqa: E402
 from vorp.csv_loader import load_players_from_csv, projections_csv_path, REPO_ROOT  # noqa: E402
-from vorp.league_config import LEAGUE_CONFIG  # noqa: E402
+from vorp.league.config import LEAGUE_CONFIG  # noqa: E402
 from vorp.models import (  # noqa: E402
     FULL_WEIGHT_SHARE,
     DEFAULT_W_FLOOR,

@@ -113,7 +113,7 @@ QB to 77.2 and leaving the rest untouched.
 
 **Depends on:** `01-calculating-replacement.md`'s replacement level and
 selected set, `02-value-over-last-rostered.md`'s last-rostered level (flex-peer
-floor included) and selected set, league config (`python/vorp/league_config.py`).
+floor included) and selected set, league config (`python/vorp/league/config.py`).
 **Implemented in:** `python/vorp/models.py` (`progressive_blend`, sharing
 `apportion_with_floor` from `python/vorp/bid_value.py`); exported by
 `python/scripts/blended_price.py`. **Done when:** on a hand-written fixture the

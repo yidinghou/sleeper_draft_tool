@@ -24,7 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Callable, Dict, List, Optional, Sequence
 
-from .league_config import FLEX_ELIGIBILITY, POSITIONS, STREAMING_POSITIONS, LeagueConfig
+from .league.config import FLEX_ELIGIBILITY, POSITIONS, STREAMING_POSITIONS, LeagueConfig
 from .models import Model, Player, Valuation
 
 LAW = "law"

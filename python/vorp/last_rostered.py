@@ -8,9 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
 
-from .league_config import POSITIONS, LeagueConfig
-from .league_state import LeagueState
-from .roster_fill import RosterFillPlayer, Slot, solve_optimal_fill, summarize_by_position
+from .league.config import POSITIONS, LeagueConfig
+from .league.teams import LeagueState
+from .league.roster_fill import RosterFillPlayer, Slot, solve_optimal_fill, summarize_by_position
 
 LastRosteredPlayer = RosterFillPlayer
 
@@ -58,7 +58,7 @@ def _build_full_roster_slots(config: LeagueConfig) -> List[Slot]:
     second one, so it's excluded from the bench pool even though it's
     otherwise draftable.
 
-    The expansion itself lives in league_state, which owns the bench
+    The expansion itself lives in league.teams, which owns the bench
     eligibility rule described above — see docs/spec/vorp/06.
     """
     return LeagueState.opening(config).full_roster_slots()

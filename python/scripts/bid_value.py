@@ -58,7 +58,7 @@ from vorp.bid_value import (  # noqa: E402
 )
 from vorp.csv_loader import load_players_from_csv, projections_csv_path, REPO_ROOT  # noqa: E402
 from vorp.last_rostered import calculate_last_rostered_levels  # noqa: E402
-from vorp.league_config import LEAGUE_CONFIG  # noqa: E402
+from vorp.league.config import LEAGUE_CONFIG  # noqa: E402
 from vorp.replacement_level import calculate_replacement_levels  # noqa: E402
 
 

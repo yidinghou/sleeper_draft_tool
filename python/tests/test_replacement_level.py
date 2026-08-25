@@ -1,6 +1,6 @@
 from dataclasses import replace
 
-from vorp.league_config import LEAGUE_CONFIG, LeagueConfig
+from vorp.league.config import LEAGUE_CONFIG, LeagueConfig
 from vorp.replacement_level import ReplacementPlayer, calculate_replacement_levels
 
 # A minimal league forcing real flex contention: 2 concrete RB slots,

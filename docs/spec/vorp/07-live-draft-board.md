@@ -104,7 +104,7 @@ input this needs.
 `01-calculating-replacement.md` and `02-value-over-last-rostered.md` for the two
 bars, `04-blended-bar-pricing.md` for the pricing model.
 **Implemented in:** `python/vorp/board.py` (`price_board`), over
-`python/vorp/league_state.py`; served by `python/scripts/draft_board.py`.
+`python/vorp/league/teams.py`; served by `python/scripts/draft_board.py`.
 **Done when:** with nothing sold the
 board reproduces `data/blended-price-2026.json`'s prices exactly, one sale
 removes exactly one player and one slot from the priced board, and the laws in

@@ -97,9 +97,9 @@ per-seat matching runs over one seat's 16 slots, not the league's 192.
 ## Reference
 
 **Depends on:** nothing upstream — this is the substrate `01`–`05` build on.
-**Implemented in:** `python/vorp/league_state.py` (`Seat`, `LeagueState`), with the
-roster template staying in `python/vorp/league_config.py` and the slot assignment
-exposed from `python/vorp/roster_fill.py`; consumed by
+**Implemented in:** `python/vorp/league/teams.py` (`Seat`, `LeagueState`), with the
+roster template staying in `python/vorp/league/config.py` and the slot assignment
+exposed from `python/vorp/league/roster_fill.py`; consumed by
 `python/vorp/replacement_level.py` and `python/vorp/last_rostered.py`. **Done when:**
 the opening slot list has the same per-position capacity as the expansion it
 replaces, `data/blended-price-2026.json` regenerates byte-identical, and one sale

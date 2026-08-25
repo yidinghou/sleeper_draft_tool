@@ -1,4 +1,4 @@
-from vorp.league_config import LeagueConfig
+from vorp.league.config import LeagueConfig
 from vorp.models import Player, points_proportional, progressive_blend, starters_only
 from vorp.principles import (
     LAW,

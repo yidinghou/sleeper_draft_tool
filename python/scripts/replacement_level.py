@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from vorp.csv_loader import load_players_from_csv, projections_csv_path, REPO_ROOT  # noqa: E402
-from vorp.league_config import LEAGUE_CONFIG, POSITIONS  # noqa: E402
+from vorp.league.config import LEAGUE_CONFIG, POSITIONS  # noqa: E402
 from vorp.replacement_level import calculate_replacement_levels  # noqa: E402
 
 

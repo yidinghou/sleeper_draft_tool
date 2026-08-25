@@ -8,9 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
 
-from .league_config import POSITIONS, LeagueConfig
-from .league_state import LeagueState
-from .roster_fill import RosterFillPlayer, Slot, solve_optimal_fill, summarize_by_position
+from .league.config import POSITIONS, LeagueConfig
+from .league.teams import LeagueState
+from .league.roster_fill import RosterFillPlayer, Slot, solve_optimal_fill, summarize_by_position
 
 #: Same shape as RosterFillPlayer; aliased for readability at call sites.
 ReplacementPlayer = RosterFillPlayer
@@ -47,7 +47,7 @@ def _build_starting_slots(config: LeagueConfig) -> List[Slot]:
     """Pool every team's starting slots (concrete + flex) into one flat list
     of slot instances.
 
-    The expansion itself lives in league_state, so that mid-draft the same
+    The expansion itself lives in league.teams, so that mid-draft the same
     list can be built from what each seat has actually filled rather than
     from `count * teams` — see docs/spec/vorp/06.
     """

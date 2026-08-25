@@ -9,8 +9,8 @@ import csv
 from pathlib import Path
 from typing import List
 
-from .league_config import POSITIONS
-from .roster_fill import RosterFillPlayer
+from .league.config import POSITIONS
+from .league.roster_fill import RosterFillPlayer
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 

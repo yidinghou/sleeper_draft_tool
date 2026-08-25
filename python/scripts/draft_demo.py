@@ -35,8 +35,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from vorp.bid_value import apportion_with_floor  # noqa: E402
 from vorp.csv_loader import load_players_from_csv, projections_csv_path, REPO_ROOT  # noqa: E402
-from vorp.league_config import LEAGUE_CONFIG  # noqa: E402
-from vorp.league_state import LeagueState  # noqa: E402
+from vorp.league.config import LEAGUE_CONFIG  # noqa: E402
+from vorp.league.teams import LeagueState  # noqa: E402
 from vorp.models import blend_weights  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
