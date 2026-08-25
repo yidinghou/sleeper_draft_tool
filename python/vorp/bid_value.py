@@ -1,47 +1,17 @@
-"""03 · Translating VORP into a bid amount.
+"""03 · Turning a margin over a bar into whole dollars.
 
-See docs/spec/vorp/03-vorp-to-bid.md.
+The apportionment every lens and every model shares: reserve each member's
+min_bid, split the rest by margin, and land on exactly the pool. See
+docs/spec/vorp/03-vorp-to-bid.md.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Dict, List
 
-from .last_rostered import calculate_last_rostered_levels
-from .league_config import LeagueConfig
-from .replacement_level import calculate_replacement_levels
 from .roster_fill import RosterFillPlayer
 
 BidPlayer = RosterFillPlayer
-
-#: Default share of the WHOLE budget reserved for starters, roughly
-#: matching how a real auction's money splits. A tunable knob on the
-#: valuation function, not a structural fact about any league.
-DEFAULT_STARTER_BUDGET_PCT = 0.90
-
-
-@dataclass(frozen=True)
-class BudgetSplit:
-    """The one explicit division of `teams * budget`, per 03's spec.
-
-    Every dollar figure in this module draws on `starter_pool` or
-    `bench_pool` -- nothing re-derives a budget of its own. The min_bid
-    floor is reserved *inside* whichever pool is paying, from that pool's
-    own members, not off the top of the combined budget.
-    """
-
-    total: int
-    starter_pool: int
-    bench_pool: int
-
-
-def split_budget(
-    config: LeagueConfig, starter_budget_pct: float = DEFAULT_STARTER_BUDGET_PCT
-) -> BudgetSplit:
-    total = config.teams * config.budget
-    starter_pool = round(total * starter_budget_pct)
-    return BudgetSplit(total=total, starter_pool=starter_pool, bench_pool=total - starter_pool)
 
 
 def floor_pressure(pool: int, member_count: int, min_bid: int) -> float:
@@ -61,14 +31,6 @@ def apportion_with_floor(pool: int, weights: Dict[str, float], min_bid: int) -> 
     floor_total = len(weights) * min_bid
     shares = apportion(max(0, pool - floor_total), weights)
     return {player_id: min_bid + share for player_id, share in shares.items()}
-
-
-@dataclass(frozen=True)
-class BidResult:
-    #: player_id -> whole-dollar bid, >= config.min_bid. Only players in
-    #: 02's full-roster selected set appear here; everyone else is
-    #: unreachable, not $0.
-    bids: Dict[str, int]
 
 
 def apportion(pool: int, weights: Dict[str, float]) -> Dict[str, int]:
@@ -116,52 +78,3 @@ def _effective_bar(level: float | None, position: str, players: List[BidPlayer])
         return level
     at_position = [p.points for p in players if p.position == position]
     return min(at_position) if at_position else 0.0
-
-
-def calculate_bids(
-    players: List[BidPlayer],
-    config: LeagueConfig,
-    starter_budget_pct: float = DEFAULT_STARTER_BUDGET_PCT,
-) -> BidResult:
-    replacement = calculate_replacement_levels(players, config)
-    last_rostered = calculate_last_rostered_levels(players, config)
-
-    by_id = {p.player_id: p for p in players}
-    starters = replacement.selected_player_ids
-    bench_only = last_rostered.selected_player_ids - starters
-
-    split = split_budget(config, starter_budget_pct)
-    starter_pool, bench_pool = split.starter_pool, split.bench_pool
-
-    # Nobody to spend the bench pool on: fold it into the starter pool so
-    # the bids still reconcile to the whole budget.
-    if not bench_only:
-        starter_pool += bench_pool
-        bench_pool = 0
-
-    starter_weights = {
-        player_id: by_id[player_id].points
-        - _effective_bar(
-            replacement.by_position[by_id[player_id].position].replacement_level,
-            by_id[player_id].position,
-            players,
-        )
-        for player_id in starters
-    }
-    bench_weights = {
-        player_id: by_id[player_id].points
-        - _effective_bar(
-            last_rostered.by_position[by_id[player_id].position].last_rostered_level,
-            by_id[player_id].position,
-            players,
-        )
-        for player_id in bench_only
-    }
-
-    # Each pool reserves its own members' floors, per 03's explicit rule.
-    bids = {
-        **apportion_with_floor(starter_pool, starter_weights, config.min_bid),
-        **apportion_with_floor(bench_pool, bench_weights, config.min_bid),
-    }
-
-    return BidResult(bids=bids)
