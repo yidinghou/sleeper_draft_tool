@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Scripted drafts, replayed against the live league state -- see
-docs/spec/vorp/06.
+docs/spec/league/03-seats-and-sales.md.
 
 The pre-draft price list can't show what the seat/slot model buys us, because
 pre-draft the model is deliberately invisible: every slot is open and the

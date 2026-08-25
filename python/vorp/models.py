@@ -52,7 +52,7 @@ def _bars(players: List[Player], config: LeagueConfig, state=None):
     """Both solved bars, plus who each fill selected. Shared by the models
     that use the optimal fill; a model is free to ignore it.
 
-    `state` is the live league (docs/spec/vorp/06); None means the pre-draft
+    `state` is the live league (docs/spec/league/03-seats-and-sales.md); None means the pre-draft
     board, where every slot is open.
     """
     replacement = calculate_replacement_levels(players, config, state)

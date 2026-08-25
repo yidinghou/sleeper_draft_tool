@@ -59,7 +59,7 @@ def _build_full_roster_slots(config: LeagueConfig) -> List[Slot]:
     otherwise draftable.
 
     The expansion itself lives in league.teams, which owns the bench
-    eligibility rule described above — see docs/spec/vorp/06.
+    eligibility rule described above — see docs/spec/league/03-seats-and-sales.md.
     """
     return LeagueState.opening(config).full_roster_slots()
 

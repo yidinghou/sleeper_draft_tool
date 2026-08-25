@@ -49,7 +49,7 @@ def _build_starting_slots(config: LeagueConfig) -> List[Slot]:
 
     The expansion itself lives in league.teams, so that mid-draft the same
     list can be built from what each seat has actually filled rather than
-    from `count * teams` — see docs/spec/vorp/06.
+    from `count * teams` — see docs/spec/league/03-seats-and-sales.md.
     """
     return LeagueState.opening(config).starting_slots()
 

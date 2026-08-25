@@ -21,7 +21,7 @@ class Slot:
     id: int
     eligible_positions: Tuple[str, ...]
     #: Which seat owns this slot, when the caller is tracking seats (see
-    #: docs/spec/vorp/06). The matching ignores it entirely -- it exists so a
+    #: docs/spec/league/03-seats-and-sales.md). The matching ignores it entirely -- it exists so a
     #: slot in the league-wide flat list can be traced back to its owner.
     #: None for callers that only care about league-wide demand.
     seat_id: Optional[int] = None
@@ -73,7 +73,7 @@ def assign_to_slots(
     `solve_optimal_fill` is this with the slot ids dropped. Callers that track
     seats need the assignment itself -- which of a seat's slots are still open
     is exactly this matching run over that one seat's slots, rather than a
-    separate greedy rule that would depend on buy order (docs/spec/vorp/06).
+    separate greedy rule that would depend on buy order (docs/spec/league/03-seats-and-sales.md).
     """
     ordered = sorted(players, key=lambda p: (-p.points, p.player_id))
 

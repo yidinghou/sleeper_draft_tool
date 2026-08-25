@@ -1,4 +1,4 @@
-"""The league as seats holding real slots — see docs/spec/vorp/06.
+"""The league as seats holding real slots — see docs/spec/league/03-seats-and-sales.md.
 
 `LeagueConfig` is a *template*: one seat's worth of roster spots, per team. It
 is the right shape for describing the rules and the wrong shape for describing
@@ -29,7 +29,8 @@ from .roster_fill import RosterFillPlayer, Slot, assign_to_slots
 #: Seat id given to a sale whose buyer we don't know — manual entry, where the
 #: room says "Gibbs, $60" and nobody records who won him. The slot and the
 #: money still leave the league, so every league-wide number stays exact; it is
-#: only this seat's own budget and max bid that become fiction. See 06's catch.
+#: only this seat's own budget and max bid that become fiction. See
+#: docs/spec/league/03-seats-and-sales.md's catch.
 UNKNOWN_SEAT = -1
 
 

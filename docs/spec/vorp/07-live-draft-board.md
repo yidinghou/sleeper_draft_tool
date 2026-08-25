@@ -1,12 +1,9 @@
 # 07 · Live draft board (FAQ) — WIP
 
 > **Work in progress — not yet implemented.** Depends on
-> [06 · League, teams and slots](06-league-teams-and-slots.md), which specifies the
-> seat-and-slot model this board reprices against. Until 06 is built, the residual
-> mechanics described below have no substrate: `LeagueConfig` counts slots per team
-> and the fill multiplies by `teams`, so the finest expressible change is twelve
-> slots, not one sale. Expect the residual-state answers and the Reference section
-> here to be revised once 06 lands.
+> [the league model](../league/index.md), which specifies the seat-and-slot model
+> this board reprices against. Expect the residual-state answers and the
+> Reference section here to be revised as that model settles.
 
 ### What does this compute?
 
@@ -33,8 +30,8 @@ pool of  = every player not yet sold
 players
 ```
 
-A sale consumes **one** slot at the seat that bought the player, by `06`'s
-matching rule. Then
+A sale consumes **one** slot at the seat that bought the player, by
+[seats and sales](../league/03-seats-and-sales.md)'s matching rule. Then
 `01`'s replacement level and `02`'s last-rostered level are re-solved over the
 remaining players and remaining slots, and `progressive_blend` is re-run at
 `w_floor`, at `1.0`, and at `0.0` — giving a fresh price, VORP $, and VOLR $ for
@@ -42,11 +39,12 @@ everyone left. The model is not modified; it is handed a smaller league.
 
 ### Where does the residual league state come from?
 
-From `06`, which models the league as seats holding real slots rather than
-per-team counts. That is what makes a single sale expressible: it removes one
-slot from the league's open list and its price from the pool. This board adds
-no state model of its own — it hands `06`'s residual state to `04`'s pricing
-model and renders the result.
+From [seats and sales](../league/03-seats-and-sales.md), which models the
+league as seats holding real slots rather than per-team counts. That is what
+makes a single sale expressible: it removes one slot from the league's open
+list and its price from the pool. This board adds no state model of its own
+— it hands that residual state to `04`'s pricing model and renders the
+result.
 
 ### What's the output, precisely?
 
@@ -100,9 +98,9 @@ input this needs.
 
 ## Reference
 
-**Depends on:** `06-league-teams-and-slots.md` for the residual league state,
-`01-calculating-replacement.md` and `02-value-over-last-rostered.md` for the two
-bars, `04-blended-bar-pricing.md` for the pricing model.
+**Depends on:** [the league model](../league/index.md) for the residual league
+state, `01-calculating-replacement.md` and `02-value-over-last-rostered.md` for
+the two bars, `04-blended-bar-pricing.md` for the pricing model.
 **Implemented in:** `python/vorp/board.py` (`price_board`), over
 `python/vorp/league/teams.py`; served by `python/scripts/draft_board.py`.
 **Done when:** with nothing sold the
