@@ -381,6 +381,30 @@
   .col-sleeper { color: var(--accent-sleeper); }
   .muted { color: var(--text-faint); }
   .price { font-weight: 600; font-size: 14px; }
+
+  /* The margin in points under the dollars it was apportioned from: the
+     raw input on top of the derived number, so a price can be checked
+     against the thing that produced it without leaving the row. Inherits
+     its column's accent, dimmed, so the dollars still lead. */
+  .pts {
+    display: block;
+    margin-top: 3px;
+    font-size: 11px;
+    font-weight: 400;
+    color: inherit;
+    opacity: 0.62;
+  }
+
+  .pts.zero { opacity: 0.38; }
+
+  thead th small {
+    display: block;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    opacity: 0.6;
+    margin-top: 2px;
+  }
   .delta.up { color: var(--up); }
   .delta.down { color: var(--warn); }
 
@@ -459,6 +483,18 @@
 
   var state = { w: D.w_floor, pos: 'ALL', query: '', sort: 'price', dir: -1 };
   var money = function (v) { return v === null || v === undefined ? '&mdash;' : '$' + v; };
+
+  // The margin in points, under the dollars it bought. A drafted player can
+  // sit BELOW a bar -- every bench pick is below replacement level, that
+  // being what makes him a bench pick -- so the sign is shown, not floored.
+  // Floor the margin and the two columns would read identically for most of
+  // the bench, which is the one place the reader needs them to differ.
+  var pts = function (v) {
+    if (v === null || v === undefined) return '';
+    var sign = v > 0 ? '+' : (v < 0 ? '−' : '');
+    return '<span class="pts' + (v === 0 ? ' zero' : '') + '">' +
+      sign + Math.abs(v).toFixed(1) + ' pts</span>';
+  };
   var key = function (w) { return w.toFixed(2); };
 
   var starting = L.roster_size - L.bench_slots;
@@ -509,9 +545,9 @@
     { key: 'name', label: 'Player' },
     { key: 'position', label: 'Pos' },
     { key: 'points', label: 'Pts' },
-    { key: 'vorp_dollar', label: 'VORP $' },
+    { key: 'vorp_dollar', label: 'VORP $', sub: 'over replacement' },
     { key: 'lean', label: 'blend' },
-    { key: 'volr_dollar', label: 'VOLR $' },
+    { key: 'volr_dollar', label: 'VOLR $', sub: 'over last rostered' },
     { key: 'price', label: 'Price' },
     { key: 'sleeper_dollar', label: 'Sleeper $' },
     { key: 'delta', label: 'vs Sleeper' }
@@ -630,7 +666,8 @@
 
     headEl.innerHTML = columns.map(function (c) {
       return '<th data-key="' + c.key + '"' + (state.sort === c.key ? ' class="sorted"' : '') + '>' +
-        c.label + (state.sort === c.key ? (state.dir === 1 ? ' &uarr;' : ' &darr;') : '') + '</th>';
+        c.label + (state.sort === c.key ? (state.dir === 1 ? ' &uarr;' : ' &darr;') : '') +
+        (c.sub ? '<small>pts ' + c.sub + '</small>' : '') + '</th>';
     }).join('');
 
     document.getElementById('tbody').innerHTML = rows.map(function (r) {
@@ -642,14 +679,15 @@
           ' <span class="role">' + (p.is_starter ? 'starter' : 'bench') + '</span></td>' +
         '<td><span class="pos ' + p.position + '">' + p.position + '</span></td>' +
         '<td>' + p.points.toFixed(1) + '</td>' +
-        '<td class="col-vorp">$' + p.vorp_dollar + '</td>' +
+        '<td class="col-vorp">$' + p.vorp_dollar + pts(p.vorp) + '</td>' +
         '<td class="blend"><div class="blend-track' + (r.flat ? ' flat' : '') + '">' +
           '<div class="blend-dot" style="left:' + (100 * r.lean) + '%"></div></div></td>' +
-        '<td class="col-volr">$' + p.volr_dollar + '</td>' +
+        '<td class="col-volr">$' + p.volr_dollar + pts(p.volr) + '</td>' +
         '<td class="price">$' + r.price + '</td>' +
         '<td class="col-sleeper">' + money(p.sleeper_dollar) + '</td>' +
         '<td class="delta ' + dc + '">' +
-          (r.delta === null ? '&mdash;' : (r.delta > 0 ? '+' : '') + '$' + r.delta) + '</td>' +
+          (r.delta === null ? '&mdash;'
+            : (r.delta > 0 ? '+$' : (r.delta < 0 ? '−$' : '$')) + Math.abs(r.delta)) + '</td>' +
         '</tr>';
     }).join('');
 
@@ -666,6 +704,10 @@
       '<span class="col-vorp">VORP $</span> and <span class="col-volr">VOLR $</span> are this ' +
       'model\'s own two ends &mdash; the price each player gets at <b>1.00</b> and at <b>0.00</b> &mdash; ' +
       'so the dot is exactly where the slider has moved him between them. ' +
+      'Under each is the margin in <b>points</b> it was apportioned from &mdash; points over ' +
+      'replacement level and over the last-rostered level &mdash; so the dollars can be checked ' +
+      'against the thing that produced them. A negative margin is a player below that bar: ' +
+      'every bench pick is below replacement level, which is what makes him a bench pick. ' +
       'Every drafted player at a position is measured against a bar that slides slower than ' +
       'his points do, so his margin &mdash; and his price &mdash; rises with his points. That is ' +
       'why seam crossings stay at zero at every weight: a property of the shape, not a tuning result. ' +
