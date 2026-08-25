@@ -62,3 +62,4 @@ This is the number a static, pre-draft cheat sheet ranks players by.
 | [04 · Blended-bar pricing](04-blended-bar-pricing.md) | The shipped price: one sliding bar per position, monotonic by construction |
 | [05 · Principles](05-principles.md) | The laws every model has to satisfy, and the harness that runs them |
 | [06 · League, teams and slots](06-league-teams-and-slots.md) | The substrate: seats holding real slots, so a single sale is expressible |
+| [07 · Live draft board](07-live-draft-board.md) | **WIP** — the same price, re-solved against the players, slots and money actually left |
