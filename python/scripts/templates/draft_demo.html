@@ -703,7 +703,7 @@
 <div class="wrap">
   <header style="display: flex; flex-direction: column; gap: 8px">
     <a class="back-link" id="back-link" href="#">&larr; All scenarios</a>
-    <span class="eyebrow">docs/spec/vorp/06 &middot; league, teams and slots</span>
+    <span class="eyebrow">docs/spec/league &middot; seats, slots and sales</span>
     <h1 id="page-title">Auction Drift</h1>
     <p class="lede" id="page-blurb">
       The same board as the pre-draft price list, replayed pick by pick.
@@ -994,7 +994,9 @@
       });
 
       document.getElementById("row-count").textContent = rows.length + " of " + players.length;
-      document.getElementById("board-note").textContent =
+      // innerHTML, not textContent: the separator is an HTML entity, and
+      // textContent renders it as the literal characters "&middot;".
+      document.getElementById("board-note").innerHTML =
         "w_floor " + D.w_floor.toFixed(2) + " &middot; re-solved after pick " + f.pick;
 
       document.getElementById("thead-row").innerHTML = columns
