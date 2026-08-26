@@ -63,3 +63,4 @@ This is the number a static, pre-draft cheat sheet ranks players by.
 | [05 · Principles](05-principles.md) | The laws every model has to satisfy, and the harness that runs them |
 | [The league model](../league/index.md) | The substrate: the roster template, the slot-assignment engine, and seats holding real slots so a single sale is expressible |
 | [07 · Live draft board](07-live-draft-board.md) | **WIP** — the same price, re-solved against the players, slots and money actually left |
+| [08 · What one seat should bid](08-seat-value.md) | The board price corrected by a seat's own roster, then capped by its own budget |

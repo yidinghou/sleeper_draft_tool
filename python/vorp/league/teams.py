@@ -108,13 +108,18 @@ class LeagueState:
 
     # ---------------------------------------------------------------- slots
 
-    def _seat_slots(self, seat: Seat, bench: bool, start_id: int) -> List[Slot]:
+    def seat_slots(self, seat: Seat, bench: bool, start_id: int = 0) -> List[Slot]:
         """One seat's roster spots, as slot objects.
 
         `bench=False` gives the starting slots only (what 01 fills against);
         `bench=True` adds the bench (what 02 fills against). Bench slots take
         any position the template plays somewhere, minus the streamed ones —
         the rule that used to live in last_rostered.py.
+
+        Public because ../vorp/08 values a player against one seat's starting
+        slots, which is this list with `bench=False`. The league-wide callers
+        below pass `start_id` to keep slot ids unique across seats; a caller
+        looking at a single seat can leave it alone.
         """
         slots: List[Slot] = []
         next_id = start_id
@@ -173,7 +178,7 @@ class LeagueState:
                 # The synthetic seat is an accounting device, not a 13th team;
                 # it owns no roster template and contributes no demand.
                 continue
-            seat_slots = self._seat_slots(seat, bench=bench, start_id=next_id)
+            seat_slots = self.seat_slots(seat, bench=bench, start_id=next_id)
             next_id += len(seat_slots)
             slots.extend(seat_slots)
         return slots
@@ -186,7 +191,7 @@ class LeagueState:
         would depend on the order the seat happened to buy in; the matching
         does not.
         """
-        slots = self._seat_slots(seat, bench=bench, start_id=start_id)
+        slots = self.seat_slots(seat, bench=bench, start_id=start_id)
         players = [
             RosterFillPlayer(player_id=b.player_id, position=b.position, points=0.0)
             for b in seat.bought
@@ -203,7 +208,7 @@ class LeagueState:
         for seat in self.seats:
             if seat.seat_id == UNKNOWN_SEAT:
                 continue
-            seat_slots = self._seat_slots(seat, bench=bench, start_id=next_id)
+            seat_slots = self.seat_slots(seat, bench=bench, start_id=next_id)
             filled = self._filled_slot_ids(seat, bench=bench, start_id=next_id)
             next_id += len(seat_slots)
             slots.extend(s for s in seat_slots if s.id not in filled)
