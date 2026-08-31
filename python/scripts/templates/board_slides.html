@@ -296,6 +296,17 @@
     letter-spacing: 0.06em;
     color: var(--ink-faint);
     font-weight: 500;
+    white-space: nowrap;
+  }
+  #matrix th {
+    cursor: pointer;
+    user-select: none;
+  }
+  #matrix th:hover {
+    color: var(--ink);
+  }
+  .scroller {
+    overflow-x: auto;
   }
   .num {
     text-align: right;
@@ -311,11 +322,18 @@
       <div class="eyebrow">Buying power</div>
       <div class="power-row" id="power"></div>
     </div>
-    <div class="card placeholder">Draft-state table and roster cards -- next up.</div>
+    <div class="card">
+      <div class="eyebrow">Draft state by position</div>
+      <div id="state-table"></div>
+    </div>
+    <div class="card placeholder">Roster cards -- next up.</div>
   </section>
 
   <section class="slide" id="s-market" hidden>
-    <div class="card placeholder">Pool matrix -- next up.</div>
+    <div class="card">
+      <div class="eyebrow">Pool matrix</div>
+      <div id="matrix"></div>
+    </div>
   </section>
 
   <section class="slide" id="s-rosters" hidden>
@@ -436,9 +454,126 @@
       .join("");
   }
 
+  const POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"];
+
+  function renderStateTable(payload) {
+    const el = document.getElementById("state-table");
+    const drafted = {};
+    const spent = {};
+    for (const pos of POSITIONS) {
+      drafted[pos] = 0;
+      spent[pos] = 0;
+    }
+    for (const seat of payload.seats || []) {
+      for (const b of seat.bought) {
+        drafted[b.position] = (drafted[b.position] || 0) + 1;
+        spent[b.position] = (spent[b.position] || 0) + b.amount;
+      }
+    }
+
+    const positions = Object.keys(payload.levels || {});
+    const rows = positions
+      .map((pos) => {
+        const level = payload.levels[pos];
+        return `
+        <tr>
+          <td class="pos-${pos}">${pos}</td>
+          <td class="num">${drafted[pos] || 0}</td>
+          <td class="num money">${fmtMoney(spent[pos] || 0)}</td>
+          <td class="num">${level.replacement.toFixed(1)}</td>
+          <td class="num">${level.last_rostered.toFixed(1)}</td>
+        </tr>
+      `;
+      })
+      .join("");
+
+    el.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Pos</th><th class="num">Drafted</th><th class="num">Spent</th><th class="num">Replacement</th><th class="num">Last rostered</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  // Bargain/expected-price sort state persists across renders so a poll
+  // refresh doesn't reset the user's chosen column.
+  let matrixSortKey = "price";
+  let matrixSortDir = -1;
+
+  function renderMatrix(payload) {
+    const el = document.getElementById("matrix");
+    const byId = Object.fromEntries((payload.players || []).map((p) => [p.player_id, p]));
+
+    const rows = [...(payload.matrix || [])];
+    rows.sort((a, b) => {
+      const key = matrixSortKey;
+      const av = key === "position" ? (byId[a.player_id] || {}).position || "" : a[key] ?? 0;
+      const bv = key === "position" ? (byId[b.player_id] || {}).position || "" : b[key] ?? 0;
+      if (av < bv) return -1 * matrixSortDir;
+      if (av > bv) return 1 * matrixSortDir;
+      return 0;
+    });
+
+    const cols = [
+      ["player_id", "Player"],
+      ["position", "Pos"],
+      ["price", "Price"],
+      ["expected_price", "Expected"],
+      ["price_setter_bid", "2nd bid"],
+      ["winner", "Winner"],
+    ];
+    const head = cols
+      .map(([key, label]) => `<th data-key="${key}">${label}${matrixSortKey === key ? (matrixSortDir === -1 ? " ↓" : " ↑") : ""}</th>`)
+      .join("");
+
+    const body = rows
+      .map((row) => {
+        const p = byId[row.player_id] || {};
+        const winnerLabel =
+          row.winner !== null && row.winner !== undefined ? seatLabel(payload, row.winner) : "--";
+        return `
+        <tr>
+          <td>${row.player_id}</td>
+          <td class="pos-${p.position || ""}">${p.position || ""}</td>
+          <td class="num money">${fmtMoney(row.price)}</td>
+          <td class="num money">${fmtMoney(row.expected_price)}</td>
+          <td class="num money">${fmtMoney(row.price_setter_bid)}</td>
+          <td>${winnerLabel}</td>
+        </tr>
+      `;
+      })
+      .join("");
+
+    el.innerHTML = `
+      <div class="scroller">
+        <table>
+          <thead><tr>${head}</tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    `;
+
+    el.querySelectorAll("th").forEach((th) => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.key;
+        if (matrixSortKey === key) {
+          matrixSortDir *= -1;
+        } else {
+          matrixSortKey = key;
+          matrixSortDir = -1;
+        }
+        renderMatrix(payload);
+      });
+    });
+  }
+
   function renderAll(payload) {
     renderHeader(payload);
     renderPower(payload);
+    renderStateTable(payload);
+    renderMatrix(payload);
   }
 
   window.__renderAll = renderAll; // exposed for a static-payload smoke test
