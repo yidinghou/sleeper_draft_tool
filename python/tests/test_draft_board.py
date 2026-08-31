@@ -1,15 +1,16 @@
 """Board · server skeleton -- see docs/spec/board/01-live-data-ingestion.md
 and docs/spec/board/03-rendering-contract.md.
 
-Covers `build_state`, `build_payload`, `seat_matrix`, `plan_payload`, and
-`Board.refresh_from_file` -- the partial slice of the rendering contract
-implemented so far (pool/spent/spots_left/levels/players/matrix/seat_users/
-divisions/seat_order/my_seat/my_division/my_plan). `block` isn't built yet;
-see the module docstring in draft_board.py. Seat identity's own logic
+Covers `build_state`, `build_payload`, `seat_matrix`, `plan_payload`,
+`block_info`, and `Board.refresh_from_file` -- the partial slice of the
+rendering contract implemented so far (pool/spent/spots_left/levels/players/
+matrix/seat_users/divisions/seat_order/my_seat/my_division/my_plan/block).
+`block`'s `market`/`wk3VorpD` fields aren't wired in (no data source); see
+the module docstring in draft_board.py. Seat identity's own logic
 (random_fill, build_divisions, resolve_my_seat) is covered in
 test_seat_identity_and_divisions.py; `09`'s own properties (feasibility,
 greedy optimality, etc.) are covered in test_optimal_roster.py -- this file
-only checks that Board wires `my_plan` into the payload correctly.
+only checks that Board wires `my_plan`/`block` into the payload correctly.
 
 Most tests pass a small `matrix_top` -- the matrix runs one lineup solve per
 (player, real seat), so the shipped default (300, "the whole board") is slow
@@ -28,13 +29,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from draft_board import Board, build_payload, build_state, seat_matrix  # noqa: E402
+from draft_board import Board, block_info, build_payload, build_state, seat_matrix  # noqa: E402
 
 from vorp.board import price_board  # noqa: E402
 from vorp.league.config import LEAGUE_CONFIG  # noqa: E402
 from vorp.league.teams import UNKNOWN_SEAT  # noqa: E402
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mock-draft-small.json"
+NOMINATION_FIXTURE = Path(__file__).parent / "fixtures" / "mock-draft-with-nomination.json"
 
 
 def _players():
@@ -192,11 +194,72 @@ def test_board_payload_carries_my_plan_for_the_resolved_seat():
 
 
 def test_my_plan_absent_when_my_seat_is_unresolved():
-    from vorp.league.teams import UNKNOWN_SEAT
-
     payload = build_payload(
         build_state(_picks(), LEAGUE_CONFIG), _players(), LEAGUE_CONFIG, w_floor=1.0,
         matrix_top=5, my_seat=UNKNOWN_SEAT,
     )
     assert "my_plan" not in payload
     assert payload["my_seat"] == UNKNOWN_SEAT
+
+
+def _nomination_picks():
+    return json.loads(NOMINATION_FIXTURE.read_text())["picks"]
+
+
+def test_block_is_none_when_no_nomination():
+    payload = build_payload(
+        build_state(_picks(), LEAGUE_CONFIG), _players(), LEAGUE_CONFIG, w_floor=1.0, matrix_top=5
+    )
+    assert payload["block"] is None
+
+
+def test_block_info_carries_price_and_the_current_high_bid():
+    players = _players()
+    state = build_state(_nomination_picks(), LEAGUE_CONFIG)
+    remaining = [p for p in players if p.player_id not in state.sold()]
+    board = price_board(state, remaining, LEAGUE_CONFIG, w_floor=1.0)
+    nomination = json.loads(NOMINATION_FIXTURE.read_text())["nomination"]
+
+    block = block_info(nomination, remaining, board, matrix_rows=[])
+    assert block["player_id"] == "1466"
+    assert block["position"] == "TE"
+    assert block["price"] == board["rows"]["1466"]["price"]
+    assert block["highest_offer"] == 14
+    assert block["offering_slot"] == 9
+
+
+def test_block_bids_come_from_a_forced_matrix_row():
+    players = _players()
+    state = build_state(_nomination_picks(), LEAGUE_CONFIG)
+    remaining = [p for p in players if p.player_id not in state.sold()]
+    board = price_board(state, remaining, LEAGUE_CONFIG, w_floor=1.0)
+    nomination = {"player_id": "1466", "highest_offer": 14, "offering_slot": 9}
+
+    # Force the nominated player into a tiny matrix even though he's
+    # nowhere near the top by price -- exactly what build_payload does.
+    matrix = seat_matrix(state, remaining, players, board, matrix_top=1, force_ids=("1466",))
+    assert any(r["player_id"] == "1466" for r in matrix)
+
+    block = block_info(nomination, remaining, board, matrix)
+    assert len(block["bids"]) == LEAGUE_CONFIG.teams
+
+
+def test_block_is_none_for_an_already_sold_or_unpriced_player():
+    players = _players()
+    state = build_state(_picks(), LEAGUE_CONFIG)
+    remaining = [p for p in players if p.player_id not in state.sold()]
+    board = price_board(state, remaining, LEAGUE_CONFIG, w_floor=1.0)
+
+    # "19" was sold in _picks(); a made-up id was never priced at all.
+    assert block_info({"player_id": "19"}, remaining, board, matrix_rows=[]) is None
+    assert block_info({"player_id": "not-a-real-id"}, remaining, board, matrix_rows=[]) is None
+
+
+def test_board_payload_carries_block_from_the_picks_files_nomination():
+    board = Board(LEAGUE_CONFIG, _players(), w_floor=1.0, matrix_top=5)
+    board.set_picks_file(NOMINATION_FIXTURE)
+    payload = board.payload()
+    assert payload["block"]["player_id"] == "1466"
+    assert len(payload["block"]["bids"]) == LEAGUE_CONFIG.teams
+    # He was forced in even though he's not naturally in the top-5 matrix.
+    assert any(row["player_id"] == "1466" for row in payload["matrix"])
