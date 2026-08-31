@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
 """The live draft board server -- see docs/spec/board/index.md.
 
-Steps 2 and 4 of docs/spec/board/guide.md's build order: the server skeleton,
-`/state.json`, seat identity + divisions, the per-seat bid matrix, `my_plan`,
-and `block`. This is still a partial slice of the full rendering contract
-(docs/spec/board/03-rendering-contract.md): everything above is real, but
-`block`'s `market`/`wk3VorpD` fields aren't (no market-price or weeks-1-3
-data source is loaded here -- see `block_info`'s docstring). Sleeper polling
-(guide.md step 3) is also follow-up work; today this only reads
-`--picks-file`, whose optional top-level `"nomination"` key
-(`{player_id, highest_offer, offering_slot, ...}`, a shape this repo
-invented -- there's no spec-given format for a manual entry pane's
-nomination, only Sleeper's own `metadata`) is the only source of a live
-block. Identity is resolved from `random_fill` plus whatever a pick's
-`picked_by` happens to carry -- there is no real `draft`/`users` feed to
-seed pins from yet, outside of `--print-seats`, which does its own one-shot
-fetch.
+Steps 2, 3, and 4 of docs/spec/board/guide.md's build order: the server
+skeleton, `/state.json`, Sleeper polling, seat identity + divisions, the
+per-seat bid matrix, `my_plan`, and `block`. This is still a partial slice
+of the full rendering contract (docs/spec/board/03-rendering-contract.md):
+everything above is real, but `block`'s `market`/`wk3VorpD` fields aren't
+(no market-price or weeks-1-3 data source is loaded here -- see
+`block_info`'s docstring). Not yet built: the scrubber + frame cache
+(guide.md step 6) and the slide deck (step 5) -- `/board` and `templates/`
+don't exist yet, only the JSON payload does.
+
+Two source modes: `--picks-file <path>` (`file` mode, re-read on mtime
+change -- a hand-edited nomination key is the only source of a live block
+there, since there's no spec-given format for a manual entry pane's
+nomination, only Sleeper's own `metadata`; this repo invented
+`{player_id, highest_offer, offering_slot}`), or `--draft-id <id>` (`draft`
+mode, the default when `--picks-file` is omitted): a background `poller`
+thread drives `Board.poll_sleeper_once` at an adaptive cadence
+(`--poll`/`--poll-live`), durably saving the draft and appending to the bid
+ladder on every real change -- see `01-live-data-ingestion.md`.
 
 The matrix has no cache in front of it (that's guide.md step 6, not built),
 so it runs one lineup solve per `(player, real seat)` pair on every
@@ -24,6 +28,7 @@ so it runs one lineup solve per `(player, real seat)` pair on every
 Usage: python scripts/draft_board.py --picks-file <path> [--me 3] [--port 8770]
                                      [--season 2026] [--w-floor 1.0]
                                      [--matrix-top 300]
+       python scripts/draft_board.py --draft-id <id> [--poll 0.75] [--poll-live 0.2]
        python scripts/draft_board.py --draft-id <id> --print-seats
 """
 
@@ -33,6 +38,7 @@ import argparse
 import json
 import random
 import sys
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -728,6 +734,26 @@ def make_handler(board: Board):
     return Handler
 
 
+def poller(
+    board: "Board",
+    idle_interval: float,
+    live_interval: float,
+    stop_event: threading.Event,
+) -> None:
+    """Background loop driving `Board.poll_sleeper_once` at an adaptive
+    cadence -- see docs/spec/board/01-live-data-ingestion.md. `live_interval`
+    (fast) while a player is on the block, `idle_interval` (slow) otherwise:
+    latency is only felt during active bidding, and a missed raise can't be
+    recovered, so the fast cadence only runs when it actually matters. Both
+    rates are localhost-only Sleeper calls, so the fast one is essentially
+    free.
+    """
+    while not stop_event.is_set():
+        board.poll_sleeper_once()
+        interval = live_interval if board.nomination is not None else idle_interval
+        stop_event.wait(interval)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--picks-file", type=Path)
@@ -737,6 +763,10 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--w-floor", type=float, default=DEFAULT_W_FLOOR)
     parser.add_argument("--matrix-top", type=int, default=DEFAULT_MATRIX_TOP)
+    parser.add_argument("--poll", type=float, default=0.75, help="idle poll interval, seconds")
+    parser.add_argument(
+        "--poll-live", type=float, default=0.2, help="poll interval while a player is on the block"
+    )
     parser.add_argument(
         "--print-seats",
         action="store_true",
@@ -750,16 +780,28 @@ def main() -> None:
         print_seats(draft, users)
         return
 
-    if not args.picks_file:
-        parser.error("--picks-file is required (Sleeper polling isn't built yet)")
-
     config = LEAGUE_CONFIG
     players = load_players_from_csv(projections_csv_path(args.season))
     board = Board(config, players, args.w_floor, me_fallback=args.me, matrix_top=args.matrix_top)
-    board.set_picks_file(args.picks_file)
+
+    if args.picks_file:
+        board.set_picks_file(args.picks_file)
+        print(f"Serving on http://127.0.0.1:{args.port}/state.json (picks: {args.picks_file})")
+    else:
+        board.set_draft_id(args.draft_id)
+        stop_event = threading.Event()
+        thread = threading.Thread(
+            target=poller,
+            args=(board, args.poll, args.poll_live, stop_event),
+            daemon=True,
+        )
+        thread.start()
+        print(
+            f"Serving on http://127.0.0.1:{args.port}/state.json "
+            f"(polling draft {args.draft_id}, idle {args.poll}s / live {args.poll_live}s)"
+        )
 
     server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(board))
-    print(f"Serving on http://127.0.0.1:{args.port}/state.json (picks: {args.picks_file})")
     server.serve_forever()
 
 
