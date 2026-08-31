@@ -40,7 +40,7 @@ from typing import Any, Dict, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from vorp.board import price_board  # noqa: E402
-from vorp.csv_loader import load_players_from_csv, projections_csv_path  # noqa: E402
+from vorp.csv_loader import REPO_ROOT, load_players_from_csv, projections_csv_path  # noqa: E402
 from vorp.league.config import (  # noqa: E402
     DIVISIONS,
     LEAGUE_CONFIG,
@@ -461,6 +461,96 @@ def _nomination_from_sleeper(draft: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     }
 
 
+def _bid_log_path(draft_id: str) -> Path:
+    return REPO_ROOT / "data" / f"bid-log-{draft_id}.json"
+
+
+def _draft_save_path(draft_id: str) -> Path:
+    return REPO_ROOT / "data" / f"draft-{draft_id}.json"
+
+
+def _append_bid_log(path: Path, player_id: str, seat: int, amount: int) -> None:
+    """Append one bid rung for `player_id`, only if it differs from the last
+    recorded rung -- see docs/spec/analysis/01-bid-trends.md's format:
+    `{player_id: [{seat, amount}, ...]}`, `seat` 1-indexed (matching
+    `offering_slot`). Sleeper exposes only the current high bid, so this
+    ladder is a sample of the bidding reconstructed from poll history, not a
+    transcript of it -- a rung raised and outbid between two polls is never
+    recorded.
+    """
+    log: Dict[str, List[Dict[str, int]]] = (
+        json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    )
+    rungs = log.setdefault(player_id, [])
+    if rungs and rungs[-1]["seat"] == seat and rungs[-1]["amount"] == amount:
+        return
+    rungs.append({"seat": seat, "amount": amount})
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(log, indent=2) + "\n", encoding="utf-8")
+
+
+def _save_draft(path: Path, board: "Board") -> None:
+    """Durable mirror of the draft -- the shape
+    docs/spec/analysis/01-bid-trends.md's guide already documents for
+    `data/draft-<id>.json`: `{me?, seat_names?, picks: [{player_id, amount,
+    draft_slot, pick_no, position}]}`. Atomic (write to a temp file, then
+    rename) so a crash mid-write never leaves a half-written file
+    `load_saved_draft`/`--picks-file` could choke on. `seat_names` is
+    0-indexed (matching `board.seat_users`); `me` is 1-indexed, matching
+    `--me` and Sleeper's own `draft_slot` convention.
+    """
+    picks = []
+    for raw in board.raw_picks:
+        meta = raw.get("metadata") or {}
+        picks.append(
+            {
+                "player_id": str(raw.get("player_id") or meta.get("player_id")),
+                "amount": int(meta.get("amount") or 0),
+                "draft_slot": raw.get("draft_slot"),
+                "pick_no": raw.get("pick_no"),
+                "position": meta.get("position"),
+            }
+        )
+    envelope: Dict[str, Any] = {
+        "picks": picks,
+        "seat_names": {
+            str(seat_id): identity.get("display_name") or identity.get("username")
+            for seat_id, identity in board.seat_users.items()
+        },
+    }
+    if board.my_seat is not None:
+        envelope["me"] = board.my_seat + 1
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(envelope, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
+def load_saved_draft(
+    path: Path, config: LeagueConfig
+) -> Optional[Tuple[LeagueState, List[Dict[str, Any]]]]:
+    """Load a saved envelope -- the same shape `_save_draft` writes, and the
+    same shape `--picks-file` already reads -- so the board can seed from it
+    on startup and work offline before the first poll lands. Returns
+    `(state, picks)` in the internal pick shape (`player_id`/`position`/
+    `amount`/`draft_slot`); `None` if the file doesn't exist.
+    """
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    picks = [
+        {
+            "player_id": p["player_id"],
+            "position": p.get("position"),
+            "amount": p["amount"],
+            "draft_slot": p.get("draft_slot"),
+        }
+        for p in data.get("picks", [])
+    ]
+    return build_state(picks, config), picks
+
+
 class Board:
     """Holds the config, the loaded projections, and the live state under a
     single-threaded refresh -- see docs/spec/board/01-live-data-ingestion.md.
@@ -528,11 +618,18 @@ class Board:
     def set_draft_id(self, draft_id: str) -> None:
         """Switch to `draft` mode and do the first poll. `league_id` comes
         off the draft itself -- one cheap extra `/draft` fetch to learn it,
-        then `poll_sleeper_once(force=True)` does the real work.
+        then `poll_sleeper_once(force=True)` does the real work. If a
+        previously saved envelope exists (`data/draft-<id>.json`), it seeds
+        `state` first, so the board has something to show even if the very
+        first poll is slow or the first request lands before it returns.
         """
         self.mode = "draft"
         self.draft_id = draft_id
         self._last_fingerprint = None
+        saved = load_saved_draft(_draft_save_path(draft_id), self.config)
+        if saved is not None:
+            self.state, picks = saved
+            self._refresh_identity(picks)
         seed = fetch_draft(draft_id)
         self._users = fetch_league_users(seed["league_id"])
         self.poll_sleeper_once(force=True)
@@ -542,19 +639,43 @@ class Board:
         docs/spec/board/01-live-data-ingestion.md. A cheap `/draft` poll,
         `draft_fingerprint`-gated: only when it changes (or `force`) does
         this pay for the expensive `/draft/{id}/picks` refetch and rebuild
-        `state`. Returns whether picks were actually refetched.
+        `state`. On a refetch, also durably saves the draft
+        (`data/draft-<id>.json`) and, if a player is on the block, appends
+        its current high bid to the bid ladder (`data/bid-log-<id>.json`).
+        Returns whether picks were actually refetched.
+
+        A network failure never raises out of here -- it's printed and
+        treated as "nothing changed", leaving `state` as it was (the last
+        good poll, or whatever `load_saved_draft` seeded it with). A
+        background poller that dies on the first hiccup is useless; a
+        request handler that 500s because Sleeper had one slow response is
+        worse than serving slightly stale data.
         """
-        draft = fetch_draft(self.draft_id)
-        fingerprint = draft_fingerprint(draft)
-        if not force and fingerprint == self._last_fingerprint:
+        try:
+            draft = fetch_draft(self.draft_id)
+            fingerprint = draft_fingerprint(draft)
+            if not force and fingerprint == self._last_fingerprint:
+                return False
+            raw_picks = fetch_draft_picks(self.draft_id)
+        except Exception as exc:  # noqa: BLE001 -- deliberately broad, see above
+            print(f"poll_sleeper_once: {exc}", file=sys.stderr)
             return False
+
         self._last_fingerprint = fingerprint
         self._draft = draft
-        self.raw_picks = fetch_draft_picks(self.draft_id)
+        self.raw_picks = raw_picks
         picks = [_pick_from_sleeper(p) for p in self.raw_picks]
         self.state = build_state(picks, self.config)
         self.nomination = _nomination_from_sleeper(draft)
         self._refresh_identity(picks)
+        _save_draft(_draft_save_path(self.draft_id), self)
+        if self.nomination and self.nomination.get("offering_slot") is not None:
+            _append_bid_log(
+                _bid_log_path(self.draft_id),
+                self.nomination["player_id"],
+                self.nomination["offering_slot"],
+                self.nomination.get("highest_offer") or 0,
+            )
         return True
 
     def payload(self) -> Dict[str, Any]:
