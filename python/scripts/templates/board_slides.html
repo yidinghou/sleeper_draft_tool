@@ -1,0 +1,445 @@
+<title>Live Draft Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+/>
+<style>
+  :root {
+    --ground: #eff2f5;
+    --surface: #ffffff;
+    --surface-sunk: #e7ebf0;
+    --line: #d3dae2;
+    --line-soft: #e3e8ee;
+    --ink: #16202b;
+    --ink-soft: #47576a;
+    --ink-faint: #7b8b9c;
+    --accent: #1f4e79;
+    --accent-soft: #dbe6f1;
+    --up: #0e7c66;
+    --up-soft: #d5ece5;
+    --down: #b4432c;
+    --down-soft: #f6ddd7;
+    --brass: #8a6413;
+    --qb: #6d4b9e;
+    --rb: #0e7c66;
+    --wr: #1f4e79;
+    --te: #a8621c;
+    --def: #5c6b7a;
+    --radius: 6px;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: Archivo, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1720;
+      --surface: #16202b;
+      --surface-sunk: #101821;
+      --line: #2a3846;
+      --line-soft: #212e3a;
+      --ink: #e3eaf1;
+      --ink-soft: #a3b2c1;
+      --ink-faint: #71818f;
+      --accent: #7aaad6;
+      --accent-soft: #1c2f42;
+      --up: #46bfa0;
+      --up-soft: #14312a;
+      --down: #e3806c;
+      --down-soft: #3a1f19;
+      --brass: #d1a94a;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0f1720;
+    --surface: #16202b;
+    --surface-sunk: #101821;
+    --line: #2a3846;
+    --line-soft: #212e3a;
+    --ink: #e3eaf1;
+    --ink-soft: #a3b2c1;
+    --ink-faint: #71818f;
+    --accent: #7aaad6;
+    --accent-soft: #1c2f42;
+    --up: #46bfa0;
+    --up-soft: #14312a;
+    --down: #e3806c;
+    --down-soft: #3a1f19;
+    --brass: #d1a94a;
+  }
+
+  html {
+    color-scheme: light dark;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 72px; /* room for the floating nav */
+  }
+
+  .wrap {
+    max-width: 1360px;
+    margin: 0 auto;
+    padding: 24px 24px 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .slide {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .slide[hidden] {
+    display: none;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .money {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pos-QB {
+    color: var(--qb);
+  }
+  .pos-RB {
+    color: var(--rb);
+  }
+  .pos-WR {
+    color: var(--wr);
+  }
+  .pos-TE {
+    color: var(--te);
+  }
+  .pos-DEF {
+    color: var(--def);
+  }
+
+  /* -------------------------------------------------- header / block --- */
+
+  .header {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .block-hero {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .block-hero .name {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  .block-hero .price {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--accent);
+  }
+  .block-hero .empty {
+    font-size: 18px;
+    color: var(--ink-faint);
+    font-style: italic;
+  }
+  .block-hero .sub {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  .worth-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .worth-tile {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--surface-sunk);
+    border: 1px solid var(--line-soft);
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+  }
+  .worth-tile.mine {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .worth-tile .seat {
+    color: var(--ink-faint);
+  }
+
+  /* --------------------------------------------------- buying power ---- */
+
+  .power-row {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 6px;
+    align-items: end;
+    height: 90px;
+  }
+  .power-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    gap: 4px;
+  }
+  .power-bar .fill {
+    width: 100%;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: 3px 3px 0 0;
+    min-height: 2px;
+  }
+  .power-bar.mine .fill {
+    background: var(--brass);
+    border-color: var(--brass);
+  }
+  .power-bar .label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  /* --------------------------------------------------------- nav --------- */
+
+  .nav {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    z-index: 10;
+  }
+  .nav button {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    padding: 8px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .nav button.active {
+    background: var(--accent);
+    color: white;
+  }
+
+  .placeholder {
+    color: var(--ink-faint);
+    font-style: italic;
+    padding: 24px;
+    text-align: center;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th,
+  td {
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  th {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    font-weight: 500;
+  }
+  .num {
+    text-align: right;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+
+<div class="wrap">
+  <section class="slide" id="s-live">
+    <div class="card header" id="header"></div>
+    <div class="card">
+      <div class="eyebrow">Buying power</div>
+      <div class="power-row" id="power"></div>
+    </div>
+    <div class="card placeholder">Draft-state table and roster cards -- next up.</div>
+  </section>
+
+  <section class="slide" id="s-market" hidden>
+    <div class="card placeholder">Pool matrix -- next up.</div>
+  </section>
+
+  <section class="slide" id="s-rosters" hidden>
+    <div class="card placeholder">Roster cards -- next up.</div>
+  </section>
+</div>
+
+<nav class="nav">
+  <button data-slide="s-live" class="active">1 Live</button>
+  <button data-slide="s-market">2 Market</button>
+  <button data-slide="s-rosters">3 Rosters</button>
+</nav>
+
+<script>
+  const SLIDES = ["s-live", "s-market", "s-rosters"];
+
+  function showSlide(id) {
+    for (const s of SLIDES) {
+      document.getElementById(s).hidden = s !== id;
+    }
+    for (const btn of document.querySelectorAll(".nav button")) {
+      btn.classList.toggle("active", btn.dataset.slide === id);
+    }
+  }
+
+  document.querySelectorAll(".nav button").forEach((btn) => {
+    btn.addEventListener("click", () => showSlide(btn.dataset.slide));
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "1" || e.key === "2" || e.key === "3") {
+      showSlide(SLIDES[Number(e.key) - 1]);
+    } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      const current = SLIDES.findIndex((s) => !document.getElementById(s).hidden);
+      const delta = e.key === "ArrowRight" ? 1 : -1;
+      const next = Math.min(SLIDES.length - 1, Math.max(0, current + delta));
+      showSlide(SLIDES[next]);
+    }
+  });
+
+  function fmtMoney(n) {
+    return n === null || n === undefined ? "--" : `$${n}`;
+  }
+
+  function seatLabel(payload, seatId) {
+    const identity = (payload.seat_users || {})[seatId];
+    return (identity && (identity.display_name || identity.username)) || `Seat ${seatId + 1}`;
+  }
+
+  function seatOrder(payload) {
+    return payload.seat_order || (payload.seats || []).map((s) => s.seat_id);
+  }
+
+  function renderHeader(payload) {
+    const el = document.getElementById("header");
+    const block = payload.block;
+
+    if (!block) {
+      el.innerHTML = `
+        <div class="block-hero">
+          <span class="empty">Nobody on the block / waiting on a nomination</span>
+        </div>
+      `;
+      return;
+    }
+
+    const posClass = block.position ? `pos-${block.position}` : "";
+    const soldTag = block.sold ? " (just sold)" : "";
+    const currentBid = block.sold
+      ? fmtMoney(block.amount)
+      : fmtMoney(block.highest_offer);
+
+    let worthRow = "";
+    if (block.bids) {
+      const order = seatOrder(payload);
+      worthRow = `<div class="worth-row">${order
+        .map((sid) => {
+          const bid = block.bids[sid];
+          const mine = sid === payload.my_seat ? " mine" : "";
+          return `<span class="worth-tile${mine}"><span class="seat">${seatLabel(
+            payload,
+            sid
+          )}</span><span class="money">${fmtMoney(bid)}</span></span>`;
+        })
+        .join("")}</div>`;
+    }
+
+    el.innerHTML = `
+      <div class="block-hero">
+        <span class="name ${posClass}">${block.player_id}${soldTag}</span>
+        <span class="price">${fmtMoney(block.price)}</span>
+        <span class="sub">board price &middot; current bid ${currentBid} &middot; VORP ${fmtMoney(
+      block.vorp_dollar
+    )} &middot; VOLR ${fmtMoney(block.volr_dollar)}</span>
+      </div>
+      ${worthRow}
+    `;
+  }
+
+  function renderPower(payload) {
+    const el = document.getElementById("power");
+    const order = seatOrder(payload);
+    const seatsById = Object.fromEntries((payload.seats || []).map((s) => [s.seat_id, s]));
+    const maxOfAll = Math.max(1, ...order.map((sid) => (seatsById[sid] || {}).max_bid || 0));
+
+    el.innerHTML = order
+      .map((sid) => {
+        const seat = seatsById[sid] || {};
+        const pct = Math.max(2, ((seat.max_bid || 0) / maxOfAll) * 100);
+        const mine = sid === payload.my_seat ? " mine" : "";
+        return `
+        <div class="power-bar${mine}">
+          <div class="fill" style="height:${pct}%" title="max bid ${fmtMoney(seat.max_bid)}"></div>
+          <div class="label">${seatLabel(payload, sid)}</div>
+        </div>
+      `;
+      })
+      .join("");
+  }
+
+  function renderAll(payload) {
+    renderHeader(payload);
+    renderPower(payload);
+  }
+
+  window.__renderAll = renderAll; // exposed for a static-payload smoke test
+</script>

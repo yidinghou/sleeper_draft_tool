@@ -1,15 +1,23 @@
 #!/usr/bin/env python3
 """The live draft board server -- see docs/spec/board/index.md.
 
-Steps 2, 3, and 4 of docs/spec/board/guide.md's build order: the server
+Steps 2, 3, 4, and 6 of docs/spec/board/guide.md's build order: the server
 skeleton, `/state.json`, Sleeper polling, seat identity + divisions, the
-per-seat bid matrix, `my_plan`, and `block`. This is still a partial slice
+per-seat bid matrix, `my_plan`, `block`, and the time-travel scrubber
+(`get_payload_upto`, disk-persisted frames). This is still a partial slice
 of the full rendering contract (docs/spec/board/03-rendering-contract.md):
-everything above is real, but `block`'s `market`/`wk3VorpD` fields aren't
-(no market-price or weeks-1-3 data source is loaded here -- see
-`block_info`'s docstring). Not yet built: the scrubber + frame cache
-(guide.md step 6) and the slide deck (step 5) -- `/board` and `templates/`
-don't exist yet, only the JSON payload does.
+`block`'s `market`/`wk3VorpD` fields aren't wired in (no market-price or
+weeks-1-3 data source is loaded here -- see `block_info`'s docstring), and
+no payload anywhere carries a player's *name* -- `RosterFillPlayer` doesn't
+carry one, so the deck (below) renders raw player ids until that's threaded
+through.
+
+Step 5, the slide deck, is in progress: `templates/board_slides.html` exists
+and serves at `GET /board` (and `GET /` -- there's no separate landing/
+source-picker page yet, both routes serve the same deck). So far it has the
+header (on-block hero, per-seat worth) and the buying-power bars; the
+draft-state table, pool matrix, roster cards, and the live poll loop are
+still placeholder cards in the template.
 
 Two source modes: `--picks-file <path>` (`file` mode, re-read on mtime
 change -- a hand-edited nomination key is the only source of a live block
@@ -883,6 +891,23 @@ class Board:
         return result
 
 
+TEMPLATES = Path(__file__).resolve().parent / "templates"
+BOARD_TEMPLATE_PATH = TEMPLATES / "board_slides.html"
+
+
+def load_board_page() -> str:
+    """The deck's HTML, wrapped in the minimal skeleton a `file://`/browser
+    `GET` needs -- the template itself is a fragment (`<title>`, `<style>`,
+    markup, `<script>`, no `<html>`/`<head>`/`<body>`), same convention as
+    `python/scripts/templates/draft_demo.html`. Re-read on every call rather
+    than cached, so a template edit takes effect without restarting the
+    server -- it's a small file and this is a dev-facing tool, not a
+    high-QPS endpoint.
+    """
+    fragment = BOARD_TEMPLATE_PATH.read_text(encoding="utf-8")
+    return f"<!doctype html>\n<html lang=\"en\">\n<meta charset=\"utf-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n{fragment}\n</html>\n"
+
+
 def make_handler(board: Board):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):  # noqa: A002 -- quiet by default
@@ -896,6 +921,14 @@ def make_handler(board: Board):
             self.end_headers()
             self.wfile.write(payload)
 
+        def _send_html(self, html: str) -> None:
+            body = html.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
         def do_GET(self) -> None:  # noqa: N802 -- stdlib method name
             parsed = urllib.parse.urlparse(self.path)
             if parsed.path == "/state.json":
@@ -905,6 +938,8 @@ def make_handler(board: Board):
                     self._send_json(board.get_payload_upto(int(upto[0])))
                 else:
                     self._send_json(board.payload())
+            elif parsed.path in ("/board", "/"):
+                self._send_html(load_board_page())
             elif self.path == "/health":
                 body = b"ok"
                 self.send_response(200)
