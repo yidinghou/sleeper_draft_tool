@@ -271,6 +271,44 @@
     color: white;
   }
 
+  .scrub-bar {
+    position: fixed;
+    bottom: 68px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    z-index: 10;
+    width: min(90vw, 480px);
+  }
+  .scrub-bar input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+  }
+  .scrub-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  .scrub-bar button {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 4px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+
   .placeholder {
     color: var(--ink-faint);
     font-style: italic;
@@ -394,6 +432,12 @@
   </section>
 </div>
 
+<div class="scrub-bar">
+  <input type="range" id="scrub" min="0" max="0" value="0" disabled />
+  <span class="scrub-label" id="scrub-label">live</span>
+  <button id="scrub-live" hidden>Live</button>
+</div>
+
 <nav class="nav">
   <button data-slide="s-live" class="active">1 Live</button>
   <button data-slide="s-market">2 Market</button>
@@ -419,7 +463,14 @@
   });
 
   document.addEventListener("keydown", (e) => {
-    if (e.key === "1" || e.key === "2" || e.key === "3") {
+    if (e.shiftKey && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
+      // Scrub one pick -- guarded by shiftKey so it doesn't also fire the
+      // plain-arrow slide navigation below.
+      scrubStep(e.key === "ArrowRight" ? 1 : -1);
+      e.preventDefault();
+    } else if (e.key === "Escape") {
+      goLive();
+    } else if (e.key === "1" || e.key === "2" || e.key === "3") {
       showSlide(SLIDES[Number(e.key) - 1]);
     } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
       const current = SLIDES.findIndex((s) => !document.getElementById(s).hidden);
@@ -714,4 +765,78 @@
   }
 
   window.__renderAll = renderAll; // exposed for a static-payload smoke test
+
+  // ---------------------------------------------------------- poll loop --
+  // Adaptive cadence mirroring the server's own poller (--poll/--poll-live,
+  // docs/spec/board/01-live-data-ingestion.md): fast while a player is on
+  // the block, slow otherwise. Re-renders only when the raw JSON text
+  // changes, so an unchanged poll costs a fetch and a string compare, not a
+  // DOM rebuild.
+
+  const IDLE_INTERVAL_MS = 750;
+  const LIVE_INTERVAL_MS = 200;
+
+  let lastJson = null;
+  let lastPayload = null;
+  let scrubPick = null; // null = live; otherwise the frozen pick to view
+
+  const scrubInput = document.getElementById("scrub");
+  const scrubLabel = document.getElementById("scrub-label");
+  const scrubLiveBtn = document.getElementById("scrub-live");
+
+  function updateScrubUI(payload) {
+    const view = payload.view || {};
+    scrubInput.max = view.total || 0;
+    scrubInput.disabled = !view.total;
+    if (scrubPick === null) scrubInput.value = view.total || 0;
+    scrubLabel.textContent = view.live ? "live" : `pick ${view.pick} / ${view.total}`;
+    scrubLiveBtn.hidden = view.live !== false;
+  }
+
+  async function fetchAndRender() {
+    const url = scrubPick === null ? "/state.json" : `/state.json?upto=${scrubPick}`;
+    let text;
+    try {
+      const res = await fetch(url);
+      text = await res.text();
+    } catch (err) {
+      return; // a network hiccup just skips this tick -- the next poll retries
+    }
+    if (text === lastJson) return;
+    lastJson = text;
+    lastPayload = JSON.parse(text);
+    renderAll(lastPayload);
+    updateScrubUI(lastPayload);
+  }
+
+  function goLive() {
+    if (scrubPick === null) return;
+    scrubPick = null;
+    lastJson = null; // force a re-render even if the live text is unchanged
+    fetchAndRender();
+  }
+
+  function scrubTo(n) {
+    const total = (lastPayload && lastPayload.view && lastPayload.view.total) || 0;
+    scrubPick = Math.max(0, Math.min(n, total));
+    lastJson = null;
+    fetchAndRender();
+  }
+
+  function scrubStep(delta) {
+    const total = (lastPayload && lastPayload.view && lastPayload.view.total) || 0;
+    const current = scrubPick === null ? total : scrubPick;
+    scrubTo(current + delta);
+  }
+
+  scrubInput.addEventListener("input", () => scrubTo(Number(scrubInput.value)));
+  scrubLiveBtn.addEventListener("click", goLive);
+
+  async function pollLoop() {
+    await fetchAndRender();
+    const onBlock = Boolean(lastPayload && lastPayload.block && !lastPayload.block.sold);
+    setTimeout(pollLoop, onBlock ? LIVE_INTERVAL_MS : IDLE_INTERVAL_MS);
+  }
+
+  pollLoop();
 </script>
