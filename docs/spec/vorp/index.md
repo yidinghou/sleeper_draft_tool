@@ -62,5 +62,12 @@ This is the number a static, pre-draft cheat sheet ranks players by.
 | [04 · Blended-bar pricing](04-blended-bar-pricing.md) | The shipped price: one sliding bar per position, monotonic by construction |
 | [05 · Principles](05-principles.md) | The laws every model has to satisfy, and the harness that runs them |
 | [The league model](../league/index.md) | The substrate: the roster template, the slot-assignment engine, and seats holding real slots so a single sale is expressible |
-| [07 · Live draft board](07-live-draft-board.md) | **WIP** — the same price, re-solved against the players, slots and money actually left |
+| [07 · Live draft board](07-live-draft-board.md) | **WIP** — the same price, re-solved against the players, slots and money actually left; the server that would run it is [`../board/`](../board/index.md) (also WIP) |
 | [08 · What one seat should bid](08-seat-value.md) | The board price corrected by a seat's own roster, then capped by its own budget |
+| [09 · The best affordable roster](09-optimal-roster.md) | **WIP** — the auction's knapsack: the set of players one seat's remaining money can still buy for the most starting-lineup points |
+| [09b · Roster scenarios](09b-roster-scenarios.md) | **WIP** — the `09` plan re-run under N seeded price-jitter scenarios, side by side, flagging the buys robust to price luck |
+
+To rebuild this engine from scratch, follow [`guide.md`](guide.md); for a
+condensed click-through, see [`brief/vorp-brief.html`](brief/vorp-brief.html).
+The live board ([`../board/`](../board/index.md), WIP) and the shareable HTML
+exports ([`../publishing/`](../publishing/index.md)) are built on these models.

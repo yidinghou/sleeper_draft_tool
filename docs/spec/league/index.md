@@ -37,3 +37,6 @@ without touching the engine at all.
 
 Consumed by `../vorp/01-calculating-replacement.md`, `../vorp/02-value-over-last-rostered.md`,
 and `../vorp/07-live-draft-board.md`.
+
+To rebuild this module from scratch in dependency order, see the
+[reproduction guide](guide.md).

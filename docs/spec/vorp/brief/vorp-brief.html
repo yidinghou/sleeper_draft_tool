@@ -124,11 +124,18 @@
   <aside class="rail">
     <div class="eyebrow">Brief</div>
     <h1>VORP</h1>
-    <div class="meta">3 steps · condensed<br>click through, or jump</div>
+    <div class="meta">10 steps · condensed<br>click through, or jump</div>
     <nav id="nav">
       <button data-step="0" class="active"><span class="n">00</span> What VORP is</button>
       <button data-step="1"><span class="n">01</span> Replacement level</button>
       <button data-step="2"><span class="n">02</span> Last rostered</button>
+      <button data-step="3"><span class="n">03</span> VORP $ / VOLR $</button>
+      <button data-step="4"><span class="n">04</span> Blended-bar price</button>
+      <button data-step="5"><span class="n">05</span> Principles</button>
+      <button data-step="6"><span class="n">07</span> Residual repricing</button>
+      <button data-step="7"><span class="n">08</span> Seat value</button>
+      <button data-step="8"><span class="n">09</span> Best roster</button>
+      <button data-step="9"><span class="n">09b</span> Roster scenarios</button>
     </nav>
     <div class="src">Condensed from <code>docs/spec/vorp/*.md</code>. Diagrams, contract tables, and full scenarios live there.</div>
   </aside>
@@ -185,11 +192,100 @@
           <li><span class="tick no">✗</span> A DEF projected to outscore everyone still isn't benched beyond one per team — a lower-scoring player at a non-streamed position wins the slot instead.</li>
         </ul>
       </section>
+
+      <section class="doc" id="s3" data-step="3" hidden>
+        <div class="kicker">03 · Two lenses</div>
+        <h1>VORP $ and VOLR $</h1>
+        <p class="thesis">Two whole-budget dollar figures on one scale, and deliberately no single blended bid — the human reads both and decides.</p>
+        <p><strong>VORP $</strong> apportions the whole budget by VORP alone, among the starters who clear replacement level. <strong>VOLR $</strong> apportions the whole budget by value over last rostered, among everyone who clears the last-rostered bar. Each independently sums to <code>teams × budget</code>; a player outside a lens's population is <code>null</code> there, never <code>$0</code>.</p>
+        <p>Each gets the full budget so the two numbers share a unit and are comparable — the old 90/10 split put them on different scales, and its collapsed bid went non-monotonic at the starter/bench seam (Cam Ward priced above the higher-scoring Bryce Young). Read <strong>the gap</strong>: <code>VORP $ ≫ VOLR $</code> is depth-survivable startability, <code>VOLR $ ≫ VORP $</code> is a cliff to the waiver wire.</p>
+        <div class="see-source">See <code>03-vorp-to-bid.md</code> for the apportionment machinery, floor-pressure, and the exact per-lens contract.</div>
+
+        <h2>What the scenarios pin down</h2>
+        <ul class="ledger">
+          <li><span class="tick ok">✓</span> Two starters, one with double the VORP → his share of the VORP lens is exactly double the other's; same rule for VOLR margin against its lens.</li>
+          <li><span class="tick ok">✓</span> Each lens is monotonic in points within a position — the one property the collapsed blended bid failed.</li>
+          <li><span class="tick no">✗</span> Neither figure is the price, and the two aren't directly rankable across the board — VOLR's lower bar and larger population lift the middle relative to VORP.</li>
+          <li><span class="tick no">✗</span> A player with zero margin still gets <code>min_bid</code>, not <code>$0</code>; a position the template never plays (K) is absent from both.</li>
+        </ul>
+      </section>
+
+      <section class="doc" id="s4" data-step="4" hidden>
+        <div class="kicker">04 · The shipped price</div>
+        <h1>Blended-bar pricing</h1>
+        <p class="thesis">One price per player out of a single pool — measured against a bar that slides between the replacement and last-rostered ends, monotonic by construction.</p>
+        <p>Blend the <em>bars</em>, not <code>03</code>'s two prices: <code>bar(p) = w·replacement + (1−w)·last_rostered</code>, with <code>w = w_floor + (1−w_floor)·t</code> and <code>t</code> ramping <strong>linearly in points</strong> from 0 to 1 over the top <code>FULL_WEIGHT_SHARE</code> (0.75) of starters. Above that point the bar is pure replacement level; below it, a marginal starter and a strong bench pick land on one continuum instead of falling off a cliff. Margins apportion with <code>apportion_with_floor</code>, so the column sums to exactly <code>teams × budget</code>.</p>
+        <p>Linear in points — not rank — is what keeps price rising with points: it makes <code>d(bar)/d(points)</code> a constant that stays ≤ 1 as long as the ramp spans the gap between its two bars. There is exactly one dial, <code>w_floor</code>, set by a human on the exported slider; <code>FULL_WEIGHT_SHARE</code> is a fixed constant of the model's shape.</p>
+        <div class="see-source">See <code>04-blended-bar-pricing.md</code> for the ramp derivation, the QB flex-peer floor, and the worked TE inversion.</div>
+
+        <div class="callout">
+          <span class="label">Catch · calibration</span>
+          The ramp is a judgement, not a derivation. <code>FULL_WEIGHT_SHARE = 0.75</code> and the shipped <code>w_floor = 0.5</code> were picked to land the starter/bench split near its best on the 2026 board — a different board could put them elsewhere. The shape is provably monotonic at every dial setting; <em>which</em> setting is the part most likely to be wrong, which is why the dial is exposed rather than baked in.
+        </div>
+      </section>
+
+      <section class="doc" id="s5" data-step="5" hidden>
+        <div class="kicker">05 · The laws</div>
+        <h1>Principles</h1>
+        <p class="thesis">A pass/fail matrix of every model against every law a price list must satisfy — models are judged by a harness, not argued about.</p>
+        <p>A model is any <code>(players, config) → Valuation</code>; a principle is any <code>(model, context) → Finding</code>. Principles receive the model itself, so they can re-run it against a shifted board or a mid-draft state, not just inspect one answer. <code>run()</code> memoizes by board identity so each distinct solve is paid for once.</p>
+        <p>A <strong>law</strong> must hold or the output isn't a price list — pass/fail, ten of them. A <strong>calibration</strong> says the model matches the world — graded, three of them, reported but never enforced, because disagreeing with the market is often the entire point. Market error alone would rank a broken model above a sound one whenever the break cancels out; laws catch the crossing that closeness-to-market can't.</p>
+        <div class="see-source">See <code>05-principles.md</code> for the full list of ten laws and three calibrations and the strawman-passes-8/8 story.</div>
+
+        <h2>What the scenarios pin down</h2>
+        <ul class="ledger">
+          <li><span class="tick ok">✓</span> A price-blending model crosses on the thin position → <code>monotonic</code> fails with the offending pair named.</li>
+          <li><span class="tick ok">✓</span> <code>points_proportional</code> scores 9/10, failing only <code>baseline-not-points</code> — a +50 shift moves 126 prices.</li>
+          <li><span class="tick no">✗</span> A strawman that passes every law is a finding about the suite, not a compliment to the strawman.</li>
+          <li><span class="tick no">✗</span> The <code>mid-draft</code> law checks a friendly two-state assumption, not a real draft — strong enough to catch the unpriceable-position collapse, no more.</li>
+        </ul>
+      </section>
+
+      <section class="doc" id="s6" data-step="6" hidden>
+        <div class="kicker">07 · Residual repricing</div>
+        <h1>Live draft board</h1>
+        <p class="thesis">The same blended price from <code>04</code>, re-solved against the players, slots, and money actually left — every sale reprices everyone.</p>
+        <p>A static list is priced for a room that no longer exists. Three things change and nothing else does: <code>pool = teams·budget − Σ(sale amounts)</code>, slots drop by one per sale, and the player pool loses the sold. <code>01</code>'s replacement level and <code>02</code>'s last-rostered level are re-solved over what remains, and <code>progressive_blend</code> is re-run — the model isn't modified, it's handed a smaller league. Prices reconcile to <code>teams × budget − spent</code>.</p>
+        <p>Early movement is almost all the money pool, not the bars: ten backs sold takes the pool $2400 → $1821 but RB's replacement level holds, so an untouched Ja'Marr Chase reprices $45 → $41. The catch: every reprice assumes the rest of the room will spend rationally — the very assumption the sale you just watched violated. It's a fair-value model re-solved on new information, not a forecast.</p>
+        <div class="see-source">See <code>07-live-draft-board.md</code>. The live server and UI that run on this are documented in the <code>board/</code> module (<code>../../board/index.md</code>).</div>
+      </section>
+
+      <section class="doc" id="s7" data-step="7" hidden>
+        <div class="kicker">08 · One seat's bid</div>
+        <h1>Seat value</h1>
+        <p class="thesis">The board price corrected by one seat's own roster, then capped by its own budget — what he's worth to <em>me</em>, and the most I may legally say.</p>
+        <p>The board price is the same for all twelve seats, which is wrong: a fourth back reaches no scoring slot for a seat that has three. So a player is worth the points he adds to that seat's optimal starting lineup, seated against the seat's own players <strong>plus a free replacement body at every position</strong>: <code>seat_vorp = lineup(bought + [player]) − lineup(bought)</code>. Imputing a body (not scoring empty slots) keeps the answer a <em>margin</em> — an empty seat's values equal league VORP exactly, so only a seat that has bought something disagrees with the board.</p>
+        <p>Dollars use <code>04</code>'s league-wide exchange rate, so seat bid and board price share a unit: <code>bid = clamp(min_bid + floor(rate × seat_vorp), max_bid(seat))</code>, floored not rounded. Value and legality stay separate — a full roster can still value an upgrade, but a seat with no open spots bids <code>0</code>.</p>
+        <div class="see-source">See <code>08-seat-value.md</code> for the free-agent-pool argument and the worked $25-board / $16-seat example.</div>
+
+        <div class="callout">
+          <span class="label">Catch · doesn't reconcile</span>
+          Seat values do not reconcile to the pool — <code>05</code>'s <code>reconciles</code> law can't hold when twelve seats each value the same player. This model sits beside <code>04</code>, never replaces it, and says nothing about what a player will actually cost, which depends on the other eleven seats.
+        </div>
+      </section>
+
+      <section class="doc" id="s8" data-step="8" hidden>
+        <div class="kicker">09 · The knapsack</div>
+        <h1>The best affordable roster</h1>
+        <p class="thesis">The set of players one seat's remaining money can still buy for the most starting-lineup points — the auction's knapsack, solved greedily.</p>
+        <p><code>08</code> prices one player in isolation; this asks about the whole shopping list. It's a knapsack, not a value-per-dollar sort, because the value of a set isn't the sum of its players: a benched player scores nothing and a second elite back can be worth far less than the first. So the objective is <code>08</code>'s lineup solve re-run as the set grows. Greedy by marginal-points-per-dollar, re-valuing against roster-plus-picks-so-far, stopping when the best affordable player adds <code>0</code> startable points. <code>max_bid</code> makes feasibility free — a dollar is already reserved for every other open slot.</p>
+        <p>Greedy is an approximation (exact knapsack is NP-hard): exactly optimal when prices are flat, within a tight bound otherwise. It spends against the current board price (<code>04</code>/<code>07</code>), so the output is "the best roster reachable <em>if prices hold</em>" — feed it live residual prices to keep it honest. <code>exclude_positions</code> drops a streaming position like DEF; <code>fill_all</code> names a cheap body for every leftover slot, tagged so fills never masquerade as upgrades.</p>
+        <div class="see-source">See <code>09-optimal-roster.md</code> for the greedy loop, the optimality bound, and the <code>RosterPlan</code> output shape.</div>
+      </section>
+
+      <section class="doc" id="s9" data-step="9" hidden>
+        <div class="kicker">09b · Price luck</div>
+        <h1>Roster scenarios</h1>
+        <p class="thesis"><code>09</code> re-run under N seeded price-jitter scenarios, side by side, flagging the "robust buys" that appear in every seed.</p>
+        <p>One plan tells you nothing about its fragility — whether a target is a buy you'd make in any market or one that only pencils out on this exact price sheet. So <code>07</code>'s board is solved once for a shared base, then per seed <code>jitter_prices</code> scales every price by an independent uniform draw on <code>[1−sigma, 1+sigma]</code> (<code>--sigma 0.15</code> is ±15%), floored at <code>min_bid</code>. Because the RNG is seeded by the column's own integer and drawn in fixed order, a seed always yields the same sheet — that determinism is the whole reason for naming seeds. <code>09</code> plans against each sheet and the columns lay out next to each other.</p>
+        <p>A <strong>robust buy</strong> is a value target — not a fill — present in <em>every</em> seed's plan; <code>robust_note</code> intersects the target sets. <code>none</code> is a real finding, not a failure: on a board deep at your open slots, small price moves swap one near-equal substitute for another, so stay flexible. The catch on top of <code>09</code>'s: the jitter is a uniform ±sigma toy of price luck, not a calibrated forecast — real mispricing is correlated and skewed.</p>
+        <div class="see-source">See <code>09b-roster-scenarios.md</code> for the jitter formula, the seed-5 worked example, and the determinism contract.</div>
+      </section>
     </div>
 
     <div class="stepper">
       <button id="back" disabled>← Back</button>
-      <span class="pos" id="pos">Step 1 of 3</span>
+      <span class="pos" id="pos">Step 1 of 10</span>
       <button id="next" class="primary">Next →</button>
     </div>
   </main>
