@@ -263,3 +263,11 @@ def test_board_payload_carries_block_from_the_picks_files_nomination():
     assert len(payload["block"]["bids"]) == LEAGUE_CONFIG.teams
     # He was forced in even though he's not naturally in the top-5 matrix.
     assert any(row["player_id"] == "1466" for row in payload["matrix"])
+
+
+def test_frame_store_dir_is_none_without_a_cache_key():
+    from draft_board import _frame_store_dir
+
+    assert _frame_store_dir(None) is None
+    assert _frame_store_dir("") is None
+    assert _frame_store_dir("some-id").name == "frames-some-id"

@@ -604,6 +604,44 @@ def _sold_block(
     }
 
 
+def _frame_store_dir(cache_key: Optional[str]) -> Optional[Path]:
+    """`data/frames-<cache_key>/` -- `None` when there's no stable key to
+    persist under (an inline paste has no draft id or file to name it by),
+    in which case frames stay in-memory only for that run.
+    """
+    if not cache_key:
+        return None
+    return REPO_ROOT / "data" / f"frames-{cache_key}"
+
+
+def _load_frame(store_dir: Optional[Path], n: int, sig: str) -> Optional[Dict[str, Any]]:
+    """A persisted frame, or `None` on a miss -- no file, or its `sig`
+    doesn't match the current one (schema bump, picks changed under it), so
+    it rebuilds instead of serving a payload the current renderer can't
+    read.
+    """
+    if store_dir is None:
+        return None
+    path = store_dir / f"{n}.json"
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("sig") != sig:
+        return None
+    return data.get("payload")
+
+
+def _store_frame(store_dir: Optional[Path], n: int, sig: str, payload: Dict[str, Any]) -> None:
+    """Persist a frame, atomically (temp file + rename)."""
+    if store_dir is None:
+        return
+    store_dir.mkdir(parents=True, exist_ok=True)
+    path = store_dir / f"{n}.json"
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps({"sig": sig, "payload": payload}), encoding="utf-8")
+    tmp.replace(path)
+
+
 class Board:
     """Holds the config, the loaded projections, and the live state under a
     single-threaded refresh -- see docs/spec/board/01-live-data-ingestion.md.
@@ -762,10 +800,23 @@ class Board:
         result["view"] = {"pick": total, "total": total, "live": True}
         return result
 
+    @property
+    def cache_key(self) -> Optional[str]:
+        """What `data/frames-<cache_key>/` is named after -- the draft id in
+        `draft` mode, the picks-file's stem in `file` mode, `None` for an
+        inline paste (no stable id, so frames stay in-memory only).
+        """
+        if self.mode == "draft" and self.draft_id:
+            return self.draft_id
+        if self.mode == "file" and self.picks_file:
+            return self.picks_file.stem
+        return None
+
     def get_payload_upto(self, n: int) -> Dict[str, Any]:
         """The board as it stood after pick `n` -- see
-        docs/spec/board/04-time-travel-scrubber.md. Memoized in memory,
-        keyed by a prefix signature (`_prefix_sig`) so a stale entry -- a
+        docs/spec/board/04-time-travel-scrubber.md. Checked in memory first,
+        then on disk (`data/frames-<cache_key>/<n>.json`), both keyed by a
+        prefix signature (`_prefix_sig`) so a stale entry -- a
         `FRAME_SCHEMA_VERSION` bump, or the seat names changing -- misses
         and rebuilds instead of serving a payload the current renderer can't
         read. `n` is clamped to `[0, total]`. Never mutates the live
@@ -779,6 +830,12 @@ class Board:
         cached = self._frame_cache.get(n)
         if cached is not None and cached[0] == sig:
             return cached[1]
+
+        store_dir = _frame_store_dir(self.cache_key)
+        disk_payload = _load_frame(store_dir, n, sig)
+        if disk_payload is not None:
+            self._frame_cache[n] = (sig, disk_payload)
+            return disk_payload
 
         sub_state = build_state(self.picks[:n], self.config)
         result = build_payload(
@@ -797,6 +854,7 @@ class Board:
         result["block"] = _sold_block(self.picks, n, self.seat_users)
         result["view"] = {"pick": n, "total": total, "live": n == total}
         self._frame_cache[n] = (sig, result)
+        _store_frame(store_dir, n, sig, result)
         return result
 
 
