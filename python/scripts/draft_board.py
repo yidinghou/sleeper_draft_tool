@@ -8,9 +8,10 @@ is still a partial slice of the full rendering contract
 a priced player list, the bid matrix, and seat_users/divisions/seat_order/
 my_seat/my_division, from a `--picks-file` replayed into a residual
 `LeagueState`. Not yet built: `block` (needs a nomination source -- the
-matrix's `force_ids` hook is there for it) and `my_plan` (needs
-`plan_roster`, spec 09 -- not built). Sleeper polling (guide.md step 3) is
-also follow-up work; today this only reads `--picks-file`, so identity is
+matrix's `force_ids` hook is there for it) and `my_plan` (`plan_roster`,
+spec 09, exists now -- python/vorp/optimal_roster.py -- wiring it into this
+payload is just not done yet). Sleeper polling (guide.md step 3) is also
+follow-up work; today this only reads `--picks-file`, so identity is
 resolved from `random_fill` plus whatever a pick's `picked_by` happens to
 carry -- there is no real `draft`/`users` feed to seed pins from yet,
 outside of `--print-seats`, which does its own one-shot fetch.
