@@ -54,7 +54,14 @@ from vorp.league.roster_fill import RosterFillPlayer as Player  # noqa: E402
 from vorp.league.teams import UNKNOWN_SEAT, LeagueState  # noqa: E402
 from vorp.optimal_roster import RosterPlan, Target, plan_roster  # noqa: E402
 from vorp.seat_value import price_from_value, seat_values  # noqa: E402
-from vorp.sleeper_client import fetch_draft, fetch_league_users, seat_identity  # noqa: E402
+from vorp.sleeper_client import (  # noqa: E402
+    draft_fingerprint,
+    fetch_draft,
+    fetch_draft_picks,
+    fetch_league_users,
+    parse_nomination,
+    seat_identity,
+)
 
 DEFAULT_PORT = 8770
 DEFAULT_W_FLOOR = 1.0
@@ -425,13 +432,43 @@ def print_seats(draft: Dict[str, Any], users: List[Dict[str, Any]]) -> None:
         print(f"seat {seat_id + 1}: {entry.get('display_name')} ({entry.get('username')})")
 
 
+def _pick_from_sleeper(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """A Sleeper `DraftPick` (see `src/sleeper.ts`) as the internal pick
+    shape `build_state` reads. `metadata.amount` is the real sold price --
+    the auction dollar Sleeper can only be scraped for elsewhere, but a
+    completed pick's own record carries it directly.
+    """
+    meta = raw.get("metadata") or {}
+    return {
+        "player_id": str(raw.get("player_id") or meta.get("player_id")),
+        "position": meta.get("position"),
+        "amount": int(meta.get("amount") or 0),
+        "draft_slot": raw.get("draft_slot"),
+    }
+
+
+def _nomination_from_sleeper(draft: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """`sleeper_client.parse_nomination`'s `Nomination` as the internal
+    nomination dict `block_info` reads. `None` when nothing is on the block.
+    """
+    nomination = parse_nomination(draft)
+    if not nomination.player_id:
+        return None
+    return {
+        "player_id": nomination.player_id,
+        "highest_offer": nomination.highest_offer,
+        "offering_slot": nomination.offering_slot,
+    }
+
+
 class Board:
     """Holds the config, the loaded projections, and the live state under a
     single-threaded refresh -- see docs/spec/board/01-live-data-ingestion.md.
-    Only the `file` source mode is implemented so far, so identity is
-    resolved from each pick's `picked_by` (usually absent from a hand-edited
-    mock) plus `random_fill` -- there is no Sleeper `draft`/`users` source
-    yet to seed real pins from.
+    Two source modes: `file` (`--picks-file`, re-read on mtime change) and
+    `draft` (`--draft-id`, polled -- see `poll_sleeper_once`). Identity comes
+    from `seat_identity` over whatever `self._draft`/`self._users` currently
+    hold (empty in `file` mode, real Sleeper data once `set_draft_id` runs)
+    plus a pick's `picked_by`, filled out by `random_fill`.
     """
 
     def __init__(
@@ -447,14 +484,20 @@ class Board:
         self.w_floor = w_floor
         self.me_fallback = me_fallback
         self.matrix_top = matrix_top
+        self.mode = "file"
         self.picks_file: Optional[Path] = None
         self._mtime: Optional[float] = None
+        self.draft_id: Optional[str] = None
+        self._last_fingerprint: Optional[str] = None
+        self._draft: Dict[str, Any] = {}
+        self._users: List[Dict[str, Any]] = []
+        self.raw_picks: List[Dict[str, Any]] = []
         self.state = LeagueState.opening(config)
         self.nomination: Optional[Dict[str, Any]] = None
         self._refresh_identity([])
 
     def _refresh_identity(self, picks: List[Dict[str, Any]]) -> None:
-        self.seat_users = refresh_seat_identity({}, [], picks, self.config)
+        self.seat_users = refresh_seat_identity(self._draft, self._users, picks, self.config)
         self.my_seat = resolve_my_seat(self.seat_users, self.me_fallback)
         self.divisions, self.seat_order = build_divisions(
             self.seat_users, self.config, self.my_seat
@@ -462,6 +505,7 @@ class Board:
         self.my_division = next((b["index"] for b in self.divisions if b["mine"]), None)
 
     def set_picks_file(self, path: Path) -> None:
+        self.mode = "file"
         self.picks_file = path
         self._mtime = None
         self.refresh_from_file()
@@ -481,9 +525,43 @@ class Board:
         self._refresh_identity(picks)
         return True
 
+    def set_draft_id(self, draft_id: str) -> None:
+        """Switch to `draft` mode and do the first poll. `league_id` comes
+        off the draft itself -- one cheap extra `/draft` fetch to learn it,
+        then `poll_sleeper_once(force=True)` does the real work.
+        """
+        self.mode = "draft"
+        self.draft_id = draft_id
+        self._last_fingerprint = None
+        seed = fetch_draft(draft_id)
+        self._users = fetch_league_users(seed["league_id"])
+        self.poll_sleeper_once(force=True)
+
+    def poll_sleeper_once(self, force: bool = False) -> bool:
+        """The cheap/expensive split -- see
+        docs/spec/board/01-live-data-ingestion.md. A cheap `/draft` poll,
+        `draft_fingerprint`-gated: only when it changes (or `force`) does
+        this pay for the expensive `/draft/{id}/picks` refetch and rebuild
+        `state`. Returns whether picks were actually refetched.
+        """
+        draft = fetch_draft(self.draft_id)
+        fingerprint = draft_fingerprint(draft)
+        if not force and fingerprint == self._last_fingerprint:
+            return False
+        self._last_fingerprint = fingerprint
+        self._draft = draft
+        self.raw_picks = fetch_draft_picks(self.draft_id)
+        picks = [_pick_from_sleeper(p) for p in self.raw_picks]
+        self.state = build_state(picks, self.config)
+        self.nomination = _nomination_from_sleeper(draft)
+        self._refresh_identity(picks)
+        return True
+
     def payload(self) -> Dict[str, Any]:
-        if self.picks_file is not None:
+        if self.mode == "file" and self.picks_file is not None:
             self.refresh_from_file()
+        # In "draft" mode the background poller (see `poller`) keeps state
+        # current; a request here just reads whatever it last built.
         return build_payload(
             self.state,
             self.players,

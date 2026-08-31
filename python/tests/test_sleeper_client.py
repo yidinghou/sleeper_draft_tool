@@ -86,31 +86,34 @@ USERS = [
 
 
 def test_seat_identity_from_dict_shaped_draft_order():
+    # Sleeper's dict-shaped draft_order is 1-indexed (slot 3, slot 7);
+    # seat_identity shifts to 0-indexed seat ids (2, 6) to match LeagueState.
     draft = {"draft_order": {"u1": 3, "u2": 7}}
     identity = seat_identity(draft, USERS)
-    assert identity[3] == {"user_id": "u1", "username": "alice", "display_name": "Alice"}
-    assert identity[7]["display_name"] == "Bob"
+    assert identity[2] == {"user_id": "u1", "username": "alice", "display_name": "Alice"}
+    assert identity[6]["display_name"] == "Bob"
 
 
 def test_seat_identity_from_array_shaped_draft_order():
-    # index 0 -> slot 1, a None entry is an unseeded slot.
+    # The array index *is* the 0-indexed seat id already; a None entry is an
+    # unseeded slot.
     draft = {"draft_order": ["u1", None, "u2"]}
     identity = seat_identity(draft, USERS)
-    assert identity[1]["user_id"] == "u1"
-    assert 2 not in identity
-    assert identity[3]["user_id"] == "u2"
+    assert identity[0]["user_id"] == "u1"
+    assert 1 not in identity
+    assert identity[2]["user_id"] == "u2"
 
 
 def test_seat_identity_falls_back_to_picks_for_unseeded_slots():
     draft = {"draft_order": {"u1": 3}}
-    picks = [{"draft_slot": 7, "picked_by": "u2"}]
+    picks = [{"draft_slot": 7, "picked_by": "u2"}]  # 1-indexed, like Sleeper
     identity = seat_identity(draft, USERS, raw_picks=picks)
-    assert identity[3]["user_id"] == "u1"
-    assert identity[7]["user_id"] == "u2"
+    assert identity[2]["user_id"] == "u1"
+    assert identity[6]["user_id"] == "u2"
 
 
 def test_seat_identity_picks_never_override_draft_order():
     draft = {"draft_order": {"u1": 3}}
     picks = [{"draft_slot": 3, "picked_by": "u2"}]
     identity = seat_identity(draft, USERS, raw_picks=picks)
-    assert identity[3]["user_id"] == "u1"
+    assert identity[2]["user_id"] == "u1"
