@@ -271,3 +271,15 @@ def test_frame_store_dir_is_none_without_a_cache_key():
     assert _frame_store_dir(None) is None
     assert _frame_store_dir("") is None
     assert _frame_store_dir("some-id").name == "frames-some-id"
+
+
+def test_payload_seats_carries_every_real_seats_roster():
+    players = _players()
+    state = build_state(_picks(), LEAGUE_CONFIG)
+    payload = build_payload(state, players, LEAGUE_CONFIG, w_floor=1.0, matrix_top=5)
+
+    assert len(payload["seats"]) == LEAGUE_CONFIG.teams  # UNKNOWN_SEAT excluded
+    seat0 = next(s for s in payload["seats"] if s["seat_id"] == 0)
+    assert {b["player_id"] for b in seat0["bought"]} == {"19", "147"}
+    assert seat0["budget_left"] == LEAGUE_CONFIG.budget - 10 - 15
+    assert seat0["max_bid"] == state.max_bid(0)
