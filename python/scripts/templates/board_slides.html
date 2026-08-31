@@ -313,6 +313,60 @@
     font-family: var(--mono);
     font-variant-numeric: tabular-nums;
   }
+
+  .division {
+    margin-bottom: 20px;
+  }
+  .division .eyebrow {
+    margin-bottom: 8px;
+  }
+  .division.mine .eyebrow {
+    color: var(--accent);
+  }
+  .roster-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 900px) {
+    .roster-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  .roster-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px;
+  }
+  .roster-card.mine {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .roster-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-weight: 600;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .roster-line {
+    font-family: var(--mono);
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    color: var(--ink-soft);
+  }
+  .roster-line.open {
+    color: var(--ink-faint);
+    font-style: italic;
+  }
+  .roster-line.bench {
+    color: var(--ink-faint);
+  }
 </style>
 
 <div class="wrap">
@@ -326,7 +380,6 @@
       <div class="eyebrow">Draft state by position</div>
       <div id="state-table"></div>
     </div>
-    <div class="card placeholder">Roster cards -- next up.</div>
   </section>
 
   <section class="slide" id="s-market" hidden>
@@ -337,7 +390,7 @@
   </section>
 
   <section class="slide" id="s-rosters" hidden>
-    <div class="card placeholder">Roster cards -- next up.</div>
+    <div id="rosters"></div>
   </section>
 </div>
 
@@ -348,6 +401,8 @@
 </nav>
 
 <script>
+  <!-- FILL_SLOTS_JS -->
+
   const SLIDES = ["s-live", "s-market", "s-rosters"];
 
   function showSlide(id) {
@@ -569,11 +624,93 @@
     });
   }
 
+  const FLEX_ELIGIBILITY = {
+    FLEX: ["RB", "WR", "TE"],
+    REC_FLEX: ["WR", "TE"],
+    SUPER_FLEX: ["QB", "RB", "WR", "TE"],
+  };
+
+  // Mirrors LeagueState.seat_slots(bench=False) -- python/vorp/league/teams.py
+  // -- starting slots only, built from the payload's own config so this
+  // never drifts from the real league template.
+  function startingSlots(config) {
+    const slots = [];
+    let nextId = 0;
+    for (const pos of POSITIONS) {
+      const count = (config.starting_slots || {})[pos] || 0;
+      for (let i = 0; i < count; i++) slots.push({ id: nextId++, eligiblePositions: [pos], flexLabel: pos });
+    }
+    for (const [flex, count] of Object.entries(config.flex_slots || {})) {
+      for (let i = 0; i < count; i++) {
+        slots.push({ id: nextId++, eligiblePositions: FLEX_ELIGIBILITY[flex], flexLabel: flex });
+      }
+    }
+    return slots;
+  }
+
+  function renderRosters(payload) {
+    const el = document.getElementById("rosters");
+    const seatsById = Object.fromEntries((payload.seats || []).map((s) => [s.seat_id, s]));
+    const divisions = payload.divisions || [
+      { name: "All seats", index: 0, mine: false, seats: (payload.seats || []).map((s) => s.seat_id) },
+    ];
+    const slotsTemplate = startingSlots(payload.config || {});
+
+    el.innerHTML = divisions
+      .map((division) => {
+        const cards = division.seats
+          .map((sid) => {
+            const seat = seatsById[sid] || { budget_left: 0, bought: [] };
+            const players = seat.bought.map((b) => ({
+              playerId: b.player_id,
+              position: b.position,
+              points: b.points,
+            }));
+            const seated = fillSlots(players, slotsTemplate);
+            const seatedIds = new Set(seated.values());
+            const bench = seat.bought.filter((b) => !seatedIds.has(b.player_id));
+
+            const lines = slotsTemplate
+              .map((slot) => {
+                const pid = seated.get(slot.id);
+                if (pid) {
+                  const b = seat.bought.find((x) => x.player_id === pid);
+                  return `<div class="roster-line"><span class="pos-${b.position}">${slot.flexLabel}</span><span>${pid}</span></div>`;
+                }
+                return `<div class="roster-line open"><span>${slot.flexLabel}</span><span>-- open --</span></div>`;
+              })
+              .join("");
+            const benchLines = bench
+              .map((b) => `<div class="roster-line bench"><span class="pos-${b.position}">BN</span><span>${b.player_id}</span></div>`)
+              .join("");
+
+            const mine = sid === payload.my_seat ? " mine" : "";
+            return `
+              <div class="roster-card${mine}">
+                <div class="roster-card-head"><span>${seatLabel(payload, sid)}</span><span class="money">$${seat.budget_left}</span></div>
+                ${lines}
+                ${benchLines}
+              </div>
+            `;
+          })
+          .join("");
+        const mineClass = division.mine ? " mine" : "";
+        return `
+          <div class="division${mineClass}">
+            <div class="eyebrow">${division.name}</div>
+            <div class="roster-grid">${cards}</div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
   function renderAll(payload) {
     renderHeader(payload);
     renderPower(payload);
     renderStateTable(payload);
     renderMatrix(payload);
+    renderRosters(payload);
   }
 
   window.__renderAll = renderAll; // exposed for a static-payload smoke test

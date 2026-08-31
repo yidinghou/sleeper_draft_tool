@@ -236,10 +236,17 @@ def plan_payload(plan: RosterPlan) -> Dict[str, Any]:
     }
 
 
-def _seat_summaries(state: LeagueState) -> List[Dict[str, Any]]:
+def _seat_summaries(
+    state: LeagueState, points_by_id: Dict[str, float]
+) -> List[Dict[str, Any]]:
     """Every real seat's roster summary -- what the deck's Rosters slide
     needs to run `fillSlots` against. `UNKNOWN_SEAT` is excluded; it owns no
-    roster. Doesn't include each pick's opening price (the full contract's
+    roster. Each bought player carries `points` (from `points_by_id`, the
+    full player list -- sold players don't appear in `board["rows"]`
+    anymore) so the client-side fill can actually order by points, same as
+    the Python matching; a player the projections no longer list scores 0
+    rather than being omitted, same convention as `seat_value.py::_roster_of`.
+    Doesn't include each pick's opening price (the full contract's
     `lines[].price`, for over/under-pay tags) -- that needs a second
     `price_board` solve against the opening board, not wired in here.
     """
@@ -249,7 +256,12 @@ def _seat_summaries(state: LeagueState) -> List[Dict[str, Any]]:
             "budget_left": seat.budget_left,
             "max_bid": state.max_bid(seat.seat_id),
             "bought": [
-                {"player_id": b.player_id, "position": b.position, "amount": b.amount}
+                {
+                    "player_id": b.player_id,
+                    "position": b.position,
+                    "amount": b.amount,
+                    "points": round(points_by_id.get(b.player_id, 0.0), 1),
+                }
                 for b in seat.bought
             ],
         }
@@ -282,8 +294,10 @@ def build_payload(
     buys, with fills clearly tagged (`kind="fill"`) so they never masquerade
     as lineup upgrades. `block` is `None` unless `nomination` names a real,
     still-unsold, priced player -- see `block_info`. `seats` is every real
-    seat's roster summary (`_seat_summaries`) -- always included, no
-    identity source needed.
+    seat's roster summary (`_seat_summaries`) and `config` is the slot
+    template (`starting_slots`/`flex_slots`/`bench_slots`) -- both always
+    included, no identity source needed; together they're what the deck's
+    Rosters slide runs `fillSlots` against.
     """
     sold_ids = set(state.sold())
     remaining = [p for p in players if p.player_id not in sold_ids]
@@ -311,7 +325,12 @@ def build_payload(
         ],
         "matrix": matrix,
         "block": block_info(nomination, remaining, board, matrix),
-        "seats": _seat_summaries(state),
+        "seats": _seat_summaries(state, {p.player_id: p.points for p in players}),
+        "config": {
+            "starting_slots": config.starting_slots,
+            "flex_slots": config.flex_slots,
+            "bench_slots": config.bench_slots,
+        },
     }
     if seat_users is not None:
         payload["seat_users"] = seat_users
@@ -895,6 +914,13 @@ TEMPLATES = Path(__file__).resolve().parent / "templates"
 BOARD_TEMPLATE_PATH = TEMPLATES / "board_slides.html"
 
 
+#: The tested, shared source of the client-side roster matching -- see
+#: src/roster-fill-client.cjs and src/roster-fill-client.test.js. Inlined
+#: verbatim into the template rather than hand-copied, so there is one
+#: source of truth instead of a driftable duplicate.
+FILL_SLOTS_JS_PATH = REPO_ROOT / "src" / "roster-fill-client.cjs"
+
+
 def load_board_page() -> str:
     """The deck's HTML, wrapped in the minimal skeleton a `file://`/browser
     `GET` needs -- the template itself is a fragment (`<title>`, `<style>`,
@@ -903,8 +929,16 @@ def load_board_page() -> str:
     than cached, so a template edit takes effect without restarting the
     server -- it's a small file and this is a dev-facing tool, not a
     high-QPS endpoint.
+
+    The template's `<!-- FILL_SLOTS_JS -->` marker is replaced with
+    `roster-fill-client.cjs`'s source. That file's trailing
+    `if (typeof module ...) { module.exports = ... }` guard is inert in a
+    browser (no `module` global there) so it's safe to inline as-is --
+    verified in `roster-fill-client.cjs`'s own commit.
     """
     fragment = BOARD_TEMPLATE_PATH.read_text(encoding="utf-8")
+    fill_slots_js = FILL_SLOTS_JS_PATH.read_text(encoding="utf-8")
+    fragment = fragment.replace("<!-- FILL_SLOTS_JS -->", fill_slots_js)
     return f"<!doctype html>\n<html lang=\"en\">\n<meta charset=\"utf-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n{fragment}\n</html>\n"
 
 
