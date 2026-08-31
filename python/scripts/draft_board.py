@@ -2,19 +2,18 @@
 """The live draft board server -- see docs/spec/board/index.md.
 
 Steps 2 and 4 of docs/spec/board/guide.md's build order: the server skeleton,
-`/state.json`, seat identity + divisions, and the per-seat bid matrix. This
-is still a partial slice of the full rendering contract
+`/state.json`, seat identity + divisions, the per-seat bid matrix, and
+`my_plan`. This is still a partial slice of the full rendering contract
 (docs/spec/board/03-rendering-contract.md) -- pool/spent/spots_left/levels,
-a priced player list, the bid matrix, and seat_users/divisions/seat_order/
-my_seat/my_division, from a `--picks-file` replayed into a residual
-`LeagueState`. Not yet built: `block` (needs a nomination source -- the
-matrix's `force_ids` hook is there for it) and `my_plan` (`plan_roster`,
-spec 09, exists now -- python/vorp/optimal_roster.py -- wiring it into this
-payload is just not done yet). Sleeper polling (guide.md step 3) is also
-follow-up work; today this only reads `--picks-file`, so identity is
-resolved from `random_fill` plus whatever a pick's `picked_by` happens to
-carry -- there is no real `draft`/`users` feed to seed pins from yet,
-outside of `--print-seats`, which does its own one-shot fetch.
+a priced player list, the bid matrix, seat_users/divisions/seat_order/
+my_seat/my_division, and my_seat's best-affordable roster, from a
+`--picks-file` replayed into a residual `LeagueState`. Not yet built: `block`
+(needs a nomination source -- the matrix's `force_ids` hook is there for
+it). Sleeper polling (guide.md step 3) is also follow-up work; today this
+only reads `--picks-file`, so identity is resolved from `random_fill` plus
+whatever a pick's `picked_by` happens to carry -- there is no real
+`draft`/`users` feed to seed pins from yet, outside of `--print-seats`,
+which does its own one-shot fetch.
 
 The matrix has no cache in front of it (that's guide.md step 6, not built),
 so it runs one lineup solve per `(player, real seat)` pair on every
@@ -51,6 +50,7 @@ from vorp.league.config import (  # noqa: E402
 )
 from vorp.league.roster_fill import RosterFillPlayer as Player  # noqa: E402
 from vorp.league.teams import UNKNOWN_SEAT, LeagueState  # noqa: E402
+from vorp.optimal_roster import RosterPlan, Target, plan_roster  # noqa: E402
 from vorp.seat_value import price_from_value, seat_values  # noqa: E402
 from vorp.sleeper_client import fetch_draft, fetch_league_users, seat_identity  # noqa: E402
 
@@ -145,6 +145,32 @@ def seat_matrix(
     return rows
 
 
+def _target_dict(t: Target) -> Dict[str, Any]:
+    return {
+        "player_id": t.player_id,
+        "position": t.position,
+        "price": t.price,
+        "points_gain": round(t.points_gain, 1),
+        "kind": t.kind,
+    }
+
+
+def plan_payload(plan: RosterPlan) -> Dict[str, Any]:
+    """`RosterPlan` as a JSON-serializable dict -- the `my_plan` payload key."""
+    return {
+        "targets": [_target_dict(t) for t in plan.targets],
+        "fills": [_target_dict(f) for f in plan.fills],
+        "spend": plan.spend,
+        "reserve": plan.reserve,
+        "budget_left_after": plan.budget_left_after,
+        "points_before": round(plan.points_before, 1),
+        "points_after": round(plan.points_after, 1),
+        "points_gain": round(plan.points_gain, 1),
+        "lineup_ids": list(plan.lineup_ids),
+        "open_slots_after": plan.open_slots_after,
+    }
+
+
 def build_payload(
     state: LeagueState,
     players: List[Player],
@@ -160,9 +186,13 @@ def build_payload(
 ) -> Dict[str, Any]:
     """The (still partial) `/state.json` payload -- see
     docs/spec/board/03-rendering-contract.md. The identity-derived keys
-    (`seat_users`, `divisions`, `seat_order`, `my_seat`, `my_division`) are
-    included only when the caller supplies them, so this stays a pure
-    function callable without an identity source.
+    (`seat_users`, `divisions`, `seat_order`, `my_seat`, `my_division`) and
+    `my_plan` are included only when `my_seat` is supplied (and resolves to a
+    real seat), so this stays a pure function callable without an identity
+    source. `my_plan` runs `09`'s `plan_roster` with `fill_all=True` -- a
+    live board wants the whole completed roster, not just the value-adding
+    buys, with fills clearly tagged (`kind="fill"`) so they never masquerade
+    as lineup upgrades.
     """
     sold_ids = set(state.sold())
     remaining = [p for p in players if p.player_id not in sold_ids]
@@ -196,6 +226,11 @@ def build_payload(
         payload["my_seat"] = my_seat
     if my_division is not None:
         payload["my_division"] = my_division
+    if my_seat is not None and my_seat != UNKNOWN_SEAT:
+        prices = {pid: row["price"] for pid, row in board["rows"].items()}
+        replacement = {pos: level["replacement"] for pos, level in board["levels"].items()}
+        plan = plan_roster(state, my_seat, remaining, prices, replacement, fill_all=True)
+        payload["my_plan"] = plan_payload(plan)
     return payload
 
 
