@@ -39,6 +39,7 @@ import json
 import random
 import sys
 import threading
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -557,6 +558,52 @@ def load_saved_draft(
     return build_state(picks, config), picks
 
 
+# --------------------------------------------------------------------------
+# The time-travel scrubber -- see docs/spec/board/04-time-travel-scrubber.md.
+# --------------------------------------------------------------------------
+
+#: Folded into every frame's cache signature, so any change to what a frame
+#: bakes in is a cache invalidation, not a manual purge -- bump this and
+#: every persisted/in-memory frame misses and rebuilds against the current
+#: shape. History: 1 -- initial frame cache (in-memory only).
+FRAME_SCHEMA_VERSION = 1
+
+
+def _prefix_sig(picks: List[Dict[str, Any]], n: int, seat_users: Dict[int, Dict[str, Any]]) -> str:
+    """The cache key for a scrubbed frame: `FRAME_SCHEMA_VERSION`, the first
+    `n` picks as `[index, player_id, amount]` triples, and the seat names a
+    frame bakes into each roster. A frame depends only on its picks prefix
+    -- the draft is append-only, so this stays valid as it grows.
+    """
+    triples = [[i, p["player_id"], p["amount"]] for i, p in enumerate(picks[:n])]
+    names = {str(sid): u.get("display_name") or u.get("username") for sid, u in seat_users.items()}
+    blob = {"v": FRAME_SCHEMA_VERSION, "picks": triples, "names": names}
+    return json.dumps(blob, sort_keys=True)
+
+
+def _sold_block(
+    picks: List[Dict[str, Any]], n: int, seat_users: Dict[int, Dict[str, Any]]
+) -> Optional[Dict[str, Any]]:
+    """The pick that just sold at `n` -- what a scrubbed frame surfaces as
+    `block` in place of a live nomination (a frozen frame has none). `None`
+    at `n == 0` (the opening board, nothing sold yet).
+    """
+    if n <= 0 or n > len(picks):
+        return None
+    pick = picks[n - 1]
+    draft_slot = pick.get("draft_slot")
+    seat_id = int(draft_slot) - 1 if draft_slot is not None else None
+    identity = seat_users.get(seat_id, {}) if seat_id is not None else {}
+    return {
+        "player_id": pick["player_id"],
+        "position": pick.get("position"),
+        "amount": pick.get("amount"),
+        "seat": seat_id,
+        "buyer": identity.get("display_name") or identity.get("username"),
+        "sold": True,
+    }
+
+
 class Board:
     """Holds the config, the loaded projections, and the live state under a
     single-threaded refresh -- see docs/spec/board/01-live-data-ingestion.md.
@@ -588,6 +635,12 @@ class Board:
         self._draft: Dict[str, Any] = {}
         self._users: List[Dict[str, Any]] = []
         self.raw_picks: List[Dict[str, Any]] = []
+        #: The current picks, in draft order, internal shape -- what the
+        #: scrubber replays prefixes of. See `get_payload_upto`.
+        self.picks: List[Dict[str, Any]] = []
+        #: {n: (prefix_sig, payload)} -- in-memory only so far (no disk
+        #: persistence yet). See `get_payload_upto`.
+        self._frame_cache: Dict[int, Tuple[str, Dict[str, Any]]] = {}
         self.state = LeagueState.opening(config)
         self.nomination: Optional[Dict[str, Any]] = None
         self._refresh_identity([])
@@ -617,6 +670,7 @@ class Board:
         data = json.loads(self.picks_file.read_text(encoding="utf-8"))
         picks = data.get("picks", [])
         self.state = build_state(picks, self.config)
+        self.picks = picks
         self.nomination = data.get("nomination")
         self._refresh_identity(picks)
         return True
@@ -635,6 +689,7 @@ class Board:
         saved = load_saved_draft(_draft_save_path(draft_id), self.config)
         if saved is not None:
             self.state, picks = saved
+            self.picks = picks
             self._refresh_identity(picks)
         seed = fetch_draft(draft_id)
         self._users = fetch_league_users(seed["league_id"])
@@ -672,6 +727,7 @@ class Board:
         self.raw_picks = raw_picks
         picks = [_pick_from_sleeper(p) for p in self.raw_picks]
         self.state = build_state(picks, self.config)
+        self.picks = picks
         self.nomination = _nomination_from_sleeper(draft)
         self._refresh_identity(picks)
         _save_draft(_draft_save_path(self.draft_id), self)
@@ -689,7 +745,8 @@ class Board:
             self.refresh_from_file()
         # In "draft" mode the background poller (see `poller`) keeps state
         # current; a request here just reads whatever it last built.
-        return build_payload(
+        total = len(self.picks)
+        result = build_payload(
             self.state,
             self.players,
             self.config,
@@ -702,6 +759,45 @@ class Board:
             matrix_top=self.matrix_top,
             nomination=self.nomination,
         )
+        result["view"] = {"pick": total, "total": total, "live": True}
+        return result
+
+    def get_payload_upto(self, n: int) -> Dict[str, Any]:
+        """The board as it stood after pick `n` -- see
+        docs/spec/board/04-time-travel-scrubber.md. Memoized in memory,
+        keyed by a prefix signature (`_prefix_sig`) so a stale entry -- a
+        `FRAME_SCHEMA_VERSION` bump, or the seat names changing -- misses
+        and rebuilds instead of serving a payload the current renderer can't
+        read. `n` is clamped to `[0, total]`. Never mutates the live
+        payload -- this builds its own residual state from a picks prefix,
+        entirely separate from `self.state`.
+        """
+        total = len(self.picks)
+        n = max(0, min(n, total))
+        sig = _prefix_sig(self.picks, n, self.seat_users)
+
+        cached = self._frame_cache.get(n)
+        if cached is not None and cached[0] == sig:
+            return cached[1]
+
+        sub_state = build_state(self.picks[:n], self.config)
+        result = build_payload(
+            sub_state,
+            self.players,
+            self.config,
+            self.w_floor,
+            seat_users=self.seat_users,
+            divisions=self.divisions,
+            seat_order=self.seat_order,
+            my_seat=self.my_seat,
+            my_division=self.my_division,
+            matrix_top=self.matrix_top,
+            nomination=None,  # a scrubbed view has no live nomination
+        )
+        result["block"] = _sold_block(self.picks, n, self.seat_users)
+        result["view"] = {"pick": n, "total": total, "live": n == total}
+        self._frame_cache[n] = (sig, result)
+        return result
 
 
 def make_handler(board: Board):
@@ -718,8 +814,14 @@ def make_handler(board: Board):
             self.wfile.write(payload)
 
         def do_GET(self) -> None:  # noqa: N802 -- stdlib method name
-            if self.path == "/state.json":
-                self._send_json(board.payload())
+            parsed = urllib.parse.urlparse(self.path)
+            if parsed.path == "/state.json":
+                query = urllib.parse.parse_qs(parsed.query)
+                upto = query.get("upto")
+                if upto:
+                    self._send_json(board.get_payload_upto(int(upto[0])))
+                else:
+                    self._send_json(board.payload())
             elif self.path == "/health":
                 body = b"ok"
                 self.send_response(200)
