@@ -1,14 +1,11 @@
 # 02 · Auction-drift demo (FAQ)
 
-> **Correction to current code.** This spec describes `scripts/draft_demo.py`
-> repricing via `price_board` from `python/vorp/board.py` — that module doesn't
-> exist in this repo. `draft_demo.py`'s actual `snapshot()`/`seat_rows()`
-> reprice with their own logic directly against `vorp.league.teams.LeagueState`
-> and `vorp.models.blend_weights`, not a shared `vorp.board` module. Every
-> `price_board`/`python/vorp/board.py` reference below (including the
-> Reference section's "Depends on") describes the not-yet-implemented `07`
-> design, not what `draft_demo.py` actually calls today. Also, `build_draft_demo.py`
-> writes its page into gitignored `artifacts/`, not a tracked `pages/`.
+> **One correction to current code.** `build_draft_demo.py` writes its page
+> into gitignored `artifacts/`, not a tracked `pages/` — see the correction
+> atop [`01-html-export-pipeline.md`](01-html-export-pipeline.md). The
+> `price_board`/`python/vorp/board.py` references below are now accurate:
+> `scripts/draft_demo.py` imports `price_board` from `python/vorp/board.py`
+> rather than keeping its own copy of the repricing logic.
 
 ### What does this build?
 

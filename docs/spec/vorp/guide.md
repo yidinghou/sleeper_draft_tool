@@ -16,7 +16,7 @@ Two inputs feed every step below, so stand them up before step 1:
   `LEAGUE_CONFIG` (the frozen template), `solve_optimal_fill` /
   `summarize_by_position` / `assign_to_slots` (the matching engine), and
   `LeagueState` / `Seat` / `max_bid` (seats holding real slots, so a single sale
-  is expressible). Steps 1, 2, 8 all call into it; steps 7, 9, 9b (below) would
+  is expressible). Steps 1, 2, 7, 8 all call into it; steps 9, 9b (below) would
   too, once built.
 - **The projections board** — `data/projections-2026.csv`, loaded by
   `vorp.csv_loader` into `RosterFillPlayer(player_id, position, points)`. It is a
@@ -32,7 +32,7 @@ Two inputs feed every step below, so stand them up before step 1:
 | [03 · VORP $ / VOLR $](03-vorp-to-bid.md) | `python/vorp/bid_value.py` (lenses assembled in `python/scripts/bid_value.py`) | `01` + `02` levels and selected sets |
 | [04 · Blended-bar pricing](04-blended-bar-pricing.md) | `python/vorp/models.py` (`progressive_blend`); exported by `python/scripts/blended_price.py` | `01` + `02` bars, `03`'s apportionment |
 | [05 · Principles](05-principles.md) | `python/vorp/principles.py`; report in `python/scripts/principles.py` | `04`'s model registry + all bars |
-| [07 · Live draft board](07-live-draft-board.md) | **WIP** — would be `python/vorp/board.py` (`price_board`) | `04` re-solved over a residual `LeagueState` |
+| [07 · Live draft board](07-live-draft-board.md) | `python/vorp/board.py` (`price_board`) — pricing core only, no server | `04` re-solved over a residual `LeagueState` |
 | [08 · Seat value](08-seat-value.md) | `python/vorp/seat_value.py` | league matching + `04`'s board price and exchange rate |
 | [09 · Best affordable roster](09-optimal-roster.md) | **WIP** — would be `python/vorp/optimal_roster.py` (`plan_roster`) | `08`'s lineup value + `04`/`07` prices |
 | [09b · Roster scenarios](09b-roster-scenarios.md) | **WIP** — would be `python/scripts/roster_scenarios.py` | `09`'s `plan_roster` + `07`'s `price_board`, N seeded times |
@@ -86,15 +86,17 @@ The pass/fail matrix that turns "which model is better" into a table. See the
 [principles harness](#what-the-principles-harness-guarantees) below for what it
 guarantees. Report rendering is `python/scripts/principles.py`.
 
-## Step 7 — `python/vorp/board.py` (not yet built)
+## Step 7 — `python/vorp/board.py`
 
-Planned to re-solve `04`'s pricing against the league that is actually left: the
-sold set read off a residual `LeagueState`, the money pool and open slots
-shrinking per sale, `blend_weights` solved once then re-apportioned at three
-floor weights (`w_floor`, `1.0`, `0.0`) for price / VORP $ / VOLR $. See
-[`07 · Live draft board`](07-live-draft-board.md) for the full spec and
-[`../board/index.md`](../board/index.md) for the live-server module that would
-consume it. Neither exists in this repo yet.
+Re-solves `04`'s pricing against the league that is actually left: the sold set
+read off a residual `LeagueState`, the money pool and open slots shrinking per
+sale, `blend_weights` solved once then re-apportioned at three floor weights
+(`w_floor`, `1.0`, `0.0`) for price / VORP $ / VOLR $. `price_board` is the
+pricing core only — it was lifted out of `scripts/draft_demo.py`'s repricing
+logic, which now imports it instead of keeping its own copy. See
+[`07 · Live draft board`](07-live-draft-board.md) for the full spec. The
+live-server module that would put an HTTP surface around it,
+[`../board/index.md`](../board/index.md), doesn't exist yet.
 
 ## Step 8 — `python/vorp/seat_value.py`
 
@@ -112,7 +114,7 @@ affordable player with the best marginal-points-per-dollar (`08`'s value
 re-solved as the set grows), stopping when no affordable player adds a
 startable point, with `exclude_positions` and `fill_all` as the two knobs on
 top. See [`09 · The best affordable roster`](09-optimal-roster.md). Depends on
-`07` (not yet built) for board prices.
+`07`'s `price_board` (now built) for board prices.
 
 ## Step 9b — `python/scripts/roster_scenarios.py` (not yet built)
 
@@ -120,8 +122,8 @@ Planned as a pure-Python wrapper (no dedicated module, no new model): price the
 board once with `07`, then for each integer seed jitter every price by a
 uniform `±sigma` and re-run `09`, laying the columns out side by side and
 flagging the buys present in every seed. See
-[`09b · Roster scenarios`](09b-roster-scenarios.md). Depends on `09` and `07`,
-neither of which exist yet.
+[`09b · Roster scenarios`](09b-roster-scenarios.md). Depends on `09`, which
+doesn't exist yet (`07`'s `price_board` is built).
 
 ## Testing
 
@@ -130,13 +132,13 @@ Run, from the repo root:
 ```
 python -m pytest python/tests/test_replacement_level.py python/tests/test_last_rostered.py \
     python/tests/test_bid_value.py python/tests/test_principles.py \
-    python/tests/test_seat_value.py
+    python/tests/test_seat_value.py python/tests/test_board.py
 ```
 
 (Equivalently, from `python/`, drop the `python/` prefix — `pyproject.toml` sets
 `pythonpath = ["."]` so the `vorp` package imports without an install. Or just
 `python -m pytest python/tests/` to run everything currently checked in.) These
-five suites are what's implemented today, all passing.
+six suites are what's implemented today, all passing.
 
 What each suite pins:
 
@@ -161,10 +163,14 @@ What each suite pins:
   worth 0, an empty seat values at exactly league VORP, the lineup leaves open
   whichever slot a free body fills best, and the `max_bid` clamp exactly (opening
   seat caps at `185`, a broke-but-not-full seat is "out" at `0`).
+- **`test_board.py`** — with nothing sold `price_board` reproduces
+  `progressive_blend`'s prices exactly at the same `w_floor`, and one sale
+  removes exactly the sold player from the rows and exactly one slot from the
+  residual state, with the priced rows still reconciling to the residual pool.
 
-Future suites (`test_board.py`, `test_optimal_roster.py`) will join this list
-once `07` and `09` are built; `09b` is expected to stay a thin script pinned by
-`09`'s determinism test rather than getting its own suite, per its spec.
+A future `test_optimal_roster.py` will join this list once `09` is built;
+`09b` is expected to stay a thin script pinned by `09`'s determinism test
+rather than getting its own suite, per its spec.
 
 ## What the principles harness guarantees
 
