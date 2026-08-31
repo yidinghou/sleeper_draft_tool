@@ -2,9 +2,13 @@
 and docs/spec/board/03-rendering-contract.md.
 
 Covers `build_state`, `build_payload`, and `Board.refresh_from_file` -- the
-minimal slice of the rendering contract implemented so far (pool/spent/
-spots_left/levels/players). Seats, divisions, the bid matrix, `block`, and
-`my_plan` aren't built yet; see the module docstring in draft_board.py.
+partial slice of the rendering contract implemented so far (pool/spent/
+spots_left/levels/players/seat_users/divisions/seat_order/my_seat/
+my_division). The bid matrix, `block`, and `my_plan` aren't built yet; see
+the module docstring in draft_board.py. Seat identity's own logic
+(random_fill, build_divisions, resolve_my_seat) is covered in
+test_seat_identity_and_divisions.py; this file only checks that Board wires
+them into the payload correctly.
 
 `tests/fixtures/mock-draft-small.json` is a small hand-built fixture (4 real
 players, 3 landing on real seats, 1 with no draft_slot) -- not the eventual
@@ -105,3 +109,15 @@ def test_board_payload_reflects_the_loaded_picks_file():
     payload = board.payload()
     assert payload["spent"] == 50
     assert "19" not in {row["player_id"] for row in payload["players"]}
+
+
+def test_board_payload_carries_a_full_identity_and_division_layout():
+    board = Board(LEAGUE_CONFIG, _players(), w_floor=1.0, me_fallback=3)
+    board.set_picks_file(FIXTURE)
+    payload = board.payload()
+
+    assert len(payload["seat_users"]) == LEAGUE_CONFIG.teams
+    assert sorted(payload["seat_order"]) == list(range(LEAGUE_CONFIG.teams))
+    assert payload["my_seat"] == 2  # --me 3, 1-indexed -> seat 2, 0-indexed
+    assert payload["my_division"] is not None
+    assert payload["divisions"][0]["mine"] is True
