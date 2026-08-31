@@ -2,21 +2,26 @@
 """The live draft board server -- see docs/spec/board/index.md.
 
 Steps 2 and 4 of docs/spec/board/guide.md's build order: the server skeleton,
-`/state.json`, and seat identity + divisions. This is still a partial slice
-of the full rendering contract (docs/spec/board/03-rendering-contract.md) --
-pool/spent/spots_left/levels, a priced player list, and seat_users/divisions/
-seat_order/my_seat/my_division, from a `--picks-file` replayed into a
-residual `LeagueState`. Not yet built: the per-seat bid matrix (needs
-seat_value.py over real seat identities), `block` (needs a nomination
-source), and `my_plan` (needs `plan_roster`, spec 09 -- not built). Sleeper
-polling (guide.md step 3) is also follow-up work; today this only reads
-`--picks-file`, so identity is resolved from `random_fill` plus whatever a
-pick's `picked_by` happens to carry -- there is no real `draft`/`users` feed
-to seed pins from yet, outside of `--print-seats`, which does its own
-one-shot fetch.
+`/state.json`, seat identity + divisions, and the per-seat bid matrix. This
+is still a partial slice of the full rendering contract
+(docs/spec/board/03-rendering-contract.md) -- pool/spent/spots_left/levels,
+a priced player list, the bid matrix, and seat_users/divisions/seat_order/
+my_seat/my_division, from a `--picks-file` replayed into a residual
+`LeagueState`. Not yet built: `block` (needs a nomination source -- the
+matrix's `force_ids` hook is there for it) and `my_plan` (needs
+`plan_roster`, spec 09 -- not built). Sleeper polling (guide.md step 3) is
+also follow-up work; today this only reads `--picks-file`, so identity is
+resolved from `random_fill` plus whatever a pick's `picked_by` happens to
+carry -- there is no real `draft`/`users` feed to seed pins from yet,
+outside of `--print-seats`, which does its own one-shot fetch.
+
+The matrix has no cache in front of it (that's guide.md step 6, not built),
+so it runs one lineup solve per `(player, real seat)` pair on every
+`/state.json` request -- `--matrix-top` (default 300) bounds it.
 
 Usage: python scripts/draft_board.py --picks-file <path> [--me 3] [--port 8770]
                                      [--season 2026] [--w-floor 1.0]
+                                     [--matrix-top 300]
        python scripts/draft_board.py --draft-id <id> --print-seats
 """
 
@@ -44,11 +49,13 @@ from vorp.league.config import (  # noqa: E402
     division_index_for,
 )
 from vorp.league.roster_fill import RosterFillPlayer as Player  # noqa: E402
-from vorp.league.teams import LeagueState  # noqa: E402
+from vorp.league.teams import UNKNOWN_SEAT, LeagueState  # noqa: E402
+from vorp.seat_value import price_from_value, seat_values  # noqa: E402
 from vorp.sleeper_client import fetch_draft, fetch_league_users, seat_identity  # noqa: E402
 
 DEFAULT_PORT = 8770
 DEFAULT_W_FLOOR = 1.0
+DEFAULT_MATRIX_TOP = 300
 
 
 def build_state(picks: List[Dict[str, Any]], config: LeagueConfig) -> LeagueState:
@@ -73,6 +80,70 @@ def build_state(picks: List[Dict[str, Any]], config: LeagueConfig) -> LeagueStat
     return state
 
 
+def seat_matrix(
+    state: LeagueState,
+    remaining: List[Player],
+    players: List[Player],
+    board: Dict[str, Any],
+    matrix_top: int = DEFAULT_MATRIX_TOP,
+    force_ids: Tuple[str, ...] = (),
+) -> List[Dict[str, Any]]:
+    """Per-seat bid matrix -- see docs/spec/board/03-rendering-contract.md.
+
+    Every priced player as a row, capped to the top `matrix_top` by board
+    price plus any `force_ids` (the on-block player is meant to always be
+    forced in, so his per-seat worth exists even off the top of the board --
+    wiring that in is follow-up work, once a nomination source exists). Each
+    row carries a bid per real seat (`UNKNOWN_SEAT` owns no roster and gets
+    none), the likely winner (highest bid), the price-setter (2nd-highest),
+    and the expected winning price (price-setter + $1, or the board price
+    when nobody but the winner would bid at all).
+
+    Runs one lineup solve per `(row, real seat)` pair -- the reason for the
+    cap. There is no caching in front of this yet (the frame cache is
+    guide.md step 6, not built), so a live server should keep `matrix_top`
+    modest; the shipped default (300) is effectively "the whole board"
+    pre-draft (~192 players).
+    """
+    real_seats = [s.seat_id for s in state.seats if s.seat_id != UNKNOWN_SEAT]
+    prices = board["rows"]
+    ranked = sorted(prices, key=lambda pid: -prices[pid]["price"])
+    top_ids = list(dict.fromkeys(ranked[:matrix_top] + list(force_ids)))
+    top_ids = [pid for pid in top_ids if pid in prices]
+
+    replacement = {pos: level["replacement"] for pos, level in board["levels"].items()}
+    points_by_id = {p.player_id: p.points for p in players}
+    by_id = {p.player_id: p for p in remaining}
+    rate = board["vorp_rate"]
+
+    bids_by_seat: Dict[int, Dict[str, int]] = {}
+    for seat_id in real_seats:
+        candidates = [by_id[pid] for pid in top_ids if pid in by_id]
+        values = seat_values(state, seat_id, candidates, replacement, points_by_id)
+        bids_by_seat[seat_id] = {
+            pid: price_from_value(values.get(pid, 0.0), rate, state, seat_id)
+            for pid in top_ids
+        }
+
+    rows = []
+    for pid in top_ids:
+        bids = {seat_id: bids_by_seat[seat_id][pid] for seat_id in real_seats}
+        ranked_bids = sorted(bids.items(), key=lambda kv: -kv[1])
+        winner_seat, winner_bid = ranked_bids[0] if ranked_bids else (None, 0)
+        setter_bid = ranked_bids[1][1] if len(ranked_bids) > 1 else 0
+        rows.append(
+            {
+                "player_id": pid,
+                "price": prices[pid]["price"],
+                "bids": bids,
+                "winner": winner_seat if winner_bid > 0 else None,
+                "price_setter_bid": setter_bid,
+                "expected_price": (setter_bid + 1) if setter_bid > 0 else prices[pid]["price"],
+            }
+        )
+    return rows
+
+
 def build_payload(
     state: LeagueState,
     players: List[Player],
@@ -84,6 +155,7 @@ def build_payload(
     seat_order: Optional[List[int]] = None,
     my_seat: Optional[int] = None,
     my_division: Optional[int] = None,
+    matrix_top: int = DEFAULT_MATRIX_TOP,
 ) -> Dict[str, Any]:
     """The (still partial) `/state.json` payload -- see
     docs/spec/board/03-rendering-contract.md. The identity-derived keys
@@ -111,6 +183,7 @@ def build_payload(
             }
             for pid, row in board["rows"].items()
         ],
+        "matrix": seat_matrix(state, remaining, players, board, matrix_top=matrix_top),
     }
     if seat_users is not None:
         payload["seat_users"] = seat_users
@@ -281,11 +354,13 @@ class Board:
         players: List[Player],
         w_floor: float,
         me_fallback: Optional[int] = None,
+        matrix_top: int = DEFAULT_MATRIX_TOP,
     ):
         self.config = config
         self.players = players
         self.w_floor = w_floor
         self.me_fallback = me_fallback
+        self.matrix_top = matrix_top
         self.picks_file: Optional[Path] = None
         self._mtime: Optional[float] = None
         self.state = LeagueState.opening(config)
@@ -331,6 +406,7 @@ class Board:
             seat_order=self.seat_order,
             my_seat=self.my_seat,
             my_division=self.my_division,
+            matrix_top=self.matrix_top,
         )
 
 
@@ -372,6 +448,7 @@ def main() -> None:
     parser.add_argument("--season", type=int, default=LEAGUE_CONFIG.season)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--w-floor", type=float, default=DEFAULT_W_FLOOR)
+    parser.add_argument("--matrix-top", type=int, default=DEFAULT_MATRIX_TOP)
     parser.add_argument(
         "--print-seats",
         action="store_true",
@@ -390,7 +467,7 @@ def main() -> None:
 
     config = LEAGUE_CONFIG
     players = load_players_from_csv(projections_csv_path(args.season))
-    board = Board(config, players, args.w_floor, me_fallback=args.me)
+    board = Board(config, players, args.w_floor, me_fallback=args.me, matrix_top=args.matrix_top)
     board.set_picks_file(args.picks_file)
 
     server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(board))
