@@ -617,6 +617,158 @@
     font-family: var(--mono);
     font-variant-numeric: tabular-nums;
   }
+  tr.open td {
+    color: var(--ink-faint);
+    font-style: italic;
+  }
+  tr.bench {
+    opacity: 0.55;
+  }
+
+  /* ---------------------------------- live-bottom: rosters + run pressure */
+
+  .live-bottom {
+    flex: 1;
+    display: flex;
+    gap: 12px;
+    min-height: 360px;
+  }
+  .rosterbox {
+    flex: 0 0 17vw;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+  }
+  .bidderbox {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  }
+  .miniwrap {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .pressbox {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .presscards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
+  }
+  .presscard {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-sunk);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-height: 0;
+  }
+  .presscard .cap {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .presscard .cliff {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+  .presscard .cliff b {
+    color: var(--ink);
+  }
+  .availlist {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    margin-top: 1px;
+  }
+  .availhd {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 42px 42px 38px;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--surface-sunk);
+    padding: 3px 2px;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--display);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+  }
+  .availhd span {
+    text-align: right;
+    white-space: nowrap;
+  }
+  .availhd span:first-child {
+    text-align: left;
+  }
+  .availhd .vd {
+    color: var(--accent);
+  }
+  .availhd .ld {
+    color: #2dd4da;
+  }
+  .availrow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 42px 42px 38px;
+    gap: 8px;
+    align-items: center;
+    font-size: 0.85rem;
+    padding: 3px 2px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .availrow:last-child {
+    border-bottom: none;
+  }
+  .availrow .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink);
+  }
+  .availrow .vd,
+  .availrow .ld,
+  .availrow .proj {
+    font-family: var(--mono);
+    font-style: normal;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8rem;
+  }
+  .availrow .vd {
+    color: var(--accent);
+  }
+  .availrow .ld {
+    color: #2dd4da;
+  }
+  .availrow .proj {
+    color: var(--ink-soft);
+  }
+  .cliffline {
+    margin: 3px 0;
+    padding: 3px 0 2px;
+    text-align: center;
+    border-top: 1px dashed var(--down);
+    color: var(--down);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
 
   /* draft-state "market so far / still on board" grouped table */
   #state-table .grouptop th {
@@ -701,6 +853,20 @@
     <div class="card">
       <div class="eyebrow">Draft state by position</div>
       <div id="state-table"></div>
+    </div>
+    <div class="live-bottom">
+      <div class="card rosterbox">
+        <div class="eyebrow" id="mini-my-label">My roster</div>
+        <div class="miniwrap"><table><tbody id="mini-my"></tbody></table></div>
+      </div>
+      <div class="card rosterbox bidderbox">
+        <div class="eyebrow" id="mini-bidder-label">High bidder's roster</div>
+        <div class="miniwrap"><table><tbody id="mini-bidder"></tbody></table></div>
+      </div>
+      <div class="card pressbox">
+        <div class="eyebrow">Run pressure -- what's left before the next tier</div>
+        <div class="presscards" id="presscards"></div>
+      </div>
     </div>
   </section>
 
@@ -1174,6 +1340,125 @@
       .join("");
   }
 
+  const SKILL_POS = ["QB", "RB", "WR", "TE"];
+  const SLOT_LABEL = { FLEX: "FLEX", REC_FLEX: "WR/TE", SUPER_FLEX: "SFLEX", BN: "BN" };
+
+  function posClassFor(pos) {
+    return SKILL_POS.includes(pos) ? pos : pos === "DEF" ? "DEF" : "FLEX";
+  }
+  function posBadgeHtml(pos) {
+    return `<span class="pos ${posClassFor(pos)}">${pos}</span>`;
+  }
+  function slotBadgeHtml(label) {
+    return `<span class="pos ${posClassFor(label)}">${SLOT_LABEL[label] || label}</span>`;
+  }
+
+  // A seat's roster as slot-filled rows via the shared fillSlots (open slots
+  // show the slot label; a flex slot shows the seated player's own position
+  // color under the flex label; bench -- unseated -- players are dimmed).
+  // `mini` drops the Proj column for the narrow Live-slide cards.
+  function slotRows(seat, slotsTemplate, mini) {
+    const bought = seat.bought || [];
+    const players = bought.map((b) => ({ playerId: b.player_id, position: b.position, points: b.points }));
+    const seated = fillSlots(players, slotsTemplate);
+    const seatedIds = new Set(seated.values());
+    const boughtById = Object.fromEntries(bought.map((b) => [b.player_id, b]));
+    const bench = bought.filter((b) => !seatedIds.has(b.player_id));
+
+    const row = (badge, b, cls) =>
+      mini
+        ? `<tr class="${cls}"><td>${badge}</td><td class="name">${
+            b ? b.player_id : "— open —"
+          }</td><td class="num money">${b ? fmtMoney(b.amount) : ""}</td></tr>`
+        : `<tr class="${cls}"><td>${badge}</td><td class="name">${
+            b ? b.player_id : "— open —"
+          }</td><td class="num">${b ? b.points : ""}</td><td class="num money">${
+            b ? fmtMoney(b.amount) : ""
+          }</td></tr>`;
+
+    const starterRows = slotsTemplate
+      .map((slot) => {
+        const pid = seated.get(slot.id);
+        if (!pid) return row(slotBadgeHtml(slot.flexLabel), null, "open");
+        const b = boughtById[pid];
+        const isFlex = slot.eligiblePositions && slot.eligiblePositions.length > 1;
+        const badge = isFlex
+          ? `<span class="pos ${posClassFor(b.position)}">${SLOT_LABEL[slot.flexLabel] || slot.flexLabel}</span>`
+          : posBadgeHtml(b.position);
+        return row(badge, b, "");
+      })
+      .join("");
+    const benchRows = bench.map((b) => row(posBadgeHtml(b.position), b, "bench")).join("");
+    return starterRows + benchRows;
+  }
+
+  // Serves both "My roster" and "High bidder's roster" -- same slot-fill,
+  // different seat.
+  function renderMiniRoster(payload, seatId, bodyId, labelId, labelText) {
+    const body = document.getElementById(bodyId);
+    const label = document.getElementById(labelId);
+    const seat = seatId != null ? seatById(payload, seatId) : null;
+    if (!seat) {
+      label.textContent = labelText;
+      body.innerHTML = "";
+      return;
+    }
+    const mine = seatId === payload.my_seat ? " (me)" : "";
+    label.textContent = `${labelText} — ${seatLabel(payload, seatId)}${mine} · ${fmtMoney(seat.budget_left)} left`;
+    body.innerHTML = slotRows(seat, startingSlots(payload.config || {}), true);
+  }
+
+  // Run pressure: top-10-by-VORP-$ available players per skill position,
+  // with a cliff marker at the biggest point drop -- pure client-side math
+  // over payload.players, no server dependency (there's no tier-cliff
+  // structure in the payload to consume instead).
+  function renderPressCards(payload) {
+    const el = document.getElementById("presscards");
+    if (!el) return;
+    const numSeats = (payload.seats || []).length;
+    el.innerHTML = SKILL_POS.map((pos) => {
+      const avail = (payload.players || [])
+        .filter((p) => p.position === pos)
+        .slice()
+        .sort((a, b) => (b.vorp_dollar || 0) - (a.vorp_dollar || 0))
+        .slice(0, 10);
+      let cliffAfter = -1,
+        cliffDrop = 0;
+      for (let i = 0; i < avail.length - 1; i++) {
+        const drop = (avail[i].points || 0) - (avail[i + 1].points || 0);
+        if (drop > cliffDrop) {
+          cliffDrop = drop;
+          cliffAfter = i;
+        }
+      }
+      if (avail.length < 3 || cliffDrop <= 0) cliffAfter = -1;
+      const target = ((payload.config || {}).starting_slots || {})[pos] || 0;
+      const slots = target * numSeats;
+      const drafted = (payload.seats || []).reduce(
+        (n, s) => n + s.bought.filter((b) => b.position === pos).length,
+        0
+      );
+      const head = `<div class="availhd"><span>Player</span><span class="vd">VORP $</span><span class="ld">VOLR $</span><span>Proj</span></div>`;
+      const rows = avail
+        .map((p, i) => {
+          const row = `<div class="availrow"><span class="name">${p.player_id}</span><span class="vd">${fmtMoney(
+            p.vorp_dollar
+          )}</span><span class="ld">${fmtMoney(p.volr_dollar)}</span><i class="proj">${Math.round(
+            p.points || 0
+          )}</i></div>`;
+          return i === cliffAfter
+            ? row + `<div class="cliffline">&#9662; -${Math.round(cliffDrop)} pts to next tier</div>`
+            : row;
+        })
+        .join("");
+      return (
+        `<div class="presscard"><div class="cap"><span class="pos ${pos}">${pos}</span>${avail.length} on the board</div>` +
+        `<div class="cliff"><b>${drafted} / ${slots}</b> starters drafted</div>` +
+        `<div class="availlist">${head}${rows}</div></div>`
+      );
+    }).join("");
+  }
+
   function renderAll(payload) {
     renderHeader(payload, document.getElementById("head-live"));
     renderHeader(payload, document.getElementById("head-market"));
@@ -1181,6 +1466,16 @@
     renderStateTable(payload);
     renderMatrix(payload);
     renderRosters(payload);
+    renderPressCards(payload);
+    renderMiniRoster(payload, payload.my_seat, "mini-my", "mini-my-label", "My roster");
+    const blockRow = payload.block ? matrixRowFor(payload, payload.block.player_id) : null;
+    renderMiniRoster(
+      payload,
+      blockRow ? blockRow.winner : null,
+      "mini-bidder",
+      "mini-bidder-label",
+      "High bidder's roster"
+    );
   }
 
   window.__renderAll = renderAll; // exposed for a static-payload smoke test
