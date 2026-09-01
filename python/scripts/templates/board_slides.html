@@ -390,41 +390,119 @@
   }
 
   /* --------------------------------------------------- buying power ---- */
+  /* Ported from golden's .barrow/.bar -- height by max_bid only, no
+     bid-activity recency fill or lead-count pill (no bid-ladder data
+     exists server-side to drive those). A .tagsrow of desperation pips
+     sits below: how many of the on-block position each seat still needs. */
 
-  .power-row {
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
+  .barrow {
+    display: flex;
+    align-items: flex-end;
     gap: 6px;
-    align-items: end;
     height: 90px;
+    border-bottom: 1px solid var(--line);
+    padding-top: 22px;
   }
-  .power-bar {
+  .bar {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
     height: 100%;
-    gap: 4px;
   }
-  .power-bar .fill {
+  .bar .amt {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 3px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .bar i {
+    display: block;
     width: 100%;
-    background: var(--accent-soft);
-    border: 1px solid var(--accent);
-    border-radius: 3px 3px 0 0;
-    min-height: 2px;
+    min-height: 3px;
+    background: var(--surface-sunk);
+    border-radius: 2px 2px 0 0;
+    flex-shrink: 0;
   }
-  .power-bar.mine .fill {
-    background: var(--brass);
-    border-color: var(--brass);
+  .bar.mine i {
+    background: var(--accent);
   }
-  .power-bar .label {
+  .power-label {
     font-family: var(--mono);
     font-size: 10px;
     color: var(--ink-faint);
+    text-align: center;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .tagsrow {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .tagsrow .tagcell {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .tagsrow .tagname {
     max-width: 100%;
+    text-align: center;
+    font-size: 0.76rem;
+    color: var(--ink-faint);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .tagsrow .tagcell.me .tagname {
+    color: var(--ink);
+    font-weight: 700;
+  }
+  .tagsrow .tagcell.me .tagname::before {
+    content: "\25B8 ";
+    color: var(--accent);
+  }
+  .pip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--surface-sunk);
+    color: var(--ink-soft);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  /* desperation ramp: --d (0..1) mixes the position colour --pc into the
+     pip; done = satisfied (recedes), empty/part = still wants one, hotter
+     the emptier the seat is at this position. */
+  .pip.done {
+    background: var(--surface-sunk);
+    color: var(--ink-faint);
+  }
+  .pip.part,
+  .pip.empty {
+    background: color-mix(in srgb, var(--pc) calc(var(--d) * 100%), var(--surface-sunk));
+    color: var(--ink);
+  }
+  .pip.empty {
+    color: #fff;
+    font-weight: 800;
+    box-shadow: 0 0 0 1.5px var(--pc);
   }
 
   /* --------------------------------------------------------- nav --------- */
@@ -540,6 +618,23 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* draft-state "market so far / still on board" grouped table */
+  #state-table .grouptop th {
+    border-bottom: none;
+    padding-bottom: 2px;
+    color: var(--ink-faint);
+    font-size: 10px;
+  }
+  #state-table td.gb,
+  #state-table th.gb {
+    border-left: 1px solid var(--line);
+  }
+  #state-table tfoot td {
+    border-top: 2px solid var(--line-soft);
+    border-bottom: none;
+    font-weight: 600;
+  }
+
   .division {
     margin-bottom: 20px;
   }
@@ -600,7 +695,8 @@
     <div class="uhead" id="head-live"></div>
     <div class="card">
       <div class="eyebrow">Buying power</div>
-      <div class="power-row" id="power"></div>
+      <div class="barrow" id="power"></div>
+      <div class="tagsrow" id="power-tags"></div>
     </div>
     <div class="card">
       <div class="eyebrow">Draft state by position</div>
@@ -817,14 +913,35 @@
     el.innerHTML = order
       .map((sid) => {
         const seat = seatsById[sid] || {};
-        const pct = Math.max(2, ((seat.max_bid || 0) / maxOfAll) * 100);
+        const pct = Math.max(4, Math.round(((seat.max_bid || 0) / maxOfAll) * 100));
         const mine = sid === payload.my_seat ? " mine" : "";
-        return `
-        <div class="power-bar${mine}">
-          <div class="fill" style="height:${pct}%" title="max bid ${fmtMoney(seat.max_bid)}"></div>
-          <div class="label">${seatLabel(payload, sid)}</div>
-        </div>
-      `;
+        return `<div class="bar${mine}"><span class="amt">${fmtMoney(
+          seat.max_bid
+        )}</span><i style="height:${pct}%"></i></div>`;
+      })
+      .join("");
+
+    const tagsEl = document.getElementById("power-tags");
+    const blockPos = payload.block && payload.block.position;
+    const target = blockPos ? (payload.config.starting_slots || {})[blockPos] || 0 : 0;
+    if (!blockPos || target <= 0) {
+      tagsEl.innerHTML = "";
+      return;
+    }
+    tagsEl.innerHTML = order
+      .map((sid) => {
+        const seat = seatsById[sid] || { bought: [] };
+        const have = seat.bought.filter((b) => b.position === blockPos).length;
+        const need = Math.max(0, target - have);
+        const d = target > 0 ? need / target : 0;
+        const cls = need === 0 ? "done" : have === 0 ? "empty" : "part";
+        const mine = sid === payload.my_seat ? " me" : "";
+        return `<div class="tagcell${mine}"><span class="tagname">${seatLabel(
+          payload,
+          sid
+        )}</span><span class="pip ${cls}" style="--pc:var(--${blockPos.toLowerCase()});--d:${d.toFixed(
+          2
+        )}">${have}/${target}</span></div>`;
       })
       .join("");
   }
@@ -835,28 +952,52 @@
     const el = document.getElementById("state-table");
     const drafted = {};
     const spent = {};
+    const vorpGot = {};
     for (const pos of POSITIONS) {
       drafted[pos] = 0;
       spent[pos] = 0;
+      vorpGot[pos] = 0;
     }
+    const levels = payload.levels || {};
     for (const seat of payload.seats || []) {
       for (const b of seat.bought) {
         drafted[b.position] = (drafted[b.position] || 0) + 1;
         spent[b.position] = (spent[b.position] || 0) + b.amount;
+        const replacement = (levels[b.position] || {}).replacement || 0;
+        vorpGot[b.position] = (vorpGot[b.position] || 0) + Math.max(0, (b.points || 0) - replacement);
       }
     }
+    const vorpLeft = {};
+    for (const pos of POSITIONS) vorpLeft[pos] = 0;
+    for (const p of payload.players || []) {
+      const replacement = (levels[p.position] || {}).replacement || 0;
+      vorpLeft[p.position] = (vorpLeft[p.position] || 0) + Math.max(0, (p.points || 0) - replacement);
+    }
+    const pct = (gv, lv) => (gv + lv > 0 ? Math.round((100 * lv) / (gv + lv)) : 0);
 
-    const positions = Object.keys(payload.levels || {});
+    const positions = Object.keys(levels);
+    let totalDrafted = 0,
+      totalSpent = 0,
+      totalGot = 0,
+      totalLeft = 0;
     const rows = positions
       .map((pos) => {
-        const level = payload.levels[pos];
+        const level = levels[pos];
+        const got = vorpGot[pos] || 0,
+          left = vorpLeft[pos] || 0;
+        totalDrafted += drafted[pos] || 0;
+        totalSpent += spent[pos] || 0;
+        totalGot += got;
+        totalLeft += left;
         return `
         <tr>
-          <td class="pos-${pos}">${pos}</td>
+          <td><span class="pos ${pos}">${pos}</span></td>
           <td class="num">${drafted[pos] || 0}</td>
           <td class="num money">${fmtMoney(spent[pos] || 0)}</td>
-          <td class="num">${level.replacement.toFixed(1)}</td>
-          <td class="num">${level.last_rostered.toFixed(1)}</td>
+          <td class="num">${Math.round(got)}</td>
+          <td class="num gb">${level.replacement.toFixed(1)}</td>
+          <td class="num gb">${Math.round(left)}</td>
+          <td class="num">${pct(got, left)}%</td>
         </tr>
       `;
       })
@@ -865,9 +1006,17 @@
     el.innerHTML = `
       <table>
         <thead>
-          <tr><th>Pos</th><th class="num">Drafted</th><th class="num">Spent</th><th class="num">Replacement</th><th class="num">Last rostered</th></tr>
+          <tr class="grouptop"><th></th><th class="num" colspan="3">Market so far</th><th class="num gb">Replacement</th><th class="num gb" colspan="2">Still on the board</th></tr>
+          <tr><th>Pos</th><th class="num">Drafted</th><th class="num">$ spent</th><th class="num">VORP got</th><th class="num gb">Bar (pts)</th><th class="num gb">VORP left</th><th class="num">% left</th></tr>
         </thead>
         <tbody>${rows}</tbody>
+        <tfoot>
+          <tr><td>Total</td><td class="num">${totalDrafted}</td><td class="num money">${fmtMoney(
+      totalSpent
+    )}</td><td class="num">${Math.round(totalGot)}</td><td class="num gb"></td><td class="num gb">${Math.round(
+      totalLeft
+    )}</td><td class="num">${pct(totalGot, totalLeft)}%</td></tr>
+        </tfoot>
       </table>
     `;
   }
