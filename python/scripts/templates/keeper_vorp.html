@@ -1,0 +1,479 @@
+<title>Snake Draft Pool</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #05091a;
+    --surface: #0f1730;
+    --surface-raised: #182144;
+    --border: #2a3258;
+    --border-soft: #1c2547;
+    --text-primary: #f5f7ff;
+    --text-secondary: #93a3c9;
+    --text-faint: #5c6790;
+    --accent-vorp: #f6ad37;
+    --accent-volr: #2dd4da;
+    --pos-qb: #fb7185;
+    --pos-rb: #34d399;
+    --pos-wr: #60a5fa;
+    --pos-te: #c084fc;
+    --pos-k: #94a3b8;
+    --up: #34d399;
+    --warn: #fb7185;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 28px 24px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .masthead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 24px;
+    border-bottom: 1px solid var(--border-soft);
+    padding-bottom: 14px;
+  }
+
+  h1 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin: 0;
+  }
+
+  .sub { color: var(--text-secondary); font-size: 13px; }
+  .sub b { color: var(--text-primary); font-weight: 600; }
+
+  /* ---------------------------------------------------------- my picks */
+
+  .picks {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .pick {
+    flex: 0 0 auto;
+    min-width: 96px;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  .pick.kept { border-style: dashed; opacity: 0.72; }
+
+  .pick .rd {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  .pick .no {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .pick .meta { font-size: 11px; color: var(--text-secondary); }
+  .pick .meta em { color: var(--accent-volr); font-style: normal; }
+
+  /* ---------------------------------------------------------- controls */
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .chip {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 5px 13px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .chip:hover { border-color: var(--border); color: var(--text-primary); }
+  .chip[aria-pressed="true"] {
+    background: var(--surface-raised);
+    border-color: var(--accent-vorp);
+    color: var(--text-primary);
+  }
+
+  input[type="search"] {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 12px;
+    min-width: 200px;
+  }
+
+  input[type="search"]:focus { outline: none; border-color: var(--accent-vorp); }
+  .spacer { flex: 1; }
+  .count { color: var(--text-faint); font-size: 12px; }
+
+  /* ------------------------------------------------------------- table */
+
+  .tablewrap {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    overflow-x: auto;
+  }
+
+  table { border-collapse: collapse; width: 100%; min-width: 860px; }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-raised);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    text-align: right;
+    padding: 9px 12px;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  thead th:not(.static):hover { color: var(--text-primary); }
+  thead th.left { text-align: left; }
+
+  /* Board rank is a label, not a dimension -- there is nothing to sort it by
+     that the VORP column doesn't already do. */
+  thead th.static { cursor: default; color: var(--text-faint); }
+  thead th[aria-sort] { color: var(--accent-vorp); }
+  thead th[aria-sort]::after { content: ' \25BC'; font-size: 9px; }
+  thead th[aria-sort="ascending"]::after { content: ' \25B2'; }
+
+  tbody td {
+    padding: 7px 12px;
+    text-align: right;
+    border-bottom: 1px solid var(--border-soft);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  tbody tr:hover { background: var(--surface-raised); }
+  tbody td.name {
+    text-align: left;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+  }
+
+  td.name small { color: var(--text-faint); font-weight: 400; }
+
+  .pos {
+    display: inline-block;
+    min-width: 30px;
+    text-align: center;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--bg);
+  }
+
+  .pos.QB { background: var(--pos-qb); }
+  .pos.RB { background: var(--pos-rb); }
+  .pos.WR { background: var(--pos-wr); }
+  .pos.TE { background: var(--pos-te); }
+  .pos.K { background: var(--pos-k); }
+
+  /* Board rank never renumbers -- it is the player's place on the full VORP
+     board, so a filtered view still shows where each name really sits. The
+     tint alternates every 10 ranks, which keeps the tier readable once
+     filtering makes the numbers non-contiguous. */
+  td.rank {
+    text-align: left;
+    color: var(--text-secondary);
+    font-weight: 600;
+    border-left: 3px solid transparent;
+  }
+
+  td.rank.t1 { background: rgba(246, 173, 55, 0.07); border-left-color: rgba(246, 173, 55, 0.5); }
+  td.rank.t0 { background: rgba(147, 163, 201, 0.06); border-left-color: rgba(147, 163, 201, 0.35); }
+
+  td.avg { color: var(--accent-vorp); font-weight: 600; }
+  td.dim { color: var(--text-faint); }
+  .delta.up { color: var(--up); }
+  .delta.down { color: var(--warn); }
+
+  /* The boundary at one of my picks: everything above it is expected gone
+     by the time I am on the clock. */
+  .pickline td {
+    padding: 0;
+    border-bottom: none;
+    background: linear-gradient(var(--accent-volr), var(--accent-volr)) no-repeat center / 100% 1px;
+  }
+
+  .pickline span {
+    display: inline-block;
+    margin-left: 12px;
+    background: var(--surface);
+    padding: 2px 10px;
+    border: 1px solid var(--accent-volr);
+    border-radius: 999px;
+    color: var(--accent-volr);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  /* A row sitting at one of my picks' board ranks. */
+  tr.mine td { background: rgba(45, 212, 218, 0.09); }
+  tr.mine td.name::before {
+    content: attr(data-pick);
+    display: inline-block;
+    margin-right: 7px;
+    color: var(--accent-volr);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+  }
+
+  .note {
+    color: var(--text-faint);
+    font-size: 12px;
+    max-width: 70ch;
+  }
+</style>
+
+<div class="app">
+  <div class="masthead">
+    <h1>Snake Draft Pool</h1>
+    <div class="sub" id="sub"></div>
+  </div>
+
+  <div class="picks" id="picks"></div>
+
+  <div class="controls">
+    <button class="chip" data-pos="ALL" aria-pressed="true">All</button>
+    <button class="chip" data-pos="QB">QB</button>
+    <button class="chip" data-pos="RB">RB</button>
+    <button class="chip" data-pos="WR">WR</button>
+    <button class="chip" data-pos="TE">TE</button>
+    <button class="chip" data-pos="K">K</button>
+    <input type="search" id="q" placeholder="Search player or team" />
+    <span class="spacer"></span>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="left static">#</th>
+          <th class="left" data-key="adp" data-dir="asc">ADP</th>
+          <th class="left" data-key="player" data-dir="asc">Player</th>
+          <th class="left" data-key="position" data-dir="asc">Pos</th>
+          <th data-key="bye" data-dir="asc">Bye</th>
+          <th data-key="vorp_avg">VORP avg</th>
+          <th data-key="vorp_sleeper">VORP Sleeper</th>
+          <th data-key="vorp_boberto">VORP Boberto</th>
+          <th data-key="spread">Spread</th>
+          <th data-key="pts_sleeper">Pts Sleeper</th>
+          <th data-key="pts_boberto">Pts Boberto</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <p class="note" id="note"></p>
+</div>
+
+<script>
+  const DATA = __DATA__;
+
+  // Board rank is VORP-average order, which is what the pick markers key off.
+  const board = [...DATA.players].sort((a, b) => b.vorp_avg - a.vorp_avg);
+  board.forEach((p, i) => { p.rank = i + 1; });
+  const pickAtRank = new Map(
+    DATA.my_picks.filter(p => p.rank).map(p => [p.rank, p])
+  );
+  DATA.players.forEach(p => {
+    p.spread = (p.vorp_sleeper != null && p.vorp_boberto != null)
+      ? Math.round((p.vorp_boberto - p.vorp_sleeper) * 10) / 10
+      : null;
+  });
+
+  const num = v => (v == null || v === '' ? null : Number(v));
+  const fmt = v => (v == null ? '—' : v.toFixed(1));
+
+  let sortKey = 'adp', sortDir = 'asc', pos = 'ALL', query = '';
+
+  function compare(a, b) {
+    const av = num(a[sortKey]) ?? (typeof a[sortKey] === 'string' ? a[sortKey] : null);
+    const bv = num(b[sortKey]) ?? (typeof b[sortKey] === 'string' ? b[sortKey] : null);
+    // Missing values always sink, whichever way the column is sorted --
+    // an unranked player is not "the best" just because ADP sorts ascending.
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    const cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
+    return sortDir === 'asc' ? cmp : -cmp;
+  }
+
+  // Every pick I actually make, in board order. The two keeper rounds carry
+  // no rank -- nothing is selected there.
+  const myLivePicks = DATA.my_picks.filter(p => p.rank).sort((a, b) => a.rank - b.rank);
+
+  function pickLine(picks) {
+    const label = picks.map(p => `R${p.round} · pick ${p.pick_no}`).join('  +  ');
+    return `<tr class="pickline"><td colspan="11"><span>${label}</span></td></tr>`;
+  }
+
+  function render() {
+    const rows = DATA.players
+      .filter(p => pos === 'ALL' || p.position === pos)
+      .filter(p => !query || (p.player + ' ' + p.team).toLowerCase().includes(query))
+      .sort(compare);
+
+    // Where each pick's line falls in the *current* view: after however many
+    // of the visible players are expected off the board by then (board rank
+    // below the pick's). In board order that puts the line exactly above the
+    // first survivor; in any other sort it still counts the right number of
+    // players gone, but they are no longer all physically above the line --
+    // an ADP-sorted row above it may still be there, and one below may not.
+    const lineAt = new Map();
+    myLivePicks.forEach(pick => {
+      const gone = rows.reduce((n, p) => n + (p.rank < pick.rank ? 1 : 0), 0);
+      (lineAt.get(gone) ?? lineAt.set(gone, []).get(gone)).push(pick);
+    });
+
+    document.getElementById('rows').innerHTML = rows.map((p, i) => {
+      const mine = pickAtRank.get(p.rank);
+      const spread = p.spread == null ? '—'
+        : `<span class="delta ${p.spread >= 0 ? 'up' : 'down'}">${p.spread > 0 ? '+' : ''}${p.spread.toFixed(1)}</span>`;
+      const tier = Math.ceil(p.rank / 10);
+
+      const line = lineAt.has(i) ? pickLine(lineAt.get(i)) : '';
+
+      return line + `<tr class="${mine ? 'mine' : ''}">
+        <td class="rank t${tier % 2}" title="Tier ${tier} (${tier * 10 - 9}–${tier * 10})">${p.rank}</td>
+        <td class="dim">${p.adp == null ? '—' : p.adp.toFixed(1)}</td>
+        <td class="name" ${mine ? `data-pick="R${mine.round}.${mine.pick_no}"` : ''}>${p.player}
+          <small>${p.team || ''}</small></td>
+        <td class="left"><span class="pos ${p.position}">${p.position}</span></td>
+        <td class="dim">${p.bye || '—'}</td>
+        <td class="avg">${fmt(p.vorp_avg)}</td>
+        <td>${fmt(p.vorp_sleeper)}</td>
+        <td>${fmt(p.vorp_boberto)}</td>
+        <td>${spread}</td>
+        <td class="dim">${fmt(p.pts_sleeper)}</td>
+        <td class="dim">${fmt(p.pts_boberto)}</td>
+      </tr>`;
+    }).join('')
+      // Picks whose whole cohort is already visible -- nothing is left below
+      // them, so they collapse into one closing line.
+      + (lineAt.has(rows.length) ? pickLine(lineAt.get(rows.length)) : '');
+
+    document.getElementById('count').textContent =
+      `${rows.length} of ${DATA.players.length} players`;
+  }
+
+  document.querySelectorAll('thead th').forEach(th => {
+    if (!th.dataset.key) return;
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (sortKey === key) {
+        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortKey = key;
+        // Rank-like columns read best ascending, value columns descending.
+        sortDir = th.dataset.dir === 'asc' ? 'asc' : 'desc';
+      }
+      document.querySelectorAll('thead th').forEach(o => o.removeAttribute('aria-sort'));
+      th.setAttribute('aria-sort', sortDir === 'asc' ? 'ascending' : 'descending');
+      render();
+    });
+  });
+
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      pos = chip.dataset.pos;
+      document.querySelectorAll('.chip').forEach(o =>
+        o.setAttribute('aria-pressed', String(o === chip)));
+      render();
+    });
+  });
+
+  document.getElementById('q').addEventListener('input', e => {
+    query = e.target.value.trim().toLowerCase();
+    render();
+  });
+
+  document.getElementById('picks').innerHTML = DATA.my_picks.map(p => `
+    <div class="pick ${p.keeper ? 'kept' : ''}">
+      <div class="rd">Rd ${p.round}</div>
+      <div class="no">${p.pick_no}</div>
+      <div class="meta">${p.keeper
+        ? `kept · ${p.keeper}`
+        : `board ~<em>${p.rank}</em>${p.gap != null ? ` · ${p.gap} until next` : ''}`}</div>
+    </div>`).join('');
+
+  document.getElementById('sub').innerHTML =
+    `${DATA.season} snake keeper league · slot <b>${DATA.my_slot}</b> · ` +
+    `${DATA.keepers.length} keepers off the board · ${DATA.players.length} draftable`;
+
+  document.getElementById('note').textContent =
+    '# is the player’s fixed place on the full VORP board — not sortable, and it never ' +
+    'renumbers when you filter or re-sort; the shading alternates every 10 ranks so tiers ' +
+    'stay visible. A pick line marks one of my turns: as many players sit above it as ' +
+    'are expected off the board by then, counted by board rank, so filtering to a ' +
+    'position shows how deep each turn reaches. Sorted by VORP avg the line is exact — ' +
+    'everything above it is gone. Under any other sort the count still holds but the ' +
+    'specific names do not: a row above the line may survive, one below may not. ' +
+    'ADP is Sleeper’s 1QB half-PPR board (adp_half_ppr) — the format this league plays, ' +
+    'not the superflex ranking. Sleeper publishes no per-league-size ADP, so it is not ' +
+    '10-team specific. VORP is points over the replacement bar solved against the slots ' +
+    'keepers left open, computed separately per projection source so the two are ' +
+    'comparable. Board rank (the highlighted rows) is VORP-average order, not ADP — the ' +
+    'room does not draft in VORP order. Defenses are excluded; kickers are kept but their ' +
+    'bar is nearly flat.';
+
+  document.querySelector('thead th[data-key="adp"]').setAttribute('aria-sort', 'ascending');
+  render();
+</script>
