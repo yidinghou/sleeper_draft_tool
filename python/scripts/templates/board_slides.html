@@ -612,6 +612,170 @@
   .scroller {
     overflow-x: auto;
   }
+
+  /* ------------------------------------------------------- pool matrix -- */
+
+  .poolhd {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .filters {
+    display: flex;
+    gap: 6px;
+  }
+  .filters button {
+    background: var(--surface);
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 4px 13px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    font-weight: 600;
+  }
+  .filters button:hover {
+    color: var(--ink);
+    border-color: var(--ink-soft);
+  }
+  .filters button.active {
+    background: var(--accent);
+    color: var(--accent-soft);
+    border-color: var(--accent);
+  }
+  .knob {
+    flex: 1 1 auto;
+    min-width: 260px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 12px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+  }
+  .knob input[type="range"] {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 80px;
+    margin: 0;
+  }
+  .knob .klabel {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .knob .klabel.vorp {
+    color: var(--accent);
+  }
+  .knob .klabel.volr {
+    color: #2dd4da;
+  }
+  .knob-readout {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .knob-readout b {
+    color: var(--accent);
+  }
+  .knob-readout i {
+    color: #2dd4da;
+    font-style: normal;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), #2dd4da);
+    outline: none;
+    margin: 0;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--ink);
+    border: 3px solid var(--ground);
+    box-shadow: 0 0 0 1px var(--line-soft);
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--ink);
+    border: 3px solid var(--ground);
+    cursor: pointer;
+  }
+
+  .col-vorp {
+    color: var(--accent);
+  }
+  .col-volr {
+    color: #2dd4da;
+  }
+  td.vorp {
+    color: var(--accent);
+  }
+  td.volr {
+    color: #2dd4da;
+  }
+  td.blend {
+    padding-left: 4px;
+    padding-right: 4px;
+    width: 92px;
+  }
+
+  td.seat {
+    min-width: 30px;
+    text-align: right;
+    color: var(--ink-soft);
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+  td.seat.out {
+    color: var(--ink-faint);
+  }
+  th.mecol,
+  td.mecol {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  td.seat.win {
+    background: var(--up);
+    color: var(--ground);
+    font-weight: 700;
+  }
+  td.seat.setter {
+    text-decoration: underline dashed;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--ink-soft);
+  }
+  th.expwin,
+  td.expwin {
+    border-left: 1px solid var(--line-soft);
+  }
+  td.expwin {
+    color: var(--up);
+    font-weight: 700;
+    font-family: var(--mono);
+    text-align: right;
+  }
+  th.seat.divedge,
+  td.seat.divedge {
+    border-left: 2px solid var(--line);
+  }
   .num {
     text-align: right;
     font-family: var(--mono);
@@ -1191,16 +1355,26 @@
   // refresh doesn't reset the user's chosen column.
   let matrixSortKey = "price";
   let matrixSortDir = -1;
+  let matrixPosFilter = "ALL";
 
   function renderMatrix(payload) {
     const el = document.getElementById("matrix");
     const byId = Object.fromEntries((payload.players || []).map((p) => [p.player_id, p]));
 
-    const rows = [...(payload.matrix || [])];
+    let rows = [...(payload.matrix || [])];
+    if (matrixPosFilter !== "ALL") {
+      rows = rows.filter((r) => (byId[r.player_id] || {}).position === matrixPosFilter);
+    }
     rows.sort((a, b) => {
       const key = matrixSortKey;
-      const av = key === "position" ? (byId[a.player_id] || {}).position || "" : a[key] ?? 0;
-      const bv = key === "position" ? (byId[b.player_id] || {}).position || "" : b[key] ?? 0;
+      const av =
+        key === "position"
+          ? (byId[a.player_id] || {}).position || ""
+          : a[key] ?? (byId[a.player_id] || {})[key] ?? 0;
+      const bv =
+        key === "position"
+          ? (byId[b.player_id] || {}).position || ""
+          : b[key] ?? (byId[b.player_id] || {})[key] ?? 0;
       if (av < bv) return -1 * matrixSortDir;
       if (av > bv) return 1 * matrixSortDir;
       return 0;
@@ -1209,34 +1383,81 @@
     const cols = [
       ["player_id", "Player"],
       ["position", "Pos"],
-      ["price", "Price"],
-      ["expected_price", "Expected"],
-      ["price_setter_bid", "2nd bid"],
-      ["winner", "Winner"],
+      ["price", "Sleeper $"],
+      ["vorp_dollar", "VORP $"],
+      ["volr_dollar", "VOLR $"],
+      ["expected_price", "Exp win"],
     ];
-    const head = cols
-      .map(([key, label]) => `<th data-key="${key}">${label}${matrixSortKey === key ? (matrixSortDir === -1 ? " ↓" : " ↑") : ""}</th>`)
-      .join("");
+    const starts = divisionStarts(payload);
+    const order = seatOrder(payload);
+    const sortArrow = (key) => (matrixSortKey === key ? (matrixSortDir === -1 ? " ↓" : " ↑") : "");
+    const head =
+      cols
+        .slice(0, 3)
+        .map(([key, label]) => `<th data-key="${key}">${label}${sortArrow(key)}</th>`)
+        .join("") +
+      `<th style="text-align:center">Blend</th>` +
+      `<th class="col-volr" data-key="volr_dollar">VOLR $${sortArrow("volr_dollar")}</th>` +
+      order
+        .map((sid) => {
+          const me = sid === payload.my_seat ? " mecol me" : "";
+          const edge = starts.has(sid) ? " divedge" : "";
+          return `<th class="num seat${me}${edge}">${seatAbbr(payload, sid)}${sid === payload.my_seat ? "*" : ""}</th>`;
+        })
+        .join("") +
+      `<th class="num expwin" data-key="expected_price">Exp win${sortArrow("expected_price")}</th>`;
 
     const body = rows
       .map((row) => {
         const p = byId[row.player_id] || {};
-        const winnerLabel =
-          row.winner !== null && row.winner !== undefined ? seatLabel(payload, row.winner) : "--";
+        const seatCells = order
+          .map((sid) => {
+            const b = row.bids ? row.bids[sid] : undefined;
+            const cls = ["seat"];
+            if (sid === payload.my_seat) cls.push("mecol");
+            if (!b || b <= 0) cls.push("out");
+            if (sid === row.winner) cls.push("win");
+            else if (row.price_setter_bid && b === row.price_setter_bid) cls.push("setter");
+            if (starts.has(sid)) cls.push("divedge");
+            return `<td class="${cls.join(" ")}">${b > 0 ? fmtMoney(b) : "—"}</td>`;
+          })
+          .join("");
         return `
         <tr>
-          <td>${row.player_id}</td>
-          <td class="pos-${p.position || ""}">${p.position || ""}</td>
+          <td><span class="pos ${p.position || ""}">${p.position || ""}</span></td>
+          <td class="name">${row.player_id}</td>
           <td class="num money">${fmtMoney(row.price)}</td>
-          <td class="num money">${fmtMoney(row.expected_price)}</td>
-          <td class="num money">${fmtMoney(row.price_setter_bid)}</td>
-          <td>${winnerLabel}</td>
+          <td class="num vorp">${fmtMoney(p.vorp_dollar)}</td>
+          <td class="blend">${blendTrack(p.vorp_dollar, p.volr_dollar)}</td>
+          <td class="num volr">${fmtMoney(p.volr_dollar)}</td>
+          ${seatCells}
+          <td class="expwin">${fmtMoney(row.expected_price)}</td>
         </tr>
       `;
       })
       .join("");
 
     el.innerHTML = `
+      <div class="poolhd">
+        <div class="filters" id="matrix-posfilter">
+          ${["ALL", "QB", "RB", "WR", "TE"]
+            .map(
+              (pos) =>
+                `<button type="button" data-pos="${pos}" class="${
+                  matrixPosFilter === pos ? "active" : ""
+                }">${pos === "ALL" ? "All" : pos}</button>`
+            )
+            .join("")}
+        </div>
+        <div class="knob">
+          <span class="klabel vorp">VORP $</span>
+          <input type="range" id="matrix-blend" min="0" max="100" step="5" value="${Math.round((1 - W) * 100)}" />
+          <span class="klabel volr">VOLR $</span>
+          <span class="knob-readout"><b id="matrix-pctVorp">${Math.round(W * 100)}%</b> VORP / <i id="matrix-pctVolr">${Math.round(
+      (1 - W) * 100
+    )}%</i> VOLR</span>
+        </div>
+      </div>
       <div class="scroller">
         <table>
           <thead><tr>${head}</tr></thead>
@@ -1245,7 +1466,21 @@
       </div>
     `;
 
-    el.querySelectorAll("th").forEach((th) => {
+    el.querySelectorAll("#matrix-posfilter button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        matrixPosFilter = btn.dataset.pos;
+        renderMatrix(payload);
+      });
+    });
+    const blendSlider = el.querySelector("#matrix-blend");
+    blendSlider.addEventListener("input", () => {
+      W = 1 - +blendSlider.value / 100;
+      renderMatrix(payload);
+      renderHeader(payload, document.getElementById("head-live"));
+      renderHeader(payload, document.getElementById("head-market"));
+    });
+
+    el.querySelectorAll("th[data-key]").forEach((th) => {
       th.addEventListener("click", () => {
         const key = th.dataset.key;
         if (matrixSortKey === key) {
