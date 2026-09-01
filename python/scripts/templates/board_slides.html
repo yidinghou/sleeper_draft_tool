@@ -507,6 +507,20 @@
 
   /* --------------------------------------------------------- nav --------- */
 
+  /* Both float as golden-style pills and auto-hide when idle (pokeNav),
+     returning on mouse move/keydown/hover -- so they don't sit over the
+     run-pressure cards or roster grid while the drafter is just watching. */
+  .nav,
+  .scrub-bar {
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  .nav.faded,
+  .scrub-bar.faded {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+    pointer-events: none;
+  }
+
   .nav {
     position: fixed;
     bottom: 16px;
@@ -514,11 +528,13 @@
     transform: translateX(-50%);
     display: flex;
     gap: 6px;
-    background: var(--surface);
+    background: rgba(10, 15, 28, 0.85);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
     border: 1px solid var(--line);
     border-radius: 999px;
     padding: 6px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
     z-index: 10;
   }
   .nav button {
@@ -532,9 +548,12 @@
     border-radius: 999px;
     cursor: pointer;
   }
+  .nav button:hover {
+    color: var(--ink);
+  }
   .nav button.active {
     background: var(--accent);
-    color: white;
+    color: var(--accent-soft);
   }
 
   .scrub-bar {
@@ -545,11 +564,13 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    background: var(--surface);
+    background: rgba(10, 15, 28, 0.85);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
     border: 1px solid var(--line);
     border-radius: 999px;
     padding: 6px 16px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
     z-index: 10;
     width: min(90vw, 480px);
   }
@@ -1162,6 +1183,30 @@
   document.querySelectorAll(".nav button").forEach((btn) => {
     btn.addEventListener("click", () => showSlide(btn.dataset.slide));
   });
+
+  // Floating nav + scrub bar auto-hide when idle, return on mouse move/key/hover.
+  const navEl = document.querySelector(".nav");
+  const scrubBarEl = document.querySelector(".scrub-bar");
+  let navTimer;
+  function pokeNav() {
+    navEl.classList.remove("faded");
+    scrubBarEl.classList.remove("faded");
+    clearTimeout(navTimer);
+    navTimer = setTimeout(() => {
+      navEl.classList.add("faded");
+      scrubBarEl.classList.add("faded");
+    }, 2000);
+  }
+  [navEl, scrubBarEl].forEach((el) =>
+    el.addEventListener("mouseenter", () => {
+      clearTimeout(navTimer);
+      navEl.classList.remove("faded");
+      scrubBarEl.classList.remove("faded");
+    })
+  );
+  document.addEventListener("mousemove", pokeNav);
+  document.addEventListener("keydown", pokeNav);
+  pokeNav();
 
   document.addEventListener("keydown", (e) => {
     if (e.shiftKey && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
