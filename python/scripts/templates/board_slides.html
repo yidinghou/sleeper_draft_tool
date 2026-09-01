@@ -951,58 +951,144 @@
     font-weight: 600;
   }
 
-  .division {
-    margin-bottom: 20px;
+  /* --------------------------------------------------------- rosters --- */
+  /* Ported from golden's .rbands/.rband/.rail/.rgrid4/.rcard: one row per
+     division, a stacked-letter rail, a 4-card grid. Each card is a fixed
+     head over a scrolling masked body of slotRows -- trimmed to 4 columns
+     (Pos/Player/Proj/Paid; bought players carry no bye and no per-line VORP
+     number, only season points). */
+
+  .rbands {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
-  .division .eyebrow {
-    margin-bottom: 8px;
+  .rband {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    border-radius: 8px;
+    padding: 4px 4px 4px 0;
   }
-  .division.mine .eyebrow {
+  .rband.mine {
+    outline: 1px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 4%, transparent);
+  }
+  .rband .rail {
+    flex: none;
+    width: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-right: 1px solid var(--line);
+    padding: 4px 0;
+  }
+  .rband.mine .rail {
+    border-right-color: var(--accent);
+  }
+  .rband .rail .divname {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 0.95rem;
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .rband.mine .rail .divname {
     color: var(--accent);
   }
-  .roster-grid {
+  .rgrid4 {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
   }
   @media (max-width: 900px) {
-    .roster-grid {
+    .rgrid4 {
       grid-template-columns: repeat(2, 1fr);
     }
   }
-  .roster-card {
+  .rcard {
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 12px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
   }
-  .roster-card.mine {
+  .rcard.mine {
     border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent);
   }
-  .roster-card-head {
+  .rhd1 {
     display: flex;
-    justify-content: space-between;
     align-items: baseline;
-    font-weight: 600;
-    margin-bottom: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--line-soft);
+    gap: 8px;
+    margin-bottom: 3px;
+    padding-bottom: 3px;
   }
-  .roster-line {
+  .rhd1 b {
     font-family: var(--mono);
-    font-size: 12px;
+    font-size: 1.05rem;
+  }
+  .rhd1 .meta {
+    color: var(--ink-faint);
+    font-size: 0.72rem;
+    margin-left: auto;
     display: flex;
-    justify-content: space-between;
-    padding: 2px 0;
-    color: var(--ink-soft);
+    align-items: baseline;
+    gap: 8px;
   }
-  .roster-line.open {
-    color: var(--ink-faint);
-    font-style: italic;
+  .rhd1 .meta .left {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent);
   }
-  .roster-line.bench {
-    color: var(--ink-faint);
+  .budget {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--surface-sunk);
+    margin-bottom: 5px;
+    overflow: hidden;
+  }
+  .budget i {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+  .rcard table {
+    table-layout: fixed;
+    width: 100%;
+  }
+  .rcard .rtbl-head {
+    flex: none;
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface-sunk);
+  }
+  .rcard .rtblwrap {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 14px), transparent);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 14px), transparent);
+  }
+  .rcard table td,
+  .rcard table th {
+    padding: 2px 6px;
+    font-size: 0.78rem;
+  }
+  .rcard table th {
+    font-size: 0.6rem;
   }
 </style>
 
@@ -1518,61 +1604,47 @@
     return slots;
   }
 
+  // Two tables share an identical <colgroup> so the fixed head lines up
+  // with the scrolling, mask-faded body beneath it.
+  const RCARD_COLS = '<colgroup><col style="width:38px"><col><col style="width:44px"><col style="width:46px"></colgroup>';
+
+  function rcard(payload, seat, sid) {
+    const pct = seat.budget_left + seat.bought.reduce((n, b) => n + b.amount, 0);
+    const pctFill = pct > 0 ? Math.round((seat.budget_left / pct) * 100) : 0;
+    const mine = sid === payload.my_seat ? " mine" : "";
+    return `<div class="rcard${mine}">
+      <div class="rhd1"><b>${seatLabel(payload, sid)}</b>
+        <span class="meta"><span class="left">${fmtMoney(seat.budget_left)}</span><span>left</span></span></div>
+      <div class="budget"><i style="width:${pctFill}%"></i></div>
+      <table class="rtbl-head">${RCARD_COLS}
+        <thead><tr><th>Pos</th><th>Player</th><th class="num">Proj</th><th class="num">Paid</th></tr></thead>
+      </table>
+      <div class="rtblwrap"><table>${RCARD_COLS}
+        <tbody>${slotRows(seat, startingSlots(payload.config || {}), false)}</tbody></table></div></div>`;
+  }
+
   function renderRosters(payload) {
     const el = document.getElementById("rosters");
     const seatsById = Object.fromEntries((payload.seats || []).map((s) => [s.seat_id, s]));
     const divisions = payload.divisions || [
       { name: "All seats", index: 0, mine: false, seats: (payload.seats || []).map((s) => s.seat_id) },
     ];
-    const slotsTemplate = startingSlots(payload.config || {});
 
-    el.innerHTML = divisions
+    el.innerHTML = `<div class="rbands">${divisions
       .map((division) => {
-        const cards = division.seats
-          .map((sid) => {
-            const seat = seatsById[sid] || { budget_left: 0, bought: [] };
-            const players = seat.bought.map((b) => ({
-              playerId: b.player_id,
-              position: b.position,
-              points: b.points,
-            }));
-            const seated = fillSlots(players, slotsTemplate);
-            const seatedIds = new Set(seated.values());
-            const bench = seat.bought.filter((b) => !seatedIds.has(b.player_id));
-
-            const lines = slotsTemplate
-              .map((slot) => {
-                const pid = seated.get(slot.id);
-                if (pid) {
-                  const b = seat.bought.find((x) => x.player_id === pid);
-                  return `<div class="roster-line"><span class="pos-${b.position}">${slot.flexLabel}</span><span>${pid}</span></div>`;
-                }
-                return `<div class="roster-line open"><span>${slot.flexLabel}</span><span>-- open --</span></div>`;
-              })
-              .join("");
-            const benchLines = bench
-              .map((b) => `<div class="roster-line bench"><span class="pos-${b.position}">BN</span><span>${b.player_id}</span></div>`)
-              .join("");
-
-            const mine = sid === payload.my_seat ? " mine" : "";
-            return `
-              <div class="roster-card${mine}">
-                <div class="roster-card-head"><span>${seatLabel(payload, sid)}</span><span class="money">$${seat.budget_left}</span></div>
-                ${lines}
-                ${benchLines}
-              </div>
-            `;
-          })
+        const letters = (division.name || "")
+          .split("")
+          .map((c) => `<span>${c}</span>`)
           .join("");
-        const mineClass = division.mine ? " mine" : "";
-        return `
-          <div class="division${mineClass}">
-            <div class="eyebrow">${division.name}</div>
-            <div class="roster-grid">${cards}</div>
-          </div>
-        `;
+        const cards = division.seats
+          .map((sid) => rcard(payload, seatsById[sid] || { budget_left: 0, bought: [] }, sid))
+          .join("");
+        return `<div class="rband${division.mine ? " mine" : ""}">
+          <div class="rail"><span class="divname">${letters}</span></div>
+          <div class="rgrid4">${cards}</div>
+        </div>`;
       })
-      .join("");
+      .join("")}</div>`;
   }
 
   const SKILL_POS = ["QB", "RB", "WR", "TE"];
