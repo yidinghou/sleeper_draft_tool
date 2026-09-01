@@ -109,62 +109,284 @@
   }
 
   /* -------------------------------------------------- header / block --- */
+  /* Ported from the golden mockup's .uhead: a hero tile (on-block player), a
+     splittile (bidding + worth, trimmed to the 3 columns this payload can
+     actually fill -- VORP $ / blend / VOLR $, no Sleeper $ or Wk1-3 $), and
+     a seatbars tile. Mounted identically on Live (#head-live) and Market
+     (#head-market). */
 
-  .header {
+  .pos {
+    display: inline-block;
+    min-width: 30px;
+    text-align: center;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .pos.QB {
+    background: #521626;
+    color: var(--qb);
+  }
+  .pos.RB {
+    background: #0f3a27;
+    color: var(--rb);
+  }
+  .pos.WR {
+    background: #12325f;
+    color: var(--wr);
+  }
+  .pos.TE {
+    background: #2b1c49;
+    color: var(--te);
+  }
+  .pos.FLEX,
+  .pos.DEF {
+    background: #1a2236;
+    color: var(--def);
+  }
+
+  .uhead {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+  }
+  .kpi {
+    flex: 1;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 8px 12px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 3px;
+    min-width: 0;
   }
-
-  .block-hero {
+  .kpi .klabel {
+    font-family: var(--display);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--ink-faint);
+    font-weight: 600;
+  }
+  .kpi b {
+    font-family: var(--mono);
+    font-size: 1.15rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
     display: flex;
-    align-items: baseline;
-    gap: 16px;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
   }
-  .block-hero .name {
-    font-size: 26px;
-    font-weight: 800;
-    letter-spacing: -0.01em;
+  .kpi b .pnm {
+    font-family: var(--sans);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .block-hero .price {
-    font-size: 26px;
-    font-weight: 800;
+  .kpi b.money {
     color: var(--accent);
   }
-  .block-hero .empty {
-    font-size: 18px;
+  .kpi .pos {
+    font-size: 0.72rem;
+    flex: none;
+  }
+  .kpi .sub {
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+  }
+  .kpi .empty {
+    font-size: 1rem;
     color: var(--ink-faint);
     font-style: italic;
   }
-  .block-hero .sub {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--ink-soft);
+
+  .uhead .kpi.hero {
+    flex: 1.8;
+  }
+  .uhead .kpi.seatile {
+    flex: 3.4;
   }
 
-  .worth-row {
+  .kpi.splittile {
+    flex: 2.4;
+    padding: 4px 10px;
+    gap: 4px;
     display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+    flex-direction: column;
+    justify-content: center;
   }
-  .worth-tile {
-    font-family: var(--mono);
-    font-size: 12px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    background: var(--surface-sunk);
-    border: 1px solid var(--line-soft);
-    display: flex;
-    gap: 6px;
-    align-items: baseline;
+  .splittile .splitrow {
+    display: grid;
+    align-items: center;
+    column-gap: 12px;
   }
-  .worth-tile.mine {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+  .splittile .bidrow {
+    grid-template-columns: auto repeat(3, 1fr);
+    padding-bottom: 3px;
+    border-bottom: 1px dotted var(--line);
   }
-  .worth-tile .seat {
+  .splittile .worthrow {
+    grid-template-columns: auto 1fr 78px 1fr;
+    padding-top: 3px;
+  }
+  .splittile .rowlabel {
+    font: 700 0.58rem var(--display);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     color: var(--ink-faint);
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    padding: 0 2px;
+    border-right: 1px solid var(--line);
+  }
+  .splittile .statcell {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .splittile .statcell .l {
+    font: 600 0.6rem var(--display);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-faint);
+  }
+  .splittile .statcell .v {
+    font: 600 0.95rem var(--mono);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+  }
+  .splittile .statcell .v.money {
+    color: var(--accent);
+  }
+  .splittile .statcell .v small {
+    color: var(--ink-soft);
+    font-weight: 400;
+    font-size: 0.68rem;
+  }
+  .splittile .worth.vorp .v {
+    color: var(--accent);
+  }
+  .splittile .worth.volr .v {
+    color: #2dd4da;
+  }
+  .splittile .blendcell {
+    align-self: stretch;
+    justify-content: center;
+    gap: 4px;
+  }
+  .splittile .blendcell .l {
+    text-align: center;
+  }
+  .splittile .blendcell .blend-track {
+    width: 100%;
+  }
+  .blend-track {
+    position: relative;
+    height: 5px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), #2dd4da);
+    opacity: 0.85;
+  }
+  .blend-track.flat {
+    background: var(--line-soft);
+  }
+  .blend-dot {
+    position: absolute;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin-top: -4.5px;
+    margin-left: -4.5px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+
+  .seatbars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    flex: 1;
+    min-height: 46px;
+    margin-top: 3px;
+  }
+  .seatbars .sb {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1px;
+    min-width: 0;
+    height: 100%;
+  }
+  .seatbars .sb .sv {
+    font-family: var(--mono);
+    font-size: 0.56rem;
+    font-variant-numeric: tabular-nums;
+    color: transparent;
+    line-height: 1;
+  }
+  .seatbars .sb i {
+    display: block;
+    width: 100%;
+    min-height: 2px;
+    background: var(--surface-sunk);
+    border-radius: 2px 2px 0 0;
+  }
+  .seatbars .sb .sl {
+    font-family: var(--mono);
+    font-size: 0.54rem;
+    color: var(--ink-faint);
+    line-height: 1;
+  }
+  .seatbars .sb.me i {
+    background: var(--accent);
+  }
+  .seatbars .sb.me .sv,
+  .seatbars .sb.me .sl {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .seatbars .sb.setter i {
+    background: var(--ink-soft);
+  }
+  .seatbars .sb.setter .sv {
+    color: var(--ink);
+  }
+  .seatbars .sb.win i {
+    background: var(--up);
+  }
+  .seatbars .sb.win .sv {
+    color: var(--up);
+    font-weight: 700;
+  }
+  .seatbars .sb.exp i {
+    background: transparent;
+    border: 1px dashed var(--up);
+  }
+  .seatbars .sb.exp .sv,
+  .seatbars .sb.exp .sl {
+    color: var(--up);
+    font-weight: 700;
+  }
+  .seatbars .sb.divedge {
+    margin-left: 6px;
+    border-left: 1px solid var(--line);
+    padding-left: 4px;
+  }
+  .seatbars .sb.divedge:first-child {
+    margin-left: 0;
+    border-left: 0;
+    padding-left: 0;
   }
 
   /* --------------------------------------------------- buying power ---- */
@@ -375,7 +597,7 @@
 
 <div class="wrap">
   <section class="slide" id="s-live">
-    <div class="card header" id="header"></div>
+    <div class="uhead" id="head-live"></div>
     <div class="card">
       <div class="eyebrow">Buying power</div>
       <div class="power-row" id="power"></div>
@@ -387,6 +609,7 @@
   </section>
 
   <section class="slide" id="s-market" hidden>
+    <div class="uhead" id="head-market"></div>
     <div class="card">
       <div class="eyebrow">Pool matrix</div>
       <div id="matrix"></div>
@@ -459,50 +682,130 @@
     return payload.seat_order || (payload.seats || []).map((s) => s.seat_id);
   }
 
-  function renderHeader(payload) {
-    const el = document.getElementById("header");
-    const block = payload.block;
+  // Compact seat label for narrow slots (seat bars, matrix columns): first
+  // token, capped so a full division row still fits.
+  function seatAbbr(payload, seatId) {
+    const label = seatLabel(payload, seatId);
+    if (/^Seat \d+$/.test(label)) return "S" + (seatId + 1);
+    const first = label.trim().split(/\s+/)[0];
+    return first.length > 7 ? first.slice(0, 6) + "…" : first;
+  }
 
+  // Seat ids that lead a division band, for a divider border in seat-ordered
+  // rows -- empty (no dividers) until identity/divisions are resolved.
+  function divisionStarts(payload) {
+    const set = new Set();
+    for (const dv of payload.divisions || []) if (dv.seats.length) set.add(dv.seats[0]);
+    return set;
+  }
+
+  function seatById(payload, seatId) {
+    return (payload.seats || []).find((s) => s.seat_id === seatId);
+  }
+
+  // The block player's own matrix row -- winner/price_setter_bid/expected_price
+  // are already computed server-side (seat_matrix's ascending-auction
+  // resolution); the client never re-derives them.
+  function matrixRowFor(payload, playerId) {
+    return (payload.matrix || []).find((r) => r.player_id === playerId);
+  }
+
+  // Shared VORP<->VOLR blend weight (1 = pure VORP), moved by the Market
+  // slide's blend slider and re-read by the header's blend-track dot.
+  let W = 1.0;
+
+  function blendTrack(vorpD, volrD) {
+    const flat = vorpD === volrD;
+    const left = flat ? 50 : Math.max(0, Math.min(100, (1 - W) * 100));
+    return `<div class="blend-track${flat ? " flat" : ""}"><span class="blend-dot" style="left:${left}%"></span></div>`;
+  }
+
+  function headerTiles(payload) {
+    const block = payload.block;
     if (!block) {
-      el.innerHTML = `
-        <div class="block-hero">
-          <span class="empty">Nobody on the block / waiting on a nomination</span>
+      return `<div class="kpi hero"><span class="klabel">On the block</span>
+        <span class="empty">Nobody on the block / waiting on a nomination</span></div>`;
+    }
+    const posBadge = block.position ? `<span class="pos ${block.position}">${block.position}</span>` : "";
+    if (block.sold) {
+      // A scrubbed frame's block is the pick that just sold at that prefix --
+      // a different, smaller shape (no price/vorp/volr/bids) than a live
+      // nomination, so it only gets the hero tile.
+      return `<div class="kpi hero"><span class="klabel">Just sold</span>
+        <b><span class="pnm">${block.player_id}</span>${posBadge}</b>
+        <span class="sub">sold for ${fmtMoney(block.amount)}${
+        block.buyer ? ` to ${block.buyer}` : ""
+      }</span></div>`;
+    }
+
+    const mySeat = payload.my_seat != null ? seatById(payload, payload.my_seat) : null;
+    const bidCell = (l, v, sub) =>
+      `<div class="statcell"><span class="l">${l}</span>
+       <span class="v money">${fmtMoney(v)}${sub ? ` <small>${sub}</small>` : ""}</span></div>`;
+    const worthCell = (l, cls, dollar) =>
+      `<div class="statcell worth ${cls}"><span class="l">${l}</span>
+       <span class="v">${fmtMoney(dollar)}</span></div>`;
+
+    return `<div class="kpi hero"><span class="klabel">On the block</span>
+        <b><span class="pnm">${block.player_id}</span>${posBadge}</b>
+        <span class="sub">${block.points != null ? `${block.points} pts proj` : ""}</span></div>
+      <div class="kpi splittile">
+        <div class="splitrow bidrow">
+          <span class="rowlabel">Bidding</span>
+          ${bidCell("Current bid", block.highest_offer)}
+          ${bidCell("My max bid", mySeat ? mySeat.max_bid : null)}
+          ${bidCell("Budget left", mySeat ? mySeat.budget_left : null)}
         </div>
-      `;
+        <div class="splitrow worthrow">
+          <span class="rowlabel">Worth</span>
+          ${worthCell("VORP $", "vorp", block.vorp_dollar)}
+          <div class="statcell blendcell"><span class="l">Blend</span>${blendTrack(
+            block.vorp_dollar,
+            block.volr_dollar
+          )}</div>
+          ${worthCell("VOLR $", "volr", block.volr_dollar)}
+        </div>
+      </div>`;
+  }
+
+  function renderHeader(payload, mount) {
+    if (!mount) return;
+    const block = payload.block;
+    if (!block || block.sold || !block.bids) {
+      mount.innerHTML = headerTiles(payload);
       return;
     }
-
-    const posClass = block.position ? `pos-${block.position}` : "";
-    const soldTag = block.sold ? " (just sold)" : "";
-    const currentBid = block.sold
-      ? fmtMoney(block.amount)
-      : fmtMoney(block.highest_offer);
-
-    let worthRow = "";
-    if (block.bids) {
-      const order = seatOrder(payload);
-      worthRow = `<div class="worth-row">${order
-        .map((sid) => {
-          const bid = block.bids[sid];
-          const mine = sid === payload.my_seat ? " mine" : "";
-          return `<span class="worth-tile${mine}"><span class="seat">${seatLabel(
-            payload,
-            sid
-          )}</span><span class="money">${fmtMoney(bid)}</span></span>`;
-        })
-        .join("")}</div>`;
-    }
-
-    el.innerHTML = `
-      <div class="block-hero">
-        <span class="name ${posClass}">${block.player_id}${soldTag}</span>
-        <span class="price">${fmtMoney(block.price)}</span>
-        <span class="sub">board price &middot; current bid ${currentBid} &middot; VORP ${fmtMoney(
-      block.vorp_dollar
-    )} &middot; VOLR ${fmtMoney(block.volr_dollar)}</span>
-      </div>
-      ${worthRow}
-    `;
+    const matrixRow = matrixRowFor(payload, block.player_id);
+    const winner = matrixRow ? matrixRow.winner : null;
+    const setter = matrixRow ? matrixRow.price_setter_bid : null;
+    const exp = matrixRow ? matrixRow.expected_price : null;
+    const order = seatOrder(payload);
+    const bidVals = order.map((sid) => block.bids[sid] || 0);
+    const maxV = Math.max(...bidVals, exp || 0, 1);
+    const barH = (v) => (v > 0 ? Math.max(6, Math.round((v / maxV) * 100)) : 0);
+    const starts = divisionStarts(payload);
+    const bars = order
+      .map((sid) => {
+        const b = block.bids[sid] || 0;
+        const cls = ["sb"];
+        if (sid === winner) cls.push("win");
+        else if (setter != null && b === setter) cls.push("setter");
+        else if (sid === payload.my_seat) cls.push("me");
+        if (starts.has(sid)) cls.push("divedge");
+        return `<div class="${cls.join(" ")}"><span class="sv">${
+          b > 0 ? fmtMoney(b) : "—"
+        }</span><i style="height:${barH(b)}%"></i><span class="sl">${seatAbbr(
+          payload,
+          sid
+        )}</span></div>`;
+      })
+      .join("");
+    const expBar = `<div class="sb exp"><span class="sv">${
+      exp != null ? fmtMoney(exp) : ""
+    }</span><i style="height:${barH(exp)}%"></i><span class="sl">Exp</span></div>`;
+    mount.innerHTML =
+      headerTiles(payload) +
+      `<div class="kpi seatile"><span class="klabel">Worth to each seat</span><div class="seatbars">${bars}${expBar}</div></div>`;
   }
 
   function renderPower(payload) {
@@ -723,7 +1026,8 @@
   }
 
   function renderAll(payload) {
-    renderHeader(payload);
+    renderHeader(payload, document.getElementById("head-live"));
+    renderHeader(payload, document.getElementById("head-market"));
     renderPower(payload);
     renderStateTable(payload);
     renderMatrix(payload);
