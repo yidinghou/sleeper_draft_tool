@@ -3,75 +3,41 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link
   rel="stylesheet"
-  href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+  href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
 />
 <style>
+  /* Fixed dark amber/navy theme, ported from the golden mockup
+     (board-slides-golden-new.html) -- this template no longer follows
+     prefers-color-scheme; draft_demo.html keeps its own light/dark tokens. */
   :root {
-    --ground: #eff2f5;
-    --surface: #ffffff;
-    --surface-sunk: #e7ebf0;
-    --line: #d3dae2;
-    --line-soft: #e3e8ee;
-    --ink: #16202b;
-    --ink-soft: #47576a;
-    --ink-faint: #7b8b9c;
-    --accent: #1f4e79;
-    --accent-soft: #dbe6f1;
-    --up: #0e7c66;
-    --up-soft: #d5ece5;
-    --down: #b4432c;
-    --down-soft: #f6ddd7;
-    --brass: #8a6413;
-    --qb: #6d4b9e;
-    --rb: #0e7c66;
-    --wr: #1f4e79;
-    --te: #a8621c;
-    --def: #5c6b7a;
-    --radius: 6px;
-    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-    --sans: Archivo, ui-sans-serif, system-ui, -apple-system, sans-serif;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --ground: #0f1720;
-      --surface: #16202b;
-      --surface-sunk: #101821;
-      --line: #2a3846;
-      --line-soft: #212e3a;
-      --ink: #e3eaf1;
-      --ink-soft: #a3b2c1;
-      --ink-faint: #71818f;
-      --accent: #7aaad6;
-      --accent-soft: #1c2f42;
-      --up: #46bfa0;
-      --up-soft: #14312a;
-      --down: #e3806c;
-      --down-soft: #3a1f19;
-      --brass: #d1a94a;
-    }
-  }
-
-  :root[data-theme="dark"] {
-    --ground: #0f1720;
-    --surface: #16202b;
-    --surface-sunk: #101821;
-    --line: #2a3846;
-    --line-soft: #212e3a;
-    --ink: #e3eaf1;
-    --ink-soft: #a3b2c1;
-    --ink-faint: #71818f;
-    --accent: #7aaad6;
-    --accent-soft: #1c2f42;
-    --up: #46bfa0;
+    --ground: #04060e;
+    --surface: #0a0f1c;
+    --surface-sunk: #121a2e;
+    --line: #161d30;
+    --line-soft: #232c47;
+    --ink: #eef2fb;
+    --ink-soft: #8b97b4;
+    --ink-faint: #586485;
+    --accent: #f2b64c;
+    --accent-soft: #241a02;
+    --up: #6fe0aa;
     --up-soft: #14312a;
-    --down: #e3806c;
+    --down: #fb7185;
     --down-soft: #3a1f19;
-    --brass: #d1a94a;
+    --brass: #f2b64c;
+    --qb: #ff9caf;
+    --rb: #6fe0aa;
+    --wr: #8fbcff;
+    --te: #d3bbf7;
+    --def: #c1c8d6;
+    --radius: 8px;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --display: "Barlow Condensed", var(--sans);
   }
 
   html {
-    color-scheme: light dark;
+    color-scheme: dark;
   }
   * {
     box-sizing: border-box;
