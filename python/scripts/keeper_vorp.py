@@ -127,6 +127,37 @@ def vorp_by_source(source: str, season: int, keepers: list[dict], config) -> dic
     }
 
 
+def add_value(rows: list[dict], drafted: int) -> None:
+    """VORP against ADP: what a player returns over *par for his draft slot*.
+
+    The two aren't in the same units, so par is read off the board itself --
+    the VORP the Nth-best player carries is what the Nth pick is worth. A
+    player going Nth by ADP is then a bargain by however much his own VORP
+    beats that. Rows must already be sorted by VORP descending.
+
+    `value_rank` is the same comparison in slots rather than points: how many
+    picks later he goes than his value says he should. Points catch what
+    slots miss -- twenty slots across a cliff is a different thing from
+    twenty slots down a flat stretch of the board.
+
+    Only players inside `drafted` get a value at all. Past the last pick
+    there is no slot to be a bargain against: measuring a man with an ADP of
+    689 against the worst rostered player scores him as a massive steal, when
+    what the ADP actually says is that nobody drafts him.
+    """
+    par = [r["vorp_avg"] for r in rows]
+    ranked = sorted((r for r in rows if r["adp"] is not None), key=lambda r: r["adp"])
+    board_rank = {id(r): i for i, r in enumerate(rows)}
+
+    for r in rows:
+        r["value"] = r["value_rank"] = None
+    for adp_rank, r in enumerate(ranked):
+        if r["adp"] > drafted or adp_rank >= len(par):
+            continue
+        r["value"] = round(r["vorp_avg"] - par[adp_rank], 1)
+        r["value_rank"] = adp_rank - board_rank[id(r)]
+
+
 def pick_schedule(keepers: list[dict], my_slot: int, config) -> list[dict]:
     """Every pick in snake order, keeper picks flagged, with how many live
     picks fall between one of my turns and the next.
@@ -193,6 +224,8 @@ def main() -> None:
             }
         )
     rows.sort(key=lambda r: -r["vorp_avg"])
+    drafted = SNAKE_CONFIG.teams * SNAKE_CONFIG.roster_size
+    add_value(rows, drafted)
 
     out_path = REPO_ROOT / "data" / f"vorp-snake-{season}.csv"
     with out_path.open("w", newline="", encoding="utf-8") as f:
@@ -210,6 +243,27 @@ def main() -> None:
             f"{r['vorp_avg']:>7.1f} {fmt(r['vorp_sleeper']):>8} {fmt(r['vorp_boberto']):>8}"
         )
     print(f"\nWrote {out_path.relative_to(REPO_ROOT)}\n")
+
+    # Best values: most VORP over par for the slot they actually cost. Capped
+    # to players inside the drafted range -- a bargain 300 picks deep is one
+    # nobody has to reach for.
+    # Kickers are left out of the shortlist (they stay in the CSV and on the
+    # page). K1 to K11 is ~16 projected points, which the model reads as real
+    # VORP and ADP prices at nothing, so kickers sweep any value ranking --
+    # but nobody reaches 60 slots for a kicker, because that spread is
+    # projection noise, not signal.
+    values = sorted(
+        (r for r in rows if r["value"] is not None and r["position"] != "K"),
+        key=lambda r: -r["value"],
+    )
+    print(f"Best value vs ADP (top {len(values[:15])}, K excluded, inside pick {drafted}):\n")
+    print(f"  {'ADP':>6} {'PLAYER':<24} {'POS':<4} {'VORP':>7} {'VALUE':>7} {'SLOTS':>6}")
+    for r in values[:15]:
+        print(
+            f"  {r['adp']:>6.1f} {r['player']:<24} {r['position']:<4} "
+            f"{r['vorp_avg']:>7.1f} {r['value']:>+7.1f} {r['value_rank']:>+6}"
+        )
+    print()
 
     my_slot = next(int(r["draft_slot"]) for r in keepers if r["owner"] == MY_USERNAME)
     picks = pick_schedule(keepers, my_slot, SNAKE_CONFIG)

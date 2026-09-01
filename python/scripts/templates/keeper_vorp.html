@@ -181,6 +181,7 @@
   /* Board rank is a label, not a dimension -- there is nothing to sort it by
      that the VORP column doesn't already do. */
   thead th.static { cursor: default; color: var(--text-faint); }
+  thead .hint { color: var(--text-faint); font-weight: 500; letter-spacing: 0.04em; }
   thead th[aria-sort] { color: var(--accent-vorp); }
   thead th[aria-sort]::after { content: ' \25BC'; font-size: 9px; }
   thead th[aria-sort="ascending"]::after { content: ' \25B2'; }
@@ -239,6 +240,27 @@
   td.dim { color: var(--text-faint); }
   .delta.up { color: var(--up); }
   .delta.down { color: var(--warn); }
+
+  /* The same gap in slots, riding along with the points: +29.6 over par is
+     worth reading differently at 6 picks than at 60. */
+  .delta small {
+    color: var(--text-faint);
+    font-size: 10px;
+    margin-left: 5px;
+  }
+
+  .legend {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    color: var(--text-faint);
+    font-size: 12px;
+    padding: 0 2px;
+  }
+
+  .legend b { color: var(--text-secondary); font-weight: 600; }
+  .legend .up { color: var(--up); }
+  .legend .down { color: var(--warn); }
 
   /* The boundary at one of my picks: everything above it is expected gone
      by the time I am on the clock. */
@@ -300,6 +322,13 @@
     <span class="count" id="count"></span>
   </div>
 
+  <div class="legend">
+    <span><b>Value</b> = VORP − par for the pick his ADP costs
+      (<span class="up">+</span> better than the slot, <span class="down">−</span> worse)</span>
+    <span><b>+6</b> = falls 6 picks below where his value belongs</span>
+    <span><b>#</b> = fixed board rank · <b>Spread</b> = Boberto − Sleeper</span>
+  </div>
+
   <div class="tablewrap">
     <table>
       <thead>
@@ -309,6 +338,7 @@
           <th class="left" data-key="player" data-dir="asc">Player</th>
           <th class="left" data-key="position" data-dir="asc">Pos</th>
           <th data-key="bye" data-dir="asc">Bye</th>
+          <th data-key="value" title="VORP over par for the pick this player's ADP costs; the small number is the same gap in draft slots">Value <span class="hint">vs ADP</span></th>
           <th data-key="vorp_avg">VORP avg</th>
           <th data-key="vorp_sleeper">VORP Sleeper</th>
           <th data-key="vorp_boberto">VORP Boberto</th>
@@ -362,7 +392,7 @@
 
   function pickLine(picks) {
     const label = picks.map(p => `R${p.round} · pick ${p.pick_no}`).join('  +  ');
-    return `<tr class="pickline"><td colspan="11"><span>${label}</span></td></tr>`;
+    return `<tr class="pickline"><td colspan="12"><span>${label}</span></td></tr>`;
   }
 
   function render() {
@@ -398,6 +428,13 @@
           <small>${p.team || ''}</small></td>
         <td class="left"><span class="pos ${p.position}">${p.position}</span></td>
         <td class="dim">${p.bye || '—'}</td>
+        <td>${p.value == null ? '—' : `<span class="delta ${p.value >= 0 ? 'up' : 'down'}"
+            title="Board rank ${p.rank}, drafted around ${Math.round(p.adp)} — ${
+              p.value_rank === 0 ? 'right where his value says'
+              : p.value_rank > 0 ? `${p.value_rank} picks later than his value says`
+              : `${-p.value_rank} picks earlier than his value says`}">${
+            p.value > 0 ? '+' : ''}${p.value.toFixed(1)}<small>${
+            p.value_rank > 0 ? '+' : ''}${p.value_rank}</small></span>`}</td>
         <td class="avg">${fmt(p.vorp_avg)}</td>
         <td>${fmt(p.vorp_sleeper)}</td>
         <td>${fmt(p.vorp_boberto)}</td>
@@ -466,6 +503,11 @@
     'position shows how deep each turn reaches. Sorted by VORP avg the line is exact — ' +
     'everything above it is gone. Under any other sort the count still holds but the ' +
     'specific names do not: a row above the line may survive, one below may not. ' +
+    'Value is VORP over par for the slot a player’s ADP costs — par being the VORP the ' +
+    'Nth-best player carries, so a positive number is value the draft position does not ' +
+    'charge for (hover it for the same gap in slots). Kickers top it for a bad reason: ' +
+    'K1 to K11 is ~16 projected points, which scores as real VORP while ADP prices it at ' +
+    'nothing — treat any kicker’s value as noise. ' +
     'ADP is Sleeper’s 1QB half-PPR board (adp_half_ppr) — the format this league plays, ' +
     'not the superflex ranking. Sleeper publishes no per-league-size ADP, so it is not ' +
     '10-team specific. VORP is points over the replacement bar solved against the slots ' +
