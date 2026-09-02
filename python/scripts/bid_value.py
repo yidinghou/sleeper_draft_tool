@@ -78,7 +78,7 @@ def load_player_meta(csv_path: Path) -> Dict[str, dict]:
     return meta
 
 
-POINTS_COLUMNS = {"season": "season_pts_half_ppr", "wk1_3": "wk1_3_pts_half_ppr"}
+POINTS_COLUMNS = {"season": "season_pts_half_ppr", "wk1_3": "wk1_3_pts_league"}
 
 
 def main() -> None:

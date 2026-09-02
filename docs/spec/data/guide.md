@@ -64,7 +64,7 @@ data/projections-2026.csv (<M> matched board data).` and writes a CSV whose
 header is exactly:
 
 ```
-player_id,player,position,team,sleeper_rank,bye_week,sleeper_proj_dollar,season_pts_half_ppr,pts_source,wk1_3_pts_half_ppr
+player_id,player,position,team,sleeper_rank,bye_week,sleeper_proj_dollar,season_pts_half_ppr,pts_source,wk1_3_pts_league,wk1_pts_league
 ```
 
 Every player present on the scraped board carries `pts_source = board`; everyone

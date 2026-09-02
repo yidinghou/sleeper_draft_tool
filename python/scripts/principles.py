@@ -23,7 +23,7 @@ from vorp.league.config import LEAGUE_CONFIG  # noqa: E402
 from vorp.models import REGISTRY  # noqa: E402
 from vorp.principles import CALIBRATION, LAW, PRINCIPLES, Context, run  # noqa: E402
 
-POINTS_COLUMNS = {"season": "season_pts_half_ppr", "wk1_3": "wk1_3_pts_half_ppr"}
+POINTS_COLUMNS = {"season": "season_pts_half_ppr", "wk1_3": "wk1_3_pts_league"}
 
 TICK, CROSS = "PASS", "FAIL"
 
