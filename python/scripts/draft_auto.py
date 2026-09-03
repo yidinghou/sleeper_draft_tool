@@ -14,8 +14,10 @@ is rejected it rings the terminal bell and keeps retrying until the turn ends,
 then lets the clock run out into Sleeper's own autopick, which drafts from the
 queue exactly as it would have if this were never running.
 
-Fires at the halfway point of the pick clock: late enough to leave a window to
-override by hand, early enough not to race Sleeper's autopick at expiry.
+Fires 10 seconds into my turn by default (--fire-after 10): early enough not to
+eat the clock, late enough to leave a window to override by hand. --fire-after 0
+fires immediately; the halfway-fraction behavior (FIRE_AT) is still there as the
+underlying mechanism when --fire-after is None, just no longer the CLI default.
 
 Shadow by default -- it logs the pick it would make and sends nothing. `--arm`
 sends for real, and needs $SLEEPER_TOKEN.
@@ -110,12 +112,57 @@ def must_fill(roster: Counter, caps: dict[str, int], picks_left: int) -> list[st
     return unfilled if len(unfilled) >= picks_left else []
 
 
+#: RB and WR are both uncapped (flex-eligible), so nothing stops the queue
+#: from running one all the way down before the other's first entry -- a
+#: 16-round mock once took 6 RB before its first WR. BALANCE_GAP keeps them
+#: within reach of each other: once one leads the other by this many, its
+#: queue rows are skipped in favor of the trailing position, same as a cap.
+FLEX_PAIR = ("RB", "WR")
+BALANCE_GAP = 2
+
+#: BALANCE_GAP alone still let 6 RB happen: the gap is against WR's count,
+#: not the calendar, so it never fires until a WR would already be overdue.
+#: This is the other half, must_fill's forcing rule aimed at a single
+#: position and my own pick count instead of the whole draft's.
+WR_QUOTA_COUNT = 1
+WR_QUOTA_BY = 7
+
+#: Rounds the balance gap applies for. Past this it is off and the queue's
+#: order wins outright.
+#:
+#: The gap exists to stop the early rounds going 6 RB deep before a WR. Late,
+#: it does the opposite of what it is for: by round 10 the starters are set and
+#: what's left worth having is the bench -- a handcuff behind one of my own
+#: backs, a back-up with a path to touches -- and the gap kept skipping those
+#: rows for whichever receiver happened to be next. A 2026 mock finished with
+#: Meyers, Worthy and Addison in the last four picks while MarShawn Lloyd and
+#: Kyle Monangai sat in the queue above them.
+#:
+#: Counted in my own picks, which is the round: every round adds exactly one
+#: player to the roster, keepers included.
+BALANCE_GAP_BY = 7
+
+
+def wr_forced(roster: Counter, my_pick_index: int) -> bool:
+    """True once WR must be taken this pick to reach WR_QUOTA_COUNT by my
+    WR_QUOTA_BY'th pick (`my_pick_index`, 1-indexed, counting this pick).
+
+    `my_pick_index <= 0` means "unknown / not tracked" and always passes,
+    same as `picks_left`'s huge default disables `must_fill`.
+    """
+    if my_pick_index <= 0 or roster["WR"] >= WR_QUOTA_COUNT:
+        return False
+    picks_until_deadline = WR_QUOTA_BY - my_pick_index + 1
+    return picks_until_deadline <= WR_QUOTA_COUNT - roster["WR"]
+
+
 def next_pick(
     queue: list[dict],
     taken: set[str],
     roster: Counter,
     caps: dict[str, int],
     picks_left: int = 10**6,
+    my_pick_index: int = 0,
 ):
     """First queue entry still available and not at its position cap.
 
@@ -128,6 +175,8 @@ def next_pick(
     Sleeper's own rankings take over, same as if the queue had run dry.
     """
     forced = must_fill(roster, caps, picks_left)
+    if not forced and wr_forced(roster, my_pick_index):
+        forced = ["WR"]
     for row in queue:
         if row["player_id"] in taken:
             continue
@@ -137,6 +186,13 @@ def next_pick(
             continue
         if roster[row["position"]] >= caps.get(row["position"], 10**6):
             continue
+        # `my_pick_index <= 0` is "round unknown", same as everywhere else --
+        # it keeps the gap on rather than silently disabling it.
+        early = my_pick_index <= 0 or my_pick_index <= BALANCE_GAP_BY
+        if early and row["position"] in FLEX_PAIR:
+            other = FLEX_PAIR[1 - FLEX_PAIR.index(row["position"])]
+            if roster[row["position"]] - roster[other] >= BALANCE_GAP:
+                continue
         return row
     return None
 
@@ -284,6 +340,7 @@ def run(
                     roster,
                     caps,
                     my_picks_left(pick_no, slot, rounds, frozenset(taken_nos)),
+                    sum(roster.values()) + 1,
                 )
                 if target is None:
                     print("queue exhausted -- deferring to Sleeper", flush=True)
@@ -321,10 +378,35 @@ def selftest() -> None:
     assert next_pick(queue, {"1"}, Counter(), caps)["player"] == "Butker"
     # The whole point: one kicker rostered, the second is passed over.
     assert next_pick(queue, {"1"}, Counter({"K": 1}), caps)["player"] == "Nabers"
-    # Uncapped positions are never blocked, however many I have.
-    assert next_pick(queue, set(), Counter({"RB": 9}), caps)["player"] == "Gibbs"
+    # Uncapped positions are still bounded by BALANCE_GAP against their flex
+    # partner -- 9 RB and 0 WR is past the gap, so WR jumps the queue (with
+    # the kicker already filled, so it isn't what jumps instead).
+    assert next_pick(queue, set(), Counter({"RB": 9, "K": 1}), caps)["player"] == "Nabers"
+    # Below the gap, the queue's order still wins.
+    assert next_pick(queue, set(), Counter({"RB": 1, "K": 1}), caps)["player"] == "Gibbs"
+    # And the gap is an early-rounds rule: past BALANCE_GAP_BY the queue wins
+    # even at 9 RB to 0 WR, which is what lets a late handcuff be drafted.
+    # WR quota already met, so the only thing that could skip an RB row here
+    # is the gap itself.
+    lopsided = Counter({"RB": 9, "WR": 1, "K": 1})
+    assert next_pick(queue, set(), lopsided, caps, my_pick_index=BALANCE_GAP_BY)["player"] == "Nabers"
+    assert next_pick(queue, set(), lopsided, caps, my_pick_index=BALANCE_GAP_BY + 1)["player"] == "Gibbs"
+    # A position with no flex partner (TE, QB, ...) is never gap-limited --
+    # here TE isn't even capped, so a pile of them still doesn't block it.
+    uncapped_te = {"K": 1, "DEF": 1}
+    assert next_pick(queue, {"1", "2", "3", "4"}, Counter({"TE": 9}), uncapped_te)["player"] == "Bowers"
     # Exhausted queue defers rather than raising.
     assert next_pick(queue, {"1", "2", "3", "4", "5", "6"}, Counter(), caps) is None
+
+    # WR_QUOTA_COUNT=1, WR_QUOTA_BY=7: with no WR yet, my 7th pick is the last
+    # chance -- it forces WR over the queue's top-ranked RB.
+    assert wr_forced(Counter(), 7) is True
+    assert next_pick(queue, set(), Counter(), caps, my_pick_index=7)["player"] == "Nabers"
+    # One pick earlier there's still slack, so the queue's order wins.
+    assert wr_forced(Counter(), 6) is False
+    assert next_pick(queue, set(), Counter(), caps, my_pick_index=6)["player"] == "Gibbs"
+    # Quota already met: never forced, whatever the pick index.
+    assert wr_forced(Counter({"WR": 1}), 7) is False
 
     # The live rule: QB and TE are capped at one alongside K and DEF, so a
     # roster already holding them falls through to the uncapped RB/WR pile.
@@ -406,9 +488,10 @@ def main() -> None:
     parser.add_argument(
         "--fire-after",
         type=float,
+        default=10.0,
         help="seconds into my turn to send, overriding the FIRE_AT fraction. "
-        "For testing against a mock, where waiting out half a 2-minute clock "
-        "on all 15 picks is the slowest part of the run.",
+        "Defaults to 10s -- fast enough not to eat the whole clock, still leaves "
+        "a manual override window.",
     )
     parser.add_argument("--selftest", action="store_true")
     args = parser.parse_args()
