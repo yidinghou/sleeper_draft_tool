@@ -388,11 +388,19 @@ def build_payload(season: int, pool_size: int, prefs: dict | None = None) -> dic
         }
 
     pooled = {p["player_id"] for p in players}
-    # Board-tail players pulled into the ranked pool by hand -- a rookie, or a
-    # flier the top-`pool_size` cut left out. Folded back in here so that a
+    # Every rookie is ranked, not just the ones the top-`pool_size` VORP cut
+    # happened to keep. Rookies are cheap projections and expensive unknowns in
+    # roughly equal measure, so their VORP rank is a bad filter for "worth
+    # comparing" -- most sit past rank 400 on ADP alone, and raising pool_size
+    # far enough to sweep them in the normal way would multiply the veteran
+    # pool by the same factor. Pulling them in by position instead keeps the
+    # question count tied to how many rookies actually exist, not to the cut.
+    rookies = {p["player_id"] for p in tail if exp.get(p["player_id"]) == 0}
+    # Board-tail players pulled into the ranked pool by hand -- a flier the
+    # pool cut left out that isn't a rookie. Folded back in here so that a
     # rebuild does not orphan them: `fit_bradley_terry` and the page's own boot
     # filter both silently drop comparisons naming a player they cannot see.
-    wanted = set(prefs.get("extras", ()))
+    wanted = set(prefs.get("extras", ())) | rookies
     entries = [entry(p) for p in players] + [
         entry(p) for p in tail if p["player_id"] in wanted and p["player_id"] not in pooled
     ]

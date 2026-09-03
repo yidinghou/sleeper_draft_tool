@@ -78,7 +78,12 @@
                letter-spacing: .1em; }
   .tile .val { font-family: 'IBM Plex Mono', monospace; font-size: 20px; margin-top: 3px; }
 
+  /* min-width: 0 overrides a grid item's default min-width: auto, which
+     otherwise sizes the column to its widest content (the ranking table) and
+     pushes the whole page wider than the screen instead of letting the table
+     scroll sideways inside its own box. */
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .cols > div { min-width: 0; }
   @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
   /* Cards stay side by side on a phone -- swiping left or right has to map to
      a card on the left or right. Only the chrome shrinks. */
@@ -180,6 +185,7 @@
       <h2>Live ranking (<span id="rankcount"></span>)</h2>
       <div class="scroll">
         <table><thead><tr><th class="act"></th><th class="n">#</th><th>Player</th><th>Pos</th>
+          <th class="n">Proj</th><th class="n">VORP</th>
           <th class="n">Seen</th><th class="n">Board</th><th class="act"></th></tr></thead>
           <tbody id="rank"></tbody></table>
       </div>
@@ -461,7 +467,9 @@ function render(anchor) {
       `<button class="rb" data-mv="-1" data-id="${id}" title="move up">&#9650;</button>` +
       `<button class="rb" data-mv="1" data-id="${id}" title="move down">&#9660;</button></td>` +
       `<td class="n">${i + 1}</td><td>${p.name}${rookie}</td>` +
-      `<td class="pos pos-${p.pos}">${p.pos}</td><td class="n">${seen[id]}</td>` +
+      `<td class="pos pos-${p.pos}">${p.pos}</td>` +
+      `<td class="n">${num(p.pts)}</td><td class="n">${num(p.vorp)}</td>` +
+      `<td class="n">${seen[id]}</td>` +
       `<td class="n ${cls}">${boardRank[id]}${move ? ` (${move > 0 ? '+' : ''}${move})` : ''}</td>` +
       `<td class="act"><button class="rb x" data-x="${id}" title="do not draft">&#10005;</button></td></tr>`;
   }).join('');
