@@ -43,6 +43,7 @@ import csv
 import json
 import math
 import random
+import re
 import statistics
 import sys
 from collections import Counter
@@ -76,6 +77,38 @@ def default_pool(season: int) -> int:
     the draft unranked and queued on VORP alone.
     """
     return draft_slots(season) - len(load_manual(season))
+
+#: FantasyPros 2026 Dynasty Rookie Rankings, in order. Matched against the
+#: board tail by normalized name -- the CSV's suffix/punctuation doesn't
+#: reliably match a pasted list.
+ROOKIE_RANK = (
+    "Jeremiyah Love", "Carnell Tate", "Jordyn Tyson", "Jadarian Price",
+    "Makai Lemon", "KC Concepcion", "Kenyon Sadiq", "De'Zhaun Stribling",
+    "Denzel Boston", "Eli Stowers", "Fernando Mendoza", "Jonah Coleman",
+    "Omar Cooper Jr.", "Antonio Williams", "Ja'Kobi Lane", "Emmett Johnson",
+    "Mike Washington Jr.",
+)
+
+
+def _normalize_name(name: str) -> str:
+    """Loose enough to survive apostrophes and a Jr./Sr./II suffix the board
+    CSV may or may not carry -- confirmed by hand: the CSV has "Omar Cooper"
+    and "Mike Washington" with no suffix at all for two of these 17."""
+    bare = re.sub(r"[^a-z ]", "", name.lower())
+    return re.sub(r"\s+(jr|sr|ii|iii|iv)$", "", bare).strip()
+
+
+def match_rookies(tail: list[dict]) -> list[dict]:
+    """The 17 FantasyPros rookies, in FantasyPros order, resolved to board
+    rows. Missing names are reported, never silently dropped."""
+    by_name = {_normalize_name(p["player"]): p for p in tail}
+    matched, missing = [], []
+    for name in ROOKIE_RANK:
+        row = by_name.get(_normalize_name(name))
+        (matched if row else missing).append(row or name)
+    if missing:
+        print(f"WARNING: {len(missing)} rookie(s) not found on the board: {missing}")
+    return matched
 
 #: Pseudo-comparisons against an average opponent, added to every player.
 #: Without it the MM iteration diverges for anyone who has won every comparison
@@ -382,10 +415,11 @@ def build_payload(season: int, pool_size: int, prefs: dict | None = None) -> dic
     """
     prefs = load_prefs(season) if prefs is None else prefs
     players = load_pool(season, pool_size)
+    board = load_board(season)
     # Everyone the pool cut off. Still fully priced -- these are board rows,
     # not fabrications -- so a rookie pulled out of here arrives with his real
     # ADP, VORP and projections, and queue_export already had him all along.
-    tail = load_board(season)[pool_size:]
+    tail = board[pool_size:]
     week1 = load_week1(season)
     exp = load_experience(season)
     teams, last = SNAKE_CONFIG.teams, SNAKE_CONFIG.roster_size
@@ -412,22 +446,32 @@ def build_payload(season: int, pool_size: int, prefs: dict | None = None) -> dic
         }
 
     pooled = {p["player_id"] for p in players}
-    # Every rookie is ranked, not just the ones the top-`pool_size` VORP cut
-    # happened to keep. Rookies are cheap projections and expensive unknowns in
-    # roughly equal measure, so their VORP rank is a bad filter for "worth
-    # comparing" -- most sit past rank 400 on ADP alone, and raising pool_size
-    # far enough to sweep them in the normal way would multiply the veteran
-    # pool by the same factor. Pulling them in by position instead keeps the
-    # question count tied to how many rookies actually exist, not to the cut.
-    rookies = {p["player_id"] for p in tail if exp.get(p["player_id"]) == 0}
+    # A curated top-17 (FantasyPros dynasty rookie rankings), in that order --
+    # not every years_exp==0 player, which used to pull in ~90 unranked names.
+    # Matched against the whole board, not just the tail: a highly-touted
+    # rookie can already be inside the VORP pool, and searching the tail alone
+    # would misreport him as missing.
+    rookies = match_rookies(board)
+    rookie_ids = {p["player_id"] for p in rookies}
+    # Below the VORP cut but still inside the live draft by ADP -- e.g. a
+    # veteran who has gone VORP-negative but the market still drafts in the
+    # early rounds (Josh Jacobs, ADP 34.8, VORP-cut at rank 132). VORP rank
+    # alone is the wrong cutoff for "will actually get drafted"; ADP already
+    # answers that question directly.
+    adp_backed = {
+        p["player_id"] for p in tail
+        if p["adp"] and float(p["adp"]) <= draft_slots(season)
+    }
     # Board-tail players pulled into the ranked pool by hand -- a flier the
     # pool cut left out that isn't a rookie. Folded back in here so that a
     # rebuild does not orphan them: `fit_bradley_terry` and the page's own boot
     # filter both silently drop comparisons naming a player they cannot see.
-    wanted = set(prefs.get("extras", ())) | rookies
-    entries = [entry(p) for p in players] + [
-        entry(p) for p in tail if p["player_id"] in wanted and p["player_id"] not in pooled
-    ]
+    wanted = (set(prefs.get("extras", ())) | adp_backed) - rookie_ids
+    entries = (
+        [entry(p) for p in players]
+        + [entry(p) for p in tail if p["player_id"] in wanted and p["player_id"] not in pooled]
+        + [entry(p) for p in rookies if p["player_id"] not in pooled]
+    )
 
     ranked = {e["id"] for e in entries}
     rounds = sorted({e["rnd"] for e in entries})
@@ -456,6 +500,23 @@ def render(payload: dict) -> str:
         .replace("__DATA__", json.dumps(payload, separators=(",", ":")))
         .replace("__SEASON__", str(payload["season"]))
     )
+
+
+RANK_TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "live_rank.html"
+
+
+def build_rank_page(season: int, pool_size: int) -> None:
+    """The live-ranking table alone, as its own page -- no duel, no prefs
+    round-trip, just build_payload()'s players list, reorderable by drag."""
+    payload = build_payload(season, pool_size)
+    fragment = (
+        RANK_TEMPLATE_PATH.read_text(encoding="utf-8")
+        .replace("__DATA__", json.dumps(payload, separators=(",", ":")))
+        .replace("__SEASON__", str(season))
+    )
+    write_local(fragment, REPO_ROOT / "data", f"live-rank-{season}")
+    out = REPO_ROOT / "data" / f"live-rank-{season}.html"
+    print(f"Wrote {out.relative_to(REPO_ROOT)} ({len(payload['players'])} players)")
 
 
 def build_page(season: int, pool_size: int) -> None:
@@ -721,6 +782,21 @@ def demo() -> None:
     print(f"ok: rho={rho:.3f} at {noise:.0%} noise, chained tiers rho={rho_chain:.3f}, "
           f"splits detected, flat and undefeated finite")
 
+    # The curated rookie list must resolve against the real board, in order,
+    # with nobody dropped -- a silent miss here means a rookie just vanishes
+    # from the ranking with no warning anyone would notice.
+    real_tail = load_board(SNAKE_CONFIG.season)
+    matched = match_rookies(real_tail)
+    assert len(matched) == len(ROOKIE_RANK), (
+        f"expected {len(ROOKIE_RANK)} rookies matched, got {len(matched)}"
+    )
+    assert [p["player"] for p in matched] != [] and all(
+        _normalize_name(p["player"]) == _normalize_name(name)
+        for p, name in zip(matched, ROOKIE_RANK)
+    ), "matched rookies out of order or misaligned with ROOKIE_RANK"
+    assert _normalize_name("Omar Cooper Jr.") == _normalize_name("Omar Cooper")
+    print(f"ok: all {len(ROOKIE_RANK)} curated rookies matched, in order")
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -729,12 +805,16 @@ def main() -> None:
     parser.add_argument("--fit", action="store_true")
     parser.add_argument("--prefs", type=Path)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--rank-only", action="store_true",
+                         help="write data/live-rank-{season}.html instead of the full builder page")
     opts = parser.parse_args()
 
     if opts.check:
         demo()
     elif opts.fit:
         fit_and_write(opts.season, opts.prefs or prefs_path(opts.season))
+    elif opts.rank_only:
+        build_rank_page(opts.season, opts.pool or default_pool(opts.season))
     else:
         build_page(opts.season, opts.pool or default_pool(opts.season))
 

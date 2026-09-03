@@ -82,9 +82,8 @@
      otherwise sizes the column to its widest content (the ranking table) and
      pushes the whole page wider than the screen instead of letting the table
      scroll sideways inside its own box. */
-  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .cols { display: grid; grid-template-columns: 1fr; gap: 18px; }
   .cols > div { min-width: 0; }
-  @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
   /* Cards stay side by side on a phone -- swiping left or right has to map to
      a card on the left or right. Only the chrome shrinks. */
   @media (max-width: 620px) {
@@ -116,6 +115,12 @@
           color: var(--bg); background: var(--accent-vorp); border-radius: 3px;
           padding: 0 4px; line-height: 1.5; vertical-align: 1px; }
   .scroll { max-height: 460px; overflow: auto; overscroll-behavior: contain; }
+
+  /* Drag-and-drop reorder: grab the handle, drop anywhere. `manual[]` records
+     the result the same way ▲/▼ does -- see moveTo(). */
+  .drag { cursor: grab; color: var(--text-faint); text-align: center; }
+  tr.dragging { opacity: .35; }
+  tr.drag-over { box-shadow: inset 0 2px 0 var(--accent-volr); }
 
   /* Row controls. Sized for a thumb during a live draft, and
      `touch-action: manipulation` drops the 300ms double-tap-zoom wait that
@@ -169,6 +174,7 @@
     <label class="chk"><input type="checkbox" id="rookies"> rookies only</label>
     <span class="spacer"></span>
     <button id="export">Export answers</button>
+    <button id="exportCsv">Export ranking (CSV)</button>
     <button id="clear">Reset all</button>
   </div>
 
@@ -190,8 +196,12 @@
   <div class="cols">
     <div>
       <h2>Live ranking (<span id="rankcount"></span>)</h2>
+      <div class="bar" style="margin-bottom:8px">
+        <input id="rankSearch" type="search" placeholder="Find a player&hellip;" autocomplete="off">
+        <button id="rankSearchBtn" title="jump to first match">&#128269; Search</button>
+      </div>
       <div class="scroll">
-        <table><thead><tr><th class="act"></th><th class="n">#</th><th>Player</th><th>Pos</th>
+        <table><thead><tr><th class="act"></th><th class="act"></th><th class="n">#</th><th>Player</th><th>Pos</th>
           <th class="n">Proj</th><th class="n">VORP</th>
           <th class="n">Seen</th><th class="n">Board</th><th class="act"></th></tr></thead>
           <tbody id="rank"></tbody></table>
@@ -484,7 +494,9 @@ function render(anchor) {
     const turn = MY_PICK_AT[i + 1];
     const pickRow = turn ? ' pickrow' : '';
     const pickTag = turn ? `<span class="pick" title="around my pick ${turn}">P${turn}</span>` : '';
-    return `<tr id="r_${id}" class="${pickRow}"><td class="act">` +
+    return `<tr id="r_${id}" class="${pickRow}" draggable="true" data-id="${id}">` +
+      `<td class="act drag" title="drag to reorder">&#8942;&#8942;</td>` +
+      `<td class="act">` +
       `<button class="rb" data-mv="-1" data-id="${id}" title="move up">&#9650;</button>` +
       `<button class="rb" data-mv="1" data-id="${id}" title="move down">&#9660;</button></td>` +
       `<td class="n">${i + 1}${pickTag}</td><td>${p.name}${rookie}</td>` +
@@ -498,6 +510,7 @@ function render(anchor) {
     const now = document.getElementById('r_' + anchor);
     if (now) box.scrollTop = wasScrolled + (now.offsetTop - wasAt);
   }
+  applyRankFilter();   // table is rebuilt wholesale above -- reapply the live filter
 
   const dnd = [...excluded];
   document.getElementById('dndn').textContent = dnd.length;
@@ -555,11 +568,25 @@ function move(id, dir) {
     .sort((a, b) => (key[a] - key[b]) || (boardRank[a] - boardRank[b]));
   const i = ord.indexOf(id), j = i + dir;
   if (i < 0 || j < 0 || j >= ord.length) return;   // already at the top or bottom
+  moveTo(id, j, ord, key);
+}
 
-  const near = key[ord[j]];
-  // One further than the row it's swapping past, or one key-unit past it when
-  // there is nothing further -- either way strictly beyond `near`.
-  const beyond = ord[j + dir] !== undefined ? key[ord[j + dir]] : near + dir;
+// Drag-and-drop drop target: pin `id` at position `targetIndex` (0-indexed, in
+// the current ranking order), same "strictly between its new neighbours" key
+// math as move() above, just for an arbitrary distance instead of one spot.
+// `ord`/`key` are optional precomputed values (move() already has them).
+function moveTo(id, targetIndex, ord, key) {
+  key = key || allKeys();
+  ord = (ord || P.filter(p => !excluded.has(p.id)).map(p => p.id)
+    .sort((a, b) => (key[a] - key[b]) || (boardRank[a] - boardRank[b])))
+    .filter(x => x !== id);
+  if (!ord.length) return;   // nothing else in the pool to sort against
+  targetIndex = Math.max(0, Math.min(targetIndex, ord.length));
+
+  const before = ord[targetIndex - 1], after = ord[targetIndex];
+  const near = before !== undefined ? key[before] : key[after];
+  const beyond = after !== undefined && before !== undefined ? key[after]
+    : before !== undefined ? near + 1 : near - 1;
   manual[id] = (near + beyond) / 2;
   save(); sync(); render(id);
 }
@@ -652,12 +679,83 @@ document.getElementById('undo').onclick = () => {
 // handlers would be re-bound hundreds of times. `click`, not `touchstart` --
 // the browser swallows the click that ends a scroll fling, which is what keeps
 // a thumb scrolling the table from removing somebody by accident.
+// --- search the live ranking (find a player among 200+ rows) ---------------
+let rankFilter = '';
+function applyRankFilter() {
+  const q = rankFilter.trim().toLowerCase();
+  document.querySelectorAll('#rank tr[draggable]').forEach(tr => {
+    const name = tr.children[3].textContent.toLowerCase();
+    const pos = tr.children[4].textContent.toLowerCase();
+    tr.hidden = !!q && !name.includes(q) && !pos.includes(q);
+  });
+}
+function jumpToFirstMatch() {
+  const first = [...document.querySelectorAll('#rank tr[draggable]')].find(tr => !tr.hidden);
+  if (!first) return;
+  first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  first.style.outline = '2px solid var(--accent-volr)';
+  setTimeout(() => { first.style.outline = ''; }, 1200);
+}
+document.getElementById('rankSearch').oninput = e => { rankFilter = e.target.value; applyRankFilter(); };
+document.getElementById('rankSearch').addEventListener('keydown', e => {
+  if (e.key === 'Enter') jumpToFirstMatch();
+});
+document.getElementById('rankSearchBtn').onclick = jumpToFirstMatch;
+
 document.getElementById('rank').onclick = e => {
   const b = e.target.closest('button');
   if (!b) return;
   if (b.dataset.x) setExcluded(b.dataset.x, true);
   else move(b.dataset.id, +b.dataset.mv);
 };
+
+// --- drag-and-drop reorder ---------------------------------------------
+const rankBody = document.getElementById('rank');
+let dragId = null;
+rankBody.addEventListener('dragstart', e => {
+  const tr = e.target.closest('tr[draggable]');
+  if (!tr) return;
+  dragId = tr.dataset.id;
+  e.dataTransfer.effectAllowed = 'move';
+  tr.classList.add('dragging');
+});
+rankBody.addEventListener('dragend', e => {
+  const tr = e.target.closest('tr[draggable]');
+  if (tr) tr.classList.remove('dragging');
+  rankBody.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+});
+rankBody.addEventListener('dragover', e => {
+  if (!dragId) return;
+  e.preventDefault();
+  const rows = [...rankBody.querySelectorAll('tr[draggable]')];
+  rankBody.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  const over = rows.find(r => {
+    const box = r.getBoundingClientRect();
+    return e.clientY < box.top + box.height / 2;
+  });
+  (over || rows[rows.length - 1]).classList.add('drag-over');
+});
+rankBody.addEventListener('drop', e => {
+  if (!dragId) return;
+  e.preventDefault();
+  const rows = [...rankBody.querySelectorAll('tr[draggable]')];
+  const over = rankBody.querySelector('.drag-over');
+  const id = dragId;
+  dragId = null;
+  if (!over) return;
+  let targetIndex = rows.indexOf(over);
+  // Dropping past the midpoint of the last row means "after it", not "before it".
+  if (over === rows[rows.length - 1]) {
+    const box = over.getBoundingClientRect();
+    if (e.clientY >= box.top + box.height / 2) targetIndex += 1;
+  }
+  // `rows` still includes the dragged row itself (DOM hasn't re-rendered yet),
+  // but moveTo()'s `ord` does not -- once the drop point is past where the
+  // dragged row currently sits, its removal shifts everything after it down one.
+  const dragIndex = rows.findIndex(r => r.dataset.id === id);
+  if (dragIndex >= 0 && dragIndex < targetIndex) targetIndex -= 1;
+  moveTo(id, targetIndex);
+});
 document.getElementById('dndlist').onclick = e => {
   const b = e.target.closest('button');
   if (b) setExcluded(b.dataset.undo, false);
@@ -698,6 +796,26 @@ document.getElementById('export').onclick = () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'queue-prefs-' + DATA.season + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+// Matches queue_export.py's queue-snake-{season}.csv column shape, so this
+// can drop straight into data/ in place of the Python fit if wanted.
+function csvCell(v) {
+  const s = String(v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+document.getElementById('exportCsv').onclick = () => {
+  const header = 'queue_pos,player_id,player,position,team,proj,wk1_pts,adp,vorp_avg,rookie';
+  const rows = order().map((id, i) => {
+    const p = byId[id];
+    return [i + 1, id, p.name, p.pos, p.team || '', p.pts ?? '', p.wk1 ?? '', p.adp ?? '', p.vorp ?? '', p.exp === 0 ? 'R' : ''];
+  });
+  const csv = [header].concat(rows.map(r => r.map(csvCell).join(','))).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'queue-snake-' + DATA.season + '.csv';
   a.click();
   URL.revokeObjectURL(a.href);
 };
