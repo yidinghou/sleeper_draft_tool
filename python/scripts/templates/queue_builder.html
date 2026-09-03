@@ -100,6 +100,9 @@
   th { color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
   td.n, th.n { text-align: right; font-family: 'IBM Plex Mono', monospace; }
   .move-up { color: var(--up); } .move-dn { color: var(--warn); }
+  .rook { display: inline-block; margin-left: 4px; font-size: 10px; font-weight: 700;
+          color: var(--bg); background: var(--accent-volr); border-radius: 3px;
+          padding: 0 3px; line-height: 1.5; vertical-align: 1px; }
   .scroll { max-height: 460px; overflow: auto; overscroll-behavior: contain; }
 
   /* Row controls. Sized for a thumb during a live draft, and
@@ -365,7 +368,7 @@ const num = (v, digits = 1) => (v === null || v === undefined ? '--' : v.toFixed
 function card(el, p, keyHint) {
   el.className = 'card';
   el.innerHTML =
-    `<div class="nm">${p.name}</div>` +
+    `<div class="nm">${p.name}${p.exp === 0 ? ' <span class="rook" title="rookie">R</span>' : ''}</div>` +
     `<div class="meta"><span class="pos pos-${p.pos}">${p.pos}</span> &middot; ${p.team} &middot; bye ${p.bye || '--'} &middot; rd ${p.rnd}</div>` +
     `<div class="stat">${num(p.pts)} proj pts &middot; ${num(p.wk1)} wk1` +
       (reveal ? ` &middot; adp ${num(p.adp)} &middot; vorp ${num(p.vorp)}` : '') +
@@ -453,10 +456,11 @@ function render(anchor) {
   document.getElementById('rank').innerHTML = ord.map((id, i) => {
     const p = byId[id], move = boardRank[id] - (i + 1);
     const cls = move > 0 ? 'move-up' : move < 0 ? 'move-dn' : '';
+    const rookie = p.exp === 0 ? '<span class="rook" title="rookie">R</span>' : '';
     return `<tr id="r_${id}"><td class="act">` +
       `<button class="rb" data-mv="-1" data-id="${id}" title="move up">&#9650;</button>` +
       `<button class="rb" data-mv="1" data-id="${id}" title="move down">&#9660;</button></td>` +
-      `<td class="n">${i + 1}</td><td>${p.name}</td>` +
+      `<td class="n">${i + 1}</td><td>${p.name}${rookie}</td>` +
       `<td class="pos pos-${p.pos}">${p.pos}</td><td class="n">${seen[id]}</td>` +
       `<td class="n ${cls}">${boardRank[id]}${move ? ` (${move > 0 ? '+' : ''}${move})` : ''}</td>` +
       `<td class="act"><button class="rb x" data-x="${id}" title="do not draft">&#10005;</button></td></tr>`;
