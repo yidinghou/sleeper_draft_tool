@@ -237,29 +237,13 @@ CONFIDENCE_AT = 6
 #: This loosens the round backbone, which is load-bearing (see `queue_order`:
 #: raw ratings scored rho 0.404 against known preferences, round-blocked 0.847).
 #: It is loosened at the end of the draft only, where ADP is worth least. If the
-#: tail order ever starts looking random, set this to 0 and keep `RISE_FLOOR`.
+#: tail order ever starts looking random, set this to 0.
 SLACK_GROWTH = 0.15
-
-#: The earliest round a hand-set override may move a player into, as a fraction
-#: of his ADP round: a 10th-rounder tops out in round 4, a 16th in round 7.
-#:
-#: This bounds the ranking page's up button, not drift. Drift is already bounded
-#: by `round_slack`, which is tighter everywhere (round 10 drifts 2.4 rounds
-#: against a 6-round ceiling), and clamping the key itself would be worse than
-#: useless -- `rise_floor(1) == 1` would flatten every round-1 key to exactly
-#: 1.0 and destroy the within-round ordering the whole page exists to produce.
-#: The override is the only thing that can reach far enough to need a limit.
-RISE_FLOOR = 0.4
 
 
 def round_slack(rnd: int, base: float = ROUND_SLACK) -> float:
     """How far, in rounds, a player in `rnd` may drift on his comparisons."""
     return base * (1 + SLACK_GROWTH * (rnd - 1))
-
-
-def rise_floor(rnd: int) -> int:
-    """The earliest round `rnd`'s player may be promoted into."""
-    return max(1, math.ceil(RISE_FLOOR * rnd))
 
 
 def queue_order(
@@ -415,13 +399,13 @@ def build_payload(season: int, pool_size: int, prefs: dict | None = None) -> dic
 
     # Round overrides from the ranking page's up/down buttons. Comparisons move
     # a player at most `round_slack` across a boundary, so anything further --
-    # a round-16 rookie I read as a round-6 pick -- has to be said outright
-    # rather than argued for with answers. Clamped to the same rise floor the
-    # key is, so an override cannot do what drift is forbidden to do.
+    # a round-16 rookie I read as a round-1 pick -- has to be said outright
+    # rather than argued for with answers. Bounded only by the draft itself:
+    # nothing before round 1, nothing past the last round.
     overrides = prefs.get("rounds", {})
     for e in entries:
         if e["id"] in overrides:
-            e["rnd"] = max(rise_floor(e["rnd"]), min(last, int(overrides[e["id"]])))
+            e["rnd"] = max(1, min(last, int(overrides[e["id"]])))
 
     ranked = {e["id"] for e in entries}
     rounds = sorted({e["rnd"] for e in entries})
@@ -663,15 +647,13 @@ def demo() -> None:
     assert crossed[ids[10]] < weakest_r1, "no cross-round promotion possible"
     assert crossed[ids[10]] > min(crossed[p] for p in ids[:10]), "promotion jumped the whole round"
 
-    # Late rounds drift further than early ones -- ADP is a guess down there --
-    # but nobody outruns his rise floor, which is the ceiling on the ranking
-    # page's up button as much as on drift.
+    # Late rounds drift further than early ones -- ADP is a guess down there.
     assert round_slack(1) == ROUND_SLACK and round_slack(10) > round_slack(1)
-    assert rise_floor(10) == 4, "a 10th-rounder must top out in round 4"
-    assert rise_floor(16) == 7 and rise_floor(1) == 1
 
     # A saturated rating with full confidence: drift reaches its widened room in
-    # a late round, and still stops at the floor.
+    # a late round, but never the whole way to round 1 -- that is what the
+    # override is for, and why the up button switches to one the moment the
+    # row above is in another round.
     late = {pid: 12 for pid in ids}
     hot = {pid: 0.0 for pid in ids}
     hot[ids[0]] = 9.0
@@ -679,12 +661,11 @@ def demo() -> None:
     far = queue_order(late, hot, full)
     assert far[ids[0]] >= 12 - round_slack(12) - 1e-9, "drift exceeded its room"
     assert far[ids[0]] < 12 - ROUND_SLACK, "late rounds did not drift further than round 1"
-    # Drift alone still cannot reach the rise floor, which is why the up button
-    # switches to an override the moment the row above is in another round.
-    assert far[ids[0]] > rise_floor(12), "drift reached the ceiling meant for overrides"
+    assert far[ids[0]] > 1, "drift alone reached round 1 -- the override has nothing left to do"
 
-    # An override lands where answers cannot -- round 12 into round 5.
-    moved = queue_order({**late, ids[0]: 5}, hot, full)
+    # An override lands where answers cannot -- round 12 all the way to round 1,
+    # with no floor stopping it short.
+    moved = queue_order({**late, ids[0]: 1}, hot, full)
     assert moved[ids[0]] < min(far[p] for p in ids[1:]), "override did not land"
 
     # And a player with one comparison stays pinned to his round: the up button

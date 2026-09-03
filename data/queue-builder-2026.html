@@ -393,11 +393,9 @@ function card(el, p, keyHint) {
 // nothing. Elo here, Bradley-Terry there, but the z-score per round is on the
 // same footing either way, so this previews the real order.
 // SLACK_GROWTH widens the drift in the late rounds, where ADP is a guess:
-// round 1 keeps ±1.0, round 16 gets ±3.3. RISE_FLOOR is the ceiling on the ▲
-// button, not on drift -- a 10th-rounder cannot be moved above round 4.
-const ROUND_SLACK = 1.0, CONFIDENCE_AT = 6, SLACK_GROWTH = 0.15, RISE_FLOOR = 0.4;
+// round 1 keeps ±1.0, round 16 gets ±3.3.
+const ROUND_SLACK = 1.0, CONFIDENCE_AT = 6, SLACK_GROWTH = 0.15;
 const roundSlack = r => ROUND_SLACK * (1 + SLACK_GROWTH * (r - 1));
-const riseFloor = r => Math.max(1, Math.ceil(RISE_FLOOR * r));
 
 function order() {
   const byRnd = {};
@@ -525,8 +523,8 @@ function next() { pair = choosePair(); render(); }
 // Across a round boundary a comparison cannot get there at all: drift is capped
 // at roundSlack and scaled by seen/CONFIDENCE_AT, so answers move a player a
 // round at most. Moving him further has to be said outright, and that is what
-// `rounds` is -- bounded by riseFloor, or enough taps would walk a round-12
-// flier into round 1.
+// `rounds` is -- bounded only by the draft itself, round 1 to LAST_ROUND, so a
+// held thumb can walk any player anywhere on the board.
 function move(id, dir) {
   const ord = order(), i = ord.indexOf(id), j = i + dir;
   if (i < 0 || j < 0 || j >= ord.length) return;
@@ -537,9 +535,8 @@ function move(id, dir) {
     // purpose -- a well-rated round-12 player sits above a weak round-11 one --
     // so the row above can be in a *later* round, and adopting it walks him
     // back down. Stepping is monotone, so a held thumb always makes progress.
-    const want = dir < 0 ? Math.max(riseFloor(me.adpRnd), me.rnd - 1)
-                         : Math.min(LAST_ROUND, me.rnd + 1);
-    if (want === me.rnd) return;          // at the rise ceiling, or the last round
+    const want = dir < 0 ? Math.max(1, me.rnd - 1) : Math.min(LAST_ROUND, me.rnd + 1);
+    if (want === me.rnd) return;          // already at round 1 or the last round
     rounds[id] = me.rnd = want;
     indexRounds();
   } else {
@@ -565,7 +562,7 @@ function move(id, dir) {
 function addPlayer(id) {
   const p = ADDABLE[id];
   if (!p || byId[id]) return;
-  P.push(p); byId[id] = p; p.adpRnd = p.rnd;
+  P.push(p); byId[id] = p;
   // Last on the board by construction -- he is behind everyone the pool kept,
   // which is exactly why he was cut. The ranking's ± column reads from here.
   boardRank[id] = P.length;
@@ -742,11 +739,7 @@ const answers = r => (r && r.comparisons ? r.comparisons.length : -1);
 if (answers(local) >= answers(restored)) restored = local || restored;
 apply(DATA.resume); apply(local);
 
-// The ADP round each player actually came with, kept before any override lands
-// on `rnd`, because riseFloor is measured against the market's opinion and not
-// against wherever the last tap left him.
-for (const p of P) p.adpRnd = p.rnd;
-for (const p of P) if (rounds[p.id]) p.rnd = Math.max(riseFloor(p.adpRnd), rounds[p.id]);
+for (const p of P) if (rounds[p.id]) p.rnd = rounds[p.id];
 indexRounds();
 
 // After the extras are in P, so their answers survive the filter below and the
