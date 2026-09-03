@@ -175,6 +175,47 @@ def load_pool(season: int, size: int) -> list[dict]:
     return load_board(season)[:size] + load_manual(season)
 
 
+def prefs_path(season: int) -> Path:
+    """The builder's answers file.
+
+    Lives here rather than in queue_builder because this module is the one the
+    queue CSV comes out of, and queue_builder already imports from it.
+    """
+    return REPO_ROOT / "data" / f"queue-prefs-{season}.json"
+
+
+def load_prefs(season: int) -> dict:
+    """The builder's answers, or {} when it has never run.
+
+    Carries more than answers now. `extras` are board-tail players pulled into
+    the ranked pool by hand, `rounds` are per-player round overrides, and
+    `excluded` is the do-not-draft list. They ride in this file rather than one
+    of their own because it is the only thing that syncs both ways: the phone
+    POSTs it to queue_server, which writes the whole body through, so a player
+    removed on a phone reaches this export with no extra plumbing.
+    """
+    path = prefs_path(season)
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+
+def queue_rows(season: int, prefs: dict) -> list[dict]:
+    """Everything eligible for the queue: the whole board plus the K and DEF,
+    less the do-not-draft list.
+
+    Filtered here, before ordering and before `place_manual`, so the queue
+    stays `depth` deep -- dropping a player pulls the next one up behind him
+    rather than leaving a hole in the middle of the draft. Every consumer
+    (draft_watch, draft_auto, mock_draft) reads only the exported CSV, so this
+    one filter is what makes "do not draft" mean it.
+    """
+    excluded = set(prefs.get("excluded", ()))
+    return [
+        r
+        for r in load_board(season) + load_manual(season)
+        if r["player_id"] not in excluded
+    ]
+
+
 def load_ratings(season: int) -> dict[str, float]:
     """The queue ordering key from scripts/queue_builder.py, if it has run.
     Empty dict when the file is absent, which is the plain-VORP case.
@@ -254,11 +295,12 @@ def main() -> None:
 
     keepers = load_my_keepers(season)
     ratings = load_ratings(season)
+    prefs = load_prefs(season)
     # The whole board, so unrated players still fill the tail, plus the K and
     # DEF the builder ranks. Without ratings those trail every skill player and
     # fall past `depth` -- which is the old hand-draft behaviour, and the right
     # default: nothing has been said about them yet to justify queueing one.
-    queue = place_manual(order_board(load_board(season) + load_manual(season), ratings), depth)
+    queue = place_manual(order_board(queue_rows(season, prefs), ratings), depth)
     picks = SNAKE_CONFIG.roster_size - len(keepers)
     source = f"pairwise preferences over {len(ratings)} players" if ratings else "pure VORP"
 
@@ -272,6 +314,12 @@ def main() -> None:
 
     kept = ", ".join(f"{k['player_name']} ({k['position']})" for k in keepers)
     print(f"Keeping {kept} -- {picks} live picks, queue {len(queue)} deep ({source})\n")
+    if prefs.get("excluded"):
+        # Said out loud, because a player missing from the queue is otherwise
+        # indistinguishable from one the depth cut off.
+        names = {r["player_id"]: r["player"] for r in load_board(season) + load_manual(season)}
+        dnd = ", ".join(names.get(i, i) for i in prefs["excluded"])
+        print(f"Do not draft ({len(prefs['excluded'])}): {dnd}\n")
     print("Enter top-down; Sleeper's queue appends to the bottom, so no dragging.\n")
     for i, row in enumerate(queue, 1):
         adp = f"{float(row['adp']):>6.1f}" if row["adp"] else "    --"
@@ -351,6 +399,16 @@ def demo() -> None:
     assert {r["player_id"] for r in manual} == {r["player_id"] for r in placed[-len(manual):]}, (
         "placing dropped or duplicated a manual player"
     )
+
+    # Do not draft: filtered before ordering, so the queue is still full depth
+    # -- the next player up fills the hole rather than the queue ending a pick
+    # short of the draft.
+    banned = board[0]["player_id"]
+    rows = queue_rows(SNAKE_CONFIG.season, {"excluded": [banned]})
+    assert banned not in {r["player_id"] for r in rows}, "excluded player survived"
+    assert len(rows) == len(board) + len(manual) - 1, "exclusion dropped more than one"
+    assert len(place_manual(order_board(rows, {}), depth)) == depth, "queue lost depth"
+    assert queue_rows(SNAKE_CONFIG.season, {}) == board + manual, "no prefs must be a no-op"
 
     pool = load_pool(SNAKE_CONFIG.season, 100)
     assert len(pool) == 100 + len(manual), f"pool is {len(pool)}, expected 100 + {len(manual)}"
