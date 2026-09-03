@@ -177,3 +177,58 @@ def test_greedy_equals_the_brute_forced_optimum_on_a_flat_price_board():
     assert plan.points_after == optimum
     # The two best-by-points RBs fill the two identical RB slots exactly.
     assert {t.player_id for t in plan.targets} == {"rbA", "rbB"}
+
+
+# --------------------------------------------------------------------------
+# A fill has to consume a slot, not just cost a dollar.
+# --------------------------------------------------------------------------
+
+#: One RB slot, one DEF slot, one bench slot. Bench excludes STREAMING_POSITIONS,
+#: so once the DEF slot is taken a second defense has nowhere at all to sit.
+#: Budget is exactly the slot count -- the state `max_bid` maintains, a dollar
+#: per slot still to fill.
+SEATING_CONFIG = LeagueConfig(
+    league_id="t",
+    draft_id="t",
+    season=2026,
+    teams=1,
+    budget=3,
+    min_bid=1,
+    starting_slots={"QB": 0, "RB": 1, "WR": 0, "TE": 0, "K": 0, "DEF": 1},
+    flex_slots={},
+    bench_slots=1,
+)
+
+#: `def2` is the trap: same price as `rb2` and a bigger margin over
+#: replacement, so a fill that sorts on price-then-margin takes it -- into a
+#: DEF slot that `def1` already holds and a bench slot that cannot hold it.
+SEATING_POOL = [
+    RosterFillPlayer(player_id="rb1", position="RB", points=50.0),
+    RosterFillPlayer(player_id="def1", position="DEF", points=40.0),
+    RosterFillPlayer(player_id="def2", position="DEF", points=30.0),
+    RosterFillPlayer(player_id="rb2", position="RB", points=10.0),
+]
+SEATING_PRICES = {"rb1": 1, "def1": 1, "def2": 1, "rb2": 1}
+SEATING_REPLACEMENT = {"RB": 0.0, "DEF": 0.0}
+
+
+def test_fill_never_buys_a_body_no_open_slot_can_seat():
+    """`max_bid` holds back a dollar for every *other* open slot, so the budget
+    stays at or above the slot count -- but only while each purchase actually
+    seats someone. A second defense in a one-DEF lineup spends the dollar and
+    leaves the slot open, and the seat ends the draft unable to fill its roster.
+
+    Found when a projections re-scrape made a spare $1 defense the cheapest
+    body on the board: the plan left six slots open on a roster that had the
+    money for every one of them.
+    """
+    state = LeagueState.opening(SEATING_CONFIG)
+    plan = plan_roster(
+        state, 0, SEATING_POOL, SEATING_PRICES, SEATING_REPLACEMENT, fill_all=True
+    )
+
+    bought = [t.position for t in plan.targets] + [f.position for f in plan.fills]
+    assert bought.count("DEF") <= 1, "bought a defense with no slot to sit in"
+    # Three slots, three dollars, three seatable players: the roster completes.
+    assert plan.open_slots_after == 0
+    assert plan.budget_left_after >= plan.open_slots_after
