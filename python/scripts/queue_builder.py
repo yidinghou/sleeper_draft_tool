@@ -55,6 +55,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from html_page import write_local  # noqa: E402
 from keeper_vorp import load_keepers, pick_schedule  # noqa: E402
 from queue_export import (  # noqa: E402
+    apply_qb_floor,
     draft_slots,
     load_board,
     load_manual,
@@ -472,6 +473,11 @@ def build_payload(season: int, pool_size: int, prefs: dict | None = None) -> dic
         + [entry(p) for p in tail if p["player_id"] in wanted and p["player_id"] not in pooled]
         + [entry(p) for p in rookies if p["player_id"] not in pooled]
     )
+
+    # Quarterbacks sunk to the round I'd actually take them in -- see
+    # queue_export.QB_FLOOR. Applied here so the pages' baseline order and the
+    # exported queue agree; the live-ranking page has no other ordering step.
+    entries = apply_qb_floor(entries, season)
 
     ranked = {e["id"] for e in entries}
     rounds = sorted({e["rnd"] for e in entries})
