@@ -131,7 +131,9 @@
     <div class="bar" style="margin-bottom:8px">
       <input id="rankSearch" type="search" placeholder="Find a player&hellip;" autocomplete="off">
       <button id="rankSearchBtn" title="jump to first match">&#128269; Search</button>
-      <button id="exportCsv" title="download this order as the drafter's queue">&#11015; Export queue (CSV)</button>
+      <button id="exportCsv" title="download this order as data/queue-snake-SEASON.csv">&#11015; Save ranking</button>
+      <button id="loadCsv" title="restore an order from a saved queue CSV">&#11014; Load ranking</button>
+      <input id="loadFile" type="file" accept=".csv,text/csv" hidden>
     </div>
     <div class="scroll">
       <table><thead><tr><th class="act"></th><th class="act"></th><th class="n">#</th><th>Player</th><th>Pos</th>
@@ -339,8 +341,11 @@ document.getElementById('rankSearch').addEventListener('keydown', e => {
 });
 document.getElementById('rankSearchBtn').onclick = jumpToFirstMatch;
 
-// Matches queue_export.py's queue-snake-{season}.csv column shape, so the
-// download drops straight into data/ and draft_watch.load_queue() reads it.
+// Saved as queue-snake-{season}.csv -- the canonical ranking, the file
+// queue_export.py writes and draft_watch.load_queue()/draft_auto read. The
+// browser can only drop it in Downloads, so move it into data/ from there.
+// Carries proj/wk1/rookie where queue_export carries bye; every consumer reads
+// only queue_pos, player_id, player and position, and Load reads it back.
 function csvCell(v) {
   const s = String(v);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -358,6 +363,37 @@ document.getElementById('exportCsv').onclick = () => {
   a.download = 'queue-snake-' + DATA.season + '.csv';
   a.click();
   URL.revokeObjectURL(a.href);
+};
+
+// --- load a saved ranking --------------------------------------------------
+// The saved file is the canonical queue -- data/queue-snake-{season}.csv, the
+// one queue_export.py writes and draft_auto reads -- so save and load
+// round-trip through the artifact the drafter already uses. No second format.
+//
+// Position in the file becomes the manual key, which is the same thing a drag
+// sets, so a loaded order is editable exactly like a hand-built one. A player
+// the file does not mention keeps his board rank rather than being guessed at:
+// the export is depth-capped, and absent is not the same claim as excluded.
+function loadRanking(text) {
+  const lines = text.trim().split(/\r?\n/);
+  // queue_pos is never quoted and comes first, so a plain split is safe up to
+  // the player_id column whatever the later columns hold.
+  const col = lines[0].split(',').indexOf('player_id');
+  if (col < 0) { alert('Not a queue CSV -- no player_id column.'); return; }
+  let n = 0;
+  lines.slice(1).forEach((line, i) => {
+    const id = line.split(',')[col];
+    if (byId[id]) { manual[id] = i + 1; n++; }
+  });
+  if (!n) { alert('No player in that file is on this board.'); return; }
+  save(); render();
+  document.getElementById('rankcount').title = n + ' of ' + P.length + ' loaded from file';
+}
+document.getElementById('loadCsv').onclick = () => document.getElementById('loadFile').click();
+document.getElementById('loadFile').onchange = async e => {
+  const file = e.target.files[0];
+  if (file) loadRanking(await file.text());
+  e.target.value = '';   // same file twice in a row still fires onchange
 };
 
 document.getElementById('season').textContent = DATA.season + ' · ' + P.length + ' players';
