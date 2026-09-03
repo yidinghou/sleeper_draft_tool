@@ -39,7 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from draft_pick import TOKEN_FILE, build_payload, post, read_token  # noqa: E402
-from draft_watch import load_queue  # noqa: E402
+from draft_watch import CAPPED, load_queue  # noqa: E402
 from keeper_vorp import pick_schedule  # noqa: E402
 from mock_draft import lineup_gaps  # noqa: E402
 from vorp.league.config import MY_USERNAME, SNAKE_CONFIG  # noqa: E402
@@ -49,11 +49,6 @@ from vorp.sleeper_client import (  # noqa: E402
     fetch_draft,
     fetch_draft_picks,
 )
-
-#: Positions to cap, and at what. Everything else is uncapped on purpose:
-#: RB/WR are flex-eligible and the pile is wanted. See queue_export.py's
-#: module docstring for why proportional per-position caps were removed.
-CAPPED = ("K", "DEF")
 
 #: Fraction of the pick clock to let run before sending. 0.5 leaves a manual
 #: override window scaled to the timer without racing autopick at expiry.
@@ -146,21 +141,50 @@ def next_pick(
     return None
 
 
-def should_fire(status: str, elapsed_ms: float, pick_timer: int) -> bool:
-    """True once the clock has run past `FIRE_AT` of the pick timer.
+def should_fire(
+    status: str, elapsed_ms: float, pick_timer: int, fire_after: float | None = None
+) -> bool:
+    """True once the clock has run past `FIRE_AT` of the pick timer, or past a
+    flat `fire_after` seconds when one is given.
 
     A paused draft never fires: the clock isn't running, so "halfway" is
     meaningless and a pick sent into a pause is rejected anyway.
     """
     if status != "drafting":
         return False
+    if fire_after is not None:
+        return elapsed_ms >= fire_after * 1000
     return elapsed_ms >= (pick_timer or DEFAULT_PICK_TIMER) * 1000 * FIRE_AT
 
 
-def my_picks_left(pick_no: int, slot: int, rounds: int) -> int:
-    """How many picks I have from `pick_no` onward, counting it if it's mine."""
+def next_pick_no(taken_nos: set[int], rounds: int) -> int:
+    """The lowest pick number nobody has used yet.
+
+    Not `len(picks) + 1`: a keeper draft starts with picks already on the board
+    at the round each keeper was kept in, scattered and non-contiguous (18
+    keepers over picks 17-108 while the draft was still `pre_draft`). Counting
+    them put the board at pick 19 before a single live pick had been made, so
+    the slot lookup pointed at the wrong team and my own turn never fired. With
+    no keepers the picks run 1..N and this returns `len(picks) + 1` anyway.
+    """
+    total = rounds * SNAKE_CONFIG.teams
+    return next((n for n in range(1, total + 1) if n not in taken_nos), total + 1)
+
+
+def my_picks_left(
+    pick_no: int, slot: int, rounds: int, taken_nos: frozenset[int] = frozenset()
+) -> int:
+    """How many picks I have from `pick_no` onward, counting it if it's mine.
+
+    `taken_nos` drops the ones a keeper already spent -- otherwise the count is
+    inflated and `must_fill` waits too long to force the mandatory positions.
+    """
     schedule = [p for p in pick_schedule([], 0, SNAKE_CONFIG) if p["round"] <= rounds]
-    return sum(1 for p in schedule if p["pick_no"] >= pick_no and p["slot"] == slot)
+    return sum(
+        1
+        for p in schedule
+        if p["pick_no"] >= pick_no and p["slot"] == slot and p["pick_no"] not in taken_nos
+    )
 
 
 def retry_due(now: float, last: float | None, retry_every: float) -> bool:
@@ -182,6 +206,7 @@ def run(
     armed: bool,
     token: str | None,
     retry_every: float = 5.0,
+    fire_after: float | None = None,
 ) -> None:
     queue = load_queue(SNAKE_CONFIG.season)
     caps = {p: SNAKE_CONFIG.starting_slots[p] for p in CAPPED}
@@ -224,7 +249,8 @@ def run(
             if slot is None:
                 sys.exit("could not resolve my draft slot -- pass --slot")
 
-        pick_no = len(picks) + 1
+        taken_nos = {int(p["pick_no"]) for p in picks if p.get("pick_no") is not None}
+        pick_no = next_pick_no(taken_nos, rounds)
         taken = {str(p.get("player_id")) for p in picks}
         roster = roster_of(picks, slot)
 
@@ -233,8 +259,10 @@ def run(
             # lineup_gaps only knows QB/RB/WR/TE -- mock_draft models the skill
             # lineup and leaves K/DEF out. Reporting its answer alone printed
             # "gaps: none" over a roster with no kicker and no defense, so the
-            # capped slots are checked here too.
-            gaps = lineup_gaps(roster) + [p for p, n in caps.items() if roster[p] < n]
+            # capped slots are checked here too -- but only the ones it misses,
+            # or capping QB/TE would list them twice.
+            gaps = lineup_gaps(roster)
+            gaps += [p for p, n in caps.items() if roster[p] < n and p not in gaps]
             have = ", ".join(f"{n}{p}" for p, n in sorted(roster.items())) or "none"
             print(f"pick {pick_no} | {status} | mine: {have} | gaps: {gaps or 'none'}", flush=True)
 
@@ -249,9 +277,13 @@ def run(
             # waits `retry_every` before trying again -- a failing pick retried
             # once a second just hammers whatever is already refusing it.
             due = retry_due(time.monotonic(), attempts.get(pick_no), retry_every)
-            if should_fire(status, elapsed, pick_timer) and due:
+            if should_fire(status, elapsed, pick_timer, fire_after) and due:
                 target = next_pick(
-                    queue, taken, roster, caps, my_picks_left(pick_no, slot, rounds)
+                    queue,
+                    taken,
+                    roster,
+                    caps,
+                    my_picks_left(pick_no, slot, rounds, frozenset(taken_nos)),
                 )
                 if target is None:
                     print("queue exhausted -- deferring to Sleeper", flush=True)
@@ -280,6 +312,8 @@ def selftest() -> None:
         {"player_id": "2", "player": "Butker", "position": "K"},
         {"player_id": "3", "player": "Shrader", "position": "K"},
         {"player_id": "4", "player": "Nabers", "position": "WR"},
+        {"player_id": "5", "player": "Bowers", "position": "TE"},
+        {"player_id": "6", "player": "Allen", "position": "QB"},
     ]
     caps = {"K": 1, "DEF": 1}
 
@@ -290,7 +324,15 @@ def selftest() -> None:
     # Uncapped positions are never blocked, however many I have.
     assert next_pick(queue, set(), Counter({"RB": 9}), caps)["player"] == "Gibbs"
     # Exhausted queue defers rather than raising.
-    assert next_pick(queue, {"1", "2", "3", "4"}, Counter(), caps) is None
+    assert next_pick(queue, {"1", "2", "3", "4", "5", "6"}, Counter(), caps) is None
+
+    # The live rule: QB and TE are capped at one alongside K and DEF, so a
+    # roster already holding them falls through to the uncapped RB/WR pile.
+    full = {p: 1 for p in CAPPED}
+    assert next_pick(queue, {"1"}, Counter({"K": 1, "TE": 1}), full)["player"] == "Nabers"
+    assert next_pick(queue, {"1", "4"}, Counter({"K": 1, "QB": 1}), full)["player"] == "Bowers"
+    # Nothing left but capped positions I've already filled.
+    assert next_pick(queue, {"1", "4"}, Counter({"K": 1, "QB": 1, "TE": 1}), full) is None
 
     # The floor: with picks to spare the queue's order wins and the kicker
     # waits, but once picks_left is down to the mandatory slots it is forced --
@@ -300,11 +342,29 @@ def selftest() -> None:
     assert must_fill(Counter(), {"K": 1, "DEF": 1}, picks_left=2) == ["K", "DEF"]
     assert must_fill(Counter(), {"K": 1, "DEF": 1}, picks_left=3) == []
     assert must_fill(Counter({"K": 1, "DEF": 1}), {"K": 1, "DEF": 1}, picks_left=1) == []
+    # With four capped positions the forcing window is four picks wide, not two.
+    assert must_fill(Counter(), full, picks_left=4) == ["QB", "TE", "K", "DEF"]
+    assert must_fill(Counter(), full, picks_left=5) == []
+    # An empty QB slot with one pick left outranks the queue's top RB.
+    assert next_pick(queue, set(), Counter({"TE": 1, "K": 1, "DEF": 1}), full, 1)["player"] == "Allen"
 
     # Picks remaining from a given pick_no, counting it when it is mine.
     assert my_picks_left(7, 7, 15) == 15
     assert my_picks_left(8, 7, 15) == 14
     assert my_picks_left(147, 7, 15) == 1
+    # A keeper already spent one of my slots, so it no longer counts as a pick
+    # I still get to make.
+    assert my_picks_left(7, 7, 15, frozenset({14})) == 14
+
+    # Keeper drafts: picks land on the board before the draft starts, at the
+    # round each was kept in, so pick numbers are scattered rather than 1..N.
+    assert next_pick_no(set(), 15) == 1  # nothing kept, nothing drafted
+    assert next_pick_no({1, 2, 3}, 15) == 4  # ordinary contiguous progress
+    # The real shape: 18 keepers over picks 17-108 with the draft not started.
+    # len(picks) + 1 would say 19; the board is actually still on pick 1.
+    assert next_pick_no({17, 31, 36, 47, 49, 89, 108}, 16) == 1
+    assert next_pick_no({1, 2, 17, 31}, 16) == 3  # live picks fill from the front
+    assert next_pick_no(set(range(1, 151)), 15) == 151  # exhausted -> past the end
 
     # Fires at the halfway mark, not before, and never while paused.
     assert not should_fire("drafting", 4_000, 10)
@@ -313,6 +373,11 @@ def selftest() -> None:
     # No pick_timer in settings falls back rather than firing instantly.
     assert not should_fire("drafting", 1_000, 0)
     assert should_fire("drafting", 31_000, 0)
+    # --fire-after replaces the fraction with a flat wait, so a long mock clock
+    # doesn't make a 15-round test run take a quarter of an hour of waiting.
+    assert not should_fire("drafting", 4_000, 120, fire_after=5)
+    assert should_fire("drafting", 5_000, 120, fire_after=5)
+    assert not should_fire("paused", 9_000, 120, fire_after=5)
 
     # First attempt goes immediately; a rejected one waits out retry_every.
     assert retry_due(100.0, None, 5.0)
@@ -338,6 +403,13 @@ def main() -> None:
         "--retry-every", type=float, default=5.0, help="seconds between retries of a rejected pick"
     )
     parser.add_argument("--arm", action="store_true", help="actually send picks")
+    parser.add_argument(
+        "--fire-after",
+        type=float,
+        help="seconds into my turn to send, overriding the FIRE_AT fraction. "
+        "For testing against a mock, where waiting out half a 2-minute clock "
+        "on all 15 picks is the slowest part of the run.",
+    )
     parser.add_argument("--selftest", action="store_true")
     args = parser.parse_args()
 
@@ -352,7 +424,7 @@ def main() -> None:
     if not args.arm:
         print("SHADOW MODE -- no picks will be sent. --arm to go live.", flush=True)
 
-    run(args.draft_id, args.slot, args.every, args.arm, token, args.retry_every)
+    run(args.draft_id, args.slot, args.every, args.arm, token, args.retry_every, args.fire_after)
 
 
 if __name__ == "__main__":
