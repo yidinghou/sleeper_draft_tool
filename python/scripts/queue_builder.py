@@ -52,6 +52,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from html_page import write_local  # noqa: E402
+from keeper_vorp import load_keepers, pick_schedule  # noqa: E402
 from queue_export import (  # noqa: E402
     draft_slots,
     load_board,
@@ -61,7 +62,7 @@ from queue_export import (  # noqa: E402
     prefs_path,
 )
 from vorp.csv_loader import REPO_ROOT, projections_csv_path  # noqa: E402
-from vorp.league.config import SNAKE_CONFIG  # noqa: E402
+from vorp.league.config import MY_USERNAME, SNAKE_CONFIG  # noqa: E402
 
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "queue_builder.html"
 
@@ -335,6 +336,29 @@ def load_experience(season: int) -> dict[str, int]:
         }
 
 
+def my_pick_ranks(season: int) -> list[int]:
+    """Which rows of the live ranking are my draft turns.
+
+    The ranking is one ordered list, position-agnostic, the same shape the
+    exported queue is in -- so if the board went strictly by that order, my
+    Nth live pick would be the Nth row. That is what makes a row worth
+    anchoring on: it is roughly who's still around when my turn comes back
+    around, not just an arbitrary rank.
+
+    `live_no` (from `pick_schedule`) is exactly that count -- draft pick
+    number with keeper picks skipped, since a keeper never takes a row off
+    this list. Empty when there is no picks CSV yet or nobody in it matches
+    `MY_USERNAME` (a fresh season, a mock), rather than failing the build.
+    """
+    try:
+        keepers = load_keepers(season)
+        slot = next(int(r["draft_slot"]) for r in keepers if r["owner"] == MY_USERNAME)
+    except (FileNotFoundError, StopIteration):
+        return []
+    picks = pick_schedule(keepers, slot, SNAKE_CONFIG)
+    return [p["live_no"] for p in picks if p["mine"] and not p["is_keeper"]]
+
+
 def season_points(player: dict) -> float | None:
     """The blended season projection: Sleeper and Boberto averaged over
     whichever of the two actually has a number. None when neither does, which
@@ -419,6 +443,9 @@ def build_payload(season: int, pool_size: int, prefs: dict | None = None) -> dic
         "addable": [entry(p) for p in tail if p["player_id"] not in ranked],
         "rounds": rounds,
         "targets": {str(r): round_target(r) for r in rounds},
+        # Which rows of the live ranking are one of my draft turns -- see
+        # `my_pick_ranks`. [] when the picks CSV can't resolve my slot.
+        "myPicks": my_pick_ranks(season),
     }
 
 

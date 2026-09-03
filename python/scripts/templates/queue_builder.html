@@ -108,6 +108,13 @@
   .rook { display: inline-block; margin-left: 4px; font-size: 10px; font-weight: 700;
           color: var(--bg); background: var(--accent-volr); border-radius: 3px;
           padding: 0 3px; line-height: 1.5; vertical-align: 1px; }
+  /* A row that lines up with one of my draft turns -- see MY_PICK_AT. The left
+     border reads at a glance while scrolling; the badge says which turn. */
+  tr.pickrow { background: color-mix(in srgb, var(--accent-vorp) 12%, transparent);
+               box-shadow: inset 3px 0 0 var(--accent-vorp); }
+  .pick { display: inline-block; margin-left: 5px; font-size: 10px; font-weight: 700;
+          color: var(--bg); background: var(--accent-vorp); border-radius: 3px;
+          padding: 0 4px; line-height: 1.5; vertical-align: 1px; }
   .scroll { max-height: 460px; overflow: auto; overscroll-behavior: contain; }
 
   /* Row controls. Sized for a thumb during a live draft, and
@@ -192,6 +199,7 @@
       <div class="note" style="margin-top:6px">
         &#9650;&#9660; moves a player exactly one spot, however far you tap it.
         &#10005; removes him from the draft entirely.
+        <span class="pick" style="margin-left:0">P#</span> marks a row around one of my draft turns.
       </div>
       <details id="dnd">
         <summary>Do not draft (<span id="dndn">0</span>)</summary>
@@ -228,6 +236,12 @@ const KEY = 'queue-prefs-' + DATA.season;
 const SYNC_URL = location.protocol.startsWith('http') ? '/prefs' + location.search : null;
 const byId = Object.fromEntries(P.map(p => [p.id, p]));
 const boardRank = Object.fromEntries(P.map((p, i) => [p.id, i + 1]));
+
+// Which live-ranking row is my Nth draft turn -- see queue_builder.my_pick_ranks.
+// A row number, not a player id: it moves with whoever the ranking currently
+// has there, which is the point -- a fixed player would go stale the moment
+// anyone answers a comparison. row (1-indexed) -> which turn, e.g. {9: 1, 12: 2}.
+const MY_PICK_AT = Object.fromEntries((DATA.myPicks || []).map((row, i) => [row, i + 1]));
 
 let comparisons = [];
 let reveal = true;   // ADP/VORP visible unless hidden
@@ -463,10 +477,17 @@ function render(anchor) {
     const p = byId[id], move = boardRank[id] - (i + 1);
     const cls = move > 0 ? 'move-up' : move < 0 ? 'move-dn' : '';
     const rookie = p.exp === 0 ? '<span class="rook" title="rookie">R</span>' : '';
-    return `<tr id="r_${id}"><td class="act">` +
+    // MY_PICK_AT is keyed by row number (1-indexed), not player id -- the
+    // anchor is "who's here for my Nth turn", which follows the row as
+    // answers reorder it, not whoever happened to be there when the page
+    // loaded.
+    const turn = MY_PICK_AT[i + 1];
+    const pickRow = turn ? ' pickrow' : '';
+    const pickTag = turn ? `<span class="pick" title="around my pick ${turn}">P${turn}</span>` : '';
+    return `<tr id="r_${id}" class="${pickRow}"><td class="act">` +
       `<button class="rb" data-mv="-1" data-id="${id}" title="move up">&#9650;</button>` +
       `<button class="rb" data-mv="1" data-id="${id}" title="move down">&#9660;</button></td>` +
-      `<td class="n">${i + 1}</td><td>${p.name}${rookie}</td>` +
+      `<td class="n">${i + 1}${pickTag}</td><td>${p.name}${rookie}</td>` +
       `<td class="pos pos-${p.pos}">${p.pos}</td>` +
       `<td class="n">${num(p.pts)}</td><td class="n">${num(p.vorp)}</td>` +
       `<td class="n">${seen[id]}</td>` +
