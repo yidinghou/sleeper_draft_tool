@@ -52,15 +52,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from html_page import write_local  # noqa: E402
-from queue_export import load_pool  # noqa: E402
+from queue_export import draft_slots, load_manual, load_pool  # noqa: E402
 from vorp.csv_loader import REPO_ROOT, projections_csv_path  # noqa: E402
 from vorp.league.config import SNAKE_CONFIG  # noqa: E402
 
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "queue_builder.html"
 
-#: Skill players to rank. K and DEF are added on top of this by `load_pool`,
-#: so the pool is larger than this number -- 117 today.
-DEFAULT_POOL = 100
+def default_pool(season: int) -> int:
+    """Skill players to rank: every live pick in the draft, less the K and DEF
+    `load_pool` appends on top.
+
+    Sized so the ranked pool covers the whole board -- 10 teams x 16 rounds
+    less 18 keepers is 142 draftable players, of which 17 are the kickers and
+    defenses, leaving 125 skill players. Anything shallower leaves the back of
+    the draft unranked and queued on VORP alone.
+    """
+    return draft_slots(season) - len(load_manual(season))
 
 #: Pseudo-comparisons against an average opponent, added to every player.
 #: Without it the MM iteration diverges for anyone who has won every comparison
@@ -303,7 +310,7 @@ def payload_path(season: int) -> Path:
     return REPO_ROOT / "data" / f"queue-payload-{season}.json"
 
 
-def build_payload(season: int, pool_size: int = 100) -> dict:
+def build_payload(season: int, pool_size: int) -> dict:
     """Everything the page needs, with no answers in it.
 
     Split out from `build_page` and written to disk because the Railway server
@@ -405,7 +412,7 @@ def fit_and_write(season: int, path: Path) -> None:
     # queued at all. Shrinking it is the case that would drop answers, so the
     # answers' own pool sets the floor.
     on_disk = json.loads(payload_path(season).read_text()).get("pool", 0) if payload_path(season).exists() else 0
-    payload = build_payload(season, max(saved.get("pool", DEFAULT_POOL), on_disk))
+    payload = build_payload(season, max(saved.get("pool", default_pool(season)), on_disk))
     players = payload["players"]
     by_id = {p["id"]: p for p in players}
     ids = [p["id"] for p in players]
@@ -588,7 +595,7 @@ def demo() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("season", nargs="?", type=int, default=SNAKE_CONFIG.season)
-    parser.add_argument("--pool", type=int, default=DEFAULT_POOL)
+    parser.add_argument("--pool", type=int)
     parser.add_argument("--fit", action="store_true")
     parser.add_argument("--prefs", type=Path)
     parser.add_argument("--check", action="store_true")
@@ -599,7 +606,7 @@ def main() -> None:
     elif opts.fit:
         fit_and_write(opts.season, opts.prefs or prefs_path(opts.season))
     else:
-        build_page(opts.season, opts.pool)
+        build_page(opts.season, opts.pool or default_pool(opts.season))
 
 
 if __name__ == "__main__":
