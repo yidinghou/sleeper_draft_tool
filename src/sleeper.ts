@@ -9,6 +9,8 @@ export interface SleeperPlayer {
   team: string | null;
   status: string;
   active?: boolean;
+  /** Seasons played. 0 is a rookie, which is the only thing this is read for. */
+  years_exp?: number | null;
 }
 
 export interface SleeperProjection {

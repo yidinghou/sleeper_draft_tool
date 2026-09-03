@@ -107,6 +107,9 @@ async function main() {
     // only because it is board-sourced and read by name all over the repo.
     "wk1_3_pts_league",
     "wk1_pts_league",
+    // Seasons played. Only the queue builder's search box reads it, to offer a
+    // rookies-only filter -- 0 is a rookie.
+    "years_exp",
   ];
 
   const rows: string[] = [header.join(",")];
@@ -137,6 +140,7 @@ async function main() {
       ptsSource,
       round(earlyWeeksPts.get(player.player_id)),
       round(week1Pts.get(player.player_id)),
+      player.years_exp ?? "",
     ];
     rows.push(row.map(csvCell).join(","));
   }
