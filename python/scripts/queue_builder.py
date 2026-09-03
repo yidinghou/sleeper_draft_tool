@@ -397,16 +397,6 @@ def build_payload(season: int, pool_size: int, prefs: dict | None = None) -> dic
         entry(p) for p in tail if p["player_id"] in wanted and p["player_id"] not in pooled
     ]
 
-    # Round overrides from the ranking page's up/down buttons. Comparisons move
-    # a player at most `round_slack` across a boundary, so anything further --
-    # a round-16 rookie I read as a round-1 pick -- has to be said outright
-    # rather than argued for with answers. Bounded only by the draft itself:
-    # nothing before round 1, nothing past the last round.
-    overrides = prefs.get("rounds", {})
-    for e in entries:
-        if e["id"] in overrides:
-            e["rnd"] = max(1, min(last, int(overrides[e["id"]])))
-
     ranked = {e["id"] for e in entries}
     rounds = sorted({e["rnd"] for e in entries})
     return {
@@ -481,7 +471,7 @@ def fit_and_write(season: int, path: Path) -> None:
     # answers' own pool sets the floor.
     #
     # `saved` is passed as the prefs so that `--prefs somewhere-else.json` fits
-    # against that file's own extras and round overrides, not the repo's.
+    # against that file's own extras, not the repo's.
     on_disk = json.loads(payload_path(season).read_text()).get("pool", 0) if payload_path(season).exists() else 0
     payload = build_payload(season, max(saved.get("pool", default_pool(season)), on_disk), saved)
     players = payload["players"]
@@ -492,6 +482,14 @@ def fit_and_write(season: int, path: Path) -> None:
     ratings = fit_bradley_terry(ids, comparisons)
     counts = comparison_counts(ids, comparisons)
     keys = queue_order(rounds, ratings, counts)
+    # The ranking page's up/down buttons pin a player's key directly rather
+    # than arguing for it through comparisons -- see `move()` in the template.
+    # The number was computed there against the same key scale this function
+    # produces, so dropping it straight in keeps both engines agreeing on
+    # where it lands, exactly the way a comparison's answer does.
+    for pid, manual_key in saved.get("manual", {}).items():
+        if pid in keys:
+            keys[pid] = float(manual_key)
     order = sorted(ids, key=lambda pid: keys[pid])
 
     ratings_path(season).write_text(
