@@ -214,12 +214,22 @@ This pattern keeps traffic low (~20 req/min for a 2-second poll interval) while 
 
 **IMPORTANT:** Sleeper's estimated auction dollar value (`sleeper_proj_dollar`, or `$PROJ` on the draft board) is **not available from the API**. It is computed client-side only, in the browser's React state on the draft-board page.
 
-**To obtain it:**
+The *rest* of the board is available, which this section used to deny. Reading the draft board's own React state (`props.items` on the virtualized rank list) shows it renders the public projections feed unchanged:
+
+```
+GET https://api.sleeper.com/projections/nfl/{season}?season_type=regular&position[]=QB&...
+```
+
+`stats.pts_half_ppr` is byte-identical to the board's `PTS` column and `stats.adp_half_ppr` to its `ADP`. The one number the board really does compute is `rank`, and it is just that feed ordered by `adp_half_ppr` — verified against the live board for 18 ranks, including the gaps that already-rostered players leave. Bye weeks come from `GET https://api.sleeper.app/schedule/nfl/regular/{season}`: a team's bye is the one regular-season week it has no game.
+
+So `npm run export:board` derives everything but the dollars, and no browser is needed. Note the board a *league* renders hides that league's keepers, which shifts every rank below them; the exporter deliberately ranks the whole feed instead, so the file stays league-independent.
+
+**To obtain the auction dollars** (auction leagues only — a snake draft has none):
 1. Open `https://sleeper.com/draft/nfl/{draft_id}` in a browser while logged in to your Sleeper account. Note: `{draft_id}` is not the same as `{league_id}` — look it up via `GET /league/{league_id}/drafts` if you only have the league ID.
-2. Use Claude in Chrome (or manual scraping) to extract the player-rank-to-dollar mapping from the virtualized draft-board list. The board also shows its own `PTS` column (its internal points projection, used to derive `$PROJ`) — scrape that too.
-3. Write the result to `data/sleeper-board-{season}.csv` with columns: `player_id,sleeper_rank,bye_week,sleeper_proj_dollar,sleeper_board_pts_half_ppr`.
-4. The projections-export script joins this CSV with API data on `player_id`, preferring the board's own PTS over the API's `pts_half_ppr` for any player present on the board (see `pts_source` column below) — this keeps rank/$/pts internally consistent as one snapshot, since the board computes $ from its own PTS, not from the API's.
-5. This file is a point-in-time snapshot (the board has no API, so freshness = whenever you last scraped) — commit it to the repo and re-scrape by hand as needed (e.g. closer to draft day).
+2. Use Claude in Chrome (or manual scraping) to extract the player-rank-to-dollar mapping from the virtualized draft-board list.
+3. Merge into `data/sleeper-board-{season}.csv`'s `sleeper_proj_dollar` column. `export:board` carries existing values forward, so re-running it never drops them.
+4. The projections-export script joins this CSV with API data on `player_id`, preferring the board's own PTS over the API's `pts_half_ppr` for any player present on the board (see `pts_source` column below).
+5. The dollars are a point-in-time snapshot (no API, so freshness = whenever you last scraped) — commit them and re-scrape by hand as needed.
 
 **Example `sleeper-board-{season}.csv`:**
 ```
