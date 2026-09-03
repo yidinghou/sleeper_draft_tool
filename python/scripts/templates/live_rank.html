@@ -127,9 +127,10 @@
     <div class="bar" style="margin-bottom:8px">
       <input id="rankSearch" type="search" placeholder="Find a player&hellip;" autocomplete="off">
       <button id="rankSearchBtn" title="jump to first match">&#128269; Search</button>
-      <button id="exportCsv" title="download this order as data/queue-snake-SEASON.csv">&#11015; Save ranking</button>
-      <button id="loadCsv" title="restore an order from a saved queue CSV">&#11014; Load ranking</button>
+      <button id="exportCsv" title="write data/queue-snake-SEASON.csv">&#11015; Save ranking</button>
+      <button id="loadCsv" title="reload data/queue-snake-SEASON.csv">&#11014; Load ranking</button>
       <input id="loadFile" type="file" accept=".csv,text/csv" hidden>
+      <span class="note" id="saveNote"></span>
     </div>
     <div class="scroll">
       <table><thead><tr><th class="act"></th><th class="act"></th><th class="n">#</th><th>Player</th><th>Pos</th>
@@ -337,28 +338,52 @@ document.getElementById('rankSearch').addEventListener('keydown', e => {
 });
 document.getElementById('rankSearchBtn').onclick = jumpToFirstMatch;
 
-// Saved as queue-snake-{season}.csv -- the canonical ranking, the file
-// queue_export.py writes and draft_watch.load_queue()/draft_auto read. The
-// browser can only drop it in Downloads, so move it into data/ from there.
-// Carries proj/wk1/rookie where queue_export carries bye; every consumer reads
-// only queue_pos, player_id, player and position, and Load reads it back.
+// Quoting for the saved CSV. It carries proj/wk1/rookie where queue_export
+// carries bye; every consumer reads only queue_pos, player_id, player and
+// position, so the two spellings are interchangeable.
 function csvCell(v) {
   const s = String(v);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
-document.getElementById('exportCsv').onclick = () => {
+// The canonical ranking -- data/queue-snake-{season}.csv, the file
+// queue_export.py writes and draft_auto reads. Save and load both go through
+// it, and it sits next to this page, so the URL is just its name.
+const QUEUE_CSV = 'queue-snake-' + DATA.season + '.csv';
+
+function note(text) {
+  const el = document.getElementById('saveNote');
+  el.textContent = text;
+  setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, 4000);
+}
+
+function currentCsv() {
   const header = 'queue_pos,player_id,player,position,team,proj,wk1_pts,adp,vorp_avg,rookie';
   const rows = order().map((id, i) => {
     const p = byId[id];
     return [i + 1, id, p.name, p.pos, p.team || '', p.pts ?? '', p.wk1 ?? '', p.adp ?? '', p.vorp ?? '', p.exp === 0 ? 'R' : ''];
   });
-  const csv = [header].concat(rows.map(r => r.map(csvCell).join(','))).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
+  return [header].concat(rows.map(r => r.map(csvCell).join(','))).join('\n');
+}
+
+function download(csv) {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'queue-snake-' + DATA.season + '.csv';
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = QUEUE_CSV;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+// PUT lands the file in data/ where the drafter reads it. The download is the
+// file:// fallback and nothing more -- Downloads is not where this file lives,
+// and moving it by hand after every save is the thing this replaces.
+document.getElementById('exportCsv').onclick = async () => {
+  const csv = currentCsv();
+  try {
+    const r = await fetch(QUEUE_CSV, { method: 'PUT', body: csv });
+    if (r.ok) { note('saved to data/' + QUEUE_CSV); return; }
+  } catch (e) { /* no server -- fall through */ }
+  download(csv);
+  note('no server: check Downloads, or run rank_server.py');
 };
 
 // --- load a saved ranking --------------------------------------------------
@@ -385,7 +410,16 @@ function loadRanking(text) {
   save(); render();
   document.getElementById('rankcount').title = n + ' of ' + P.length + ' loaded from file';
 }
-document.getElementById('loadCsv').onclick = () => document.getElementById('loadFile').click();
+// Loads the saved ranking itself rather than asking which file it is: served
+// from data/, the canonical one is right there. The picker is the file://
+// fallback, and the way to load some other export.
+document.getElementById('loadCsv').onclick = async () => {
+  try {
+    const r = await fetch(QUEUE_CSV, { cache: 'no-store' });
+    if (r.ok) { loadRanking(await r.text()); note('loaded data/' + QUEUE_CSV); return; }
+  } catch (e) { /* no server -- fall through to the picker */ }
+  document.getElementById('loadFile').click();
+};
 document.getElementById('loadFile').onchange = async e => {
   const file = e.target.files[0];
   if (file) loadRanking(await file.text());
