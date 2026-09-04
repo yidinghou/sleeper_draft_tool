@@ -115,12 +115,12 @@ nothing broken on the server's side.
 **Depends on:** `build_payload`/`price_board` for the frame body
 (`03-rendering-contract.md`, `../vorp/07-live-draft-board.md`); the picks and
 seat names persisted by ingestion (`01-live-data-ingestion.md`).
-**Implemented in:** `python/scripts/draft_board.py` — `get_payload_upto`,
+**Implemented in:** `python/scripts/auction/draft_board.py` — `get_payload_upto`,
 `_prefix_sig`, `_load_frame`/`_store_frame`, `_frame_store_dir`,
 `FRAME_SCHEMA_VERSION`, `sold_block`, `start_prewarm`/`warm_next_cold_frame`, and
 the `frame_warmer` thread; scrubber UI (`scrubTo`, `fetchFrame`, `goLive`,
 `warmFrames`, the keydown handlers) in
-`python/scripts/templates/board_slides.html`. **Done when:** `upto(n)` replays
+`python/scripts/auction/templates/board_slides.html`. **Done when:** `upto(n)` replays
 exactly the first `n` picks, is built at most once per prefix, surfaces the
 just-sold pick as `block`, clamps out of range, and never mutates the live
 payload — see `test_get_payload_upto_replays_only_the_first_n_picks`,

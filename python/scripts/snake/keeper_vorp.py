@@ -25,6 +25,7 @@ from statistics import mean
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from html_page import write_local  # noqa: E402
 from vorp.csv_loader import load_players_from_csv, projections_csv_path, REPO_ROOT  # noqa: E402
@@ -35,7 +36,7 @@ from vorp.replacement_level import calculate_replacement_levels  # noqa: E402
 
 #: The snake league's own draft, exported from Sleeper -- keeper rows carry
 #: `draft_slot`, so seats here are the real ones, not an arbitrary mapping.
-PICKS_CSV = REPO_ROOT / "data" / "snake-draft-2026-picks.csv"
+PICKS_CSV = REPO_ROOT / "data" / "snake" / "snake-draft-2026-picks.csv"
 
 #: Kept off the board entirely. A defense is streamed off waivers all season,
 #: so its draft-day value is roughly "whoever is left in the last round" --
@@ -227,7 +228,7 @@ def main() -> None:
     drafted = SNAKE_CONFIG.teams * SNAKE_CONFIG.roster_size
     add_value(rows, drafted)
 
-    out_path = REPO_ROOT / "data" / f"vorp-snake-{season}.csv"
+    out_path = REPO_ROOT / "data" / "snake" / f"vorp-snake-{season}.csv"
     with out_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         writer.writeheader()
@@ -313,7 +314,7 @@ def main() -> None:
     }
     template = HTML_TEMPLATE_PATH.read_text(encoding="utf-8")
     fragment = template.replace("__DATA__", json.dumps(payload, separators=(",", ":")))
-    write_local(fragment, REPO_ROOT / "data", f"vorp-snake-{season}")
+    write_local(fragment, REPO_ROOT / "data" / "snake", f"vorp-snake-{season}")
     print(f"\nWrote data/vorp-snake-{season}.html")
 
 

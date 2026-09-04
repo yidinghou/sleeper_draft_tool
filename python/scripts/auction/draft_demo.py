@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from vorp.board import price_board  # noqa: E402
 from vorp.csv_loader import load_players_from_csv, projections_csv_path, REPO_ROOT  # noqa: E402
@@ -38,6 +38,7 @@ from vorp.league.config import LEAGUE_CONFIG  # noqa: E402
 from vorp.league.teams import LeagueState  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from bid_value import POINTS_COLUMNS, load_player_meta  # noqa: E402
 from html_page import write_local  # noqa: E402
@@ -237,12 +238,12 @@ def write_scenario_page(payload: Dict, config, args, board: List[str], meta, by_
         }
     )
 
-    json_path = REPO_ROOT / "data" / f"{stem}.json"
+    json_path = REPO_ROOT / "data" / "auction" / f"{stem}.json"
     json_path.write_text(json.dumps(full, indent=2) + "\n")
 
     template = DEMO_TEMPLATE_PATH.read_text(encoding="utf-8")
     fragment = template.replace("__DATA__", json.dumps(full, separators=(",", ":")))
-    write_local(fragment, REPO_ROOT / "data", stem)
+    write_local(fragment, REPO_ROOT / "data" / "auction", stem)
 
     last = full["frames"][-1]
     print(
@@ -355,12 +356,12 @@ def main() -> None:
             "scenarios": summaries,
         }
         stem = f"draft-demo-{args.season}"
-        json_path = REPO_ROOT / "data" / f"{stem}.json"
+        json_path = REPO_ROOT / "data" / "auction" / f"{stem}.json"
         json_path.write_text(json.dumps(index_payload, indent=2) + "\n")
 
         template = INDEX_TEMPLATE_PATH.read_text(encoding="utf-8")
         fragment = template.replace("__DATA__", json.dumps(index_payload, separators=(",", ":")))
-        write_local(fragment, REPO_ROOT / "data", stem)
+        write_local(fragment, REPO_ROOT / "data" / "auction", stem)
         print(f"Wrote data/{stem}.html -- the landing page, linking to all {len(keys)} scenarios")
 
 

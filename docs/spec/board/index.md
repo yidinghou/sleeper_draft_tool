@@ -4,7 +4,7 @@
 > `python/vorp/board.py` (`price_board`), is implemented — see
 > [`../vorp/07-live-draft-board.md`](../vorp/07-live-draft-board.md). The
 > **server** itself is not: none of `python/vorp/sleeper_client.py`,
-> `python/scripts/draft_board.py`, or the `board_slides.html` deck exist in
+> `python/scripts/auction/draft_board.py`, or the `board_slides.html` deck exist in
 > this repo yet, on any branch. Expect this whole spec directory to be
 > revised as the server gets built.
 
@@ -33,7 +33,7 @@ identity resolves who sits in each seat (real managers where Sleeper knows them,
 deterministic placeholders where it doesn't) and groups them into divisions. The
 rendering contract is the `/state.json` payload and the deck that consumes it.
 The scrubber replays any prefix of the draft as a frozen, memoized frame. All
-four are one server process, `python/scripts/draft_board.py`.
+four are one server process, `python/scripts/auction/draft_board.py`.
 
 ## The specs
 

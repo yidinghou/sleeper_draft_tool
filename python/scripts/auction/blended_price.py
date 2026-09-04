@@ -38,7 +38,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from vorp.bid_value import apportion_with_floor, floor_pressure  # noqa: E402
 from vorp.csv_loader import load_players_from_csv, projections_csv_path, REPO_ROOT  # noqa: E402
@@ -50,6 +50,7 @@ from vorp.models import (  # noqa: E402
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from bid_value import POINTS_COLUMNS, load_player_meta  # noqa: E402
 from html_page import write_local  # noqa: E402
@@ -258,13 +259,13 @@ def main() -> None:
     suffix = "" if args.window == "season" else f"-{args.window.replace('_', '-')}"
     stem = f"blended-price-{season}{suffix}"
 
-    json_path = REPO_ROOT / "data" / f"{stem}.json"
+    json_path = REPO_ROOT / "data" / "auction" / f"{stem}.json"
     json_path.write_text(json.dumps(payload, indent=2) + "\n")
     print(f"Wrote {json_path.relative_to(REPO_ROOT)} ({len(rows)} drafted players)")
 
     template = HTML_TEMPLATE_PATH.read_text(encoding="utf-8")
     fragment = template.replace("__DATA__", json.dumps(payload, separators=(",", ":")))
-    write_local(fragment, REPO_ROOT / "data", stem)
+    write_local(fragment, REPO_ROOT / "data" / "auction", stem)
     print(f"Wrote data/{stem}.html")
 
     s = solved[default_w][2]

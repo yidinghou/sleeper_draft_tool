@@ -112,13 +112,13 @@ display-only — asserted by `test_divisions_group_seats_mine_first_when_identit
 
 ## Reference
 
-**Depends on:** `build_payload` in `python/scripts/draft_board.py` (which calls
+**Depends on:** `build_payload` in `python/scripts/auction/draft_board.py` (which calls
 `price_board`, `seat_values`/`price_from_value`, and `plan_roster`);
 `../vorp/07-live-draft-board.md` for the prices, `../vorp/08-seat-value.md` for
 the per-seat bids, `../league/02-slot-assignment.md` for the matching the client
-mirrors. **Implemented in:** `python/scripts/draft_board.py`
+mirrors. **Implemented in:** `python/scripts/auction/draft_board.py`
 (`build_payload`, `seat_matrix`, `block_info`, `draft_state_table`,
-`player_pool`, `league_payload`) and `python/scripts/templates/board_slides.html`
+`player_pool`, `league_payload`) and `python/scripts/auction/templates/board_slides.html`
 (`renderHeader`, `renderPower`, `renderStateTable`, `renderMatrix`,
 `renderRosters`, `fillSlots`). **Done when:** the payload reconciles to the
 residual pool, the block carries `{market, vorpD, volrD, wk3VorpD, bids}` with
