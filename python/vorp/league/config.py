@@ -15,10 +15,12 @@ POSITIONS = ("QB", "RB", "WR", "TE", "K", "DEF")
 #: Positions real managers stream off the waiver wire week to week rather
 #: than draft bench depth for. DEF is high-variance and matchup-dependent —
 #: nobody actually spends a bench slot on a second defense, even though a
-#: defense has a real starting slot and is fully draftable. Excluded from
-#: bench eligibility in last_rostered.py; still counted normally everywhere
-#: else (its own concrete slot, replacement level).
-STREAMING_POSITIONS = ("DEF",)
+#: defense has a real starting slot and is fully draftable. K is the same
+#: story in the snake league (SNAKE_CONFIG), which does play a kicker; the
+#: auction league never drafts one at all, so listing it here is a no-op
+#: there. Excluded from bench eligibility in last_rostered.py; still counted
+#: normally everywhere else (its own concrete slot, replacement level).
+STREAMING_POSITIONS = ("DEF", "K")
 
 #: Which positions each flex slot can hold.
 FLEX_ELIGIBILITY: Dict[str, List[str]] = {
@@ -110,6 +112,24 @@ LEAGUE_CONFIG = LeagueConfig(
     min_bid=1,
     starting_slots={"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 0, "DEF": 1},
     flex_slots={"FLEX": 1, "REC_FLEX": 1, "SUPER_FLEX": 1},
+    bench_slots=6,
+)
+
+
+#: The snake keeper league — a different league from the auction one above,
+#: sharing only the projections. Standard lineup with a single QB (no
+#: superflex) and two RB/WR/TE flexes. `budget`/`min_bid` are unused here:
+#: a snake draft has no money, and nothing in the points-based VORP/VOLR
+#: math reads them.
+SNAKE_CONFIG = LeagueConfig(
+    league_id="",
+    draft_id="",
+    season=2026,
+    teams=10,
+    budget=0,
+    min_bid=0,
+    starting_slots={"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1, "DEF": 1},
+    flex_slots={"FLEX": 2},
     bench_slots=6,
 )
 
