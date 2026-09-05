@@ -100,7 +100,35 @@
   th { color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
   td.n, th.n { text-align: right; font-family: 'IBM Plex Mono', monospace; }
   .move-up { color: var(--up); } .move-dn { color: var(--warn); }
-  .scroll { max-height: 460px; overflow-y: auto; }
+  .scroll { max-height: 460px; overflow: auto; overscroll-behavior: contain; }
+
+  /* Row controls. Sized for a thumb during a live draft, and
+     `touch-action: manipulation` drops the 300ms double-tap-zoom wait that
+     otherwise makes every tap feel like it missed. */
+  td.act, th.act { width: 1%; white-space: nowrap; padding: 1px 2px; }
+  .rb { min-width: 34px; height: 32px; padding: 0; font-size: 15px; line-height: 1;
+        background: transparent; border-color: var(--border-soft); color: var(--text-secondary);
+        touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .rb:hover { color: var(--text-primary); }
+  .rb.x:hover { border-color: var(--warn); color: var(--warn); }
+  #search { font-family: inherit; font-size: 13px; color: var(--text-primary);
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 7px; padding: 7px 11px; min-width: 190px; }
+  .chk { color: var(--text-secondary); font-size: 12px; display: flex; align-items: center; gap: 5px; }
+  details#dnd { margin-top: 10px; }
+  details#dnd summary { color: var(--text-secondary); font-size: 12px; cursor: pointer;
+                        text-transform: uppercase; letter-spacing: .08em; }
+  #dndlist { margin-top: 6px; }
+  #dndlist .row { display: flex; align-items: center; gap: 8px; padding: 3px 0;
+                  border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+  @media (max-width: 620px) {
+    .scroll { max-height: 52vh; }
+    .rb { min-width: 38px; height: 36px; }
+    /* Two button columns cost the table ~33px it does not have on a phone.
+       Taking it out of the cell padding keeps every column visible; the
+       overflow-x above is only the backstop for a narrower screen still. */
+    #rank td, .scroll th { padding: 2px 3px; }
+  }
   .note { color: var(--text-faint); font-size: 12px; }
   textarea { width: 100%; height: 90px; background: var(--surface); color: var(--text-secondary);
              border: 1px solid var(--border); border-radius: 8px; font-family: 'IBM Plex Mono', monospace;
@@ -120,6 +148,10 @@
     <button id="undo">&larr; Undo</button>
     <button id="skip">Skip pair</button>
     <button id="reveal">Hide ADP / VORP</button>
+    <input id="search" type="search" list="addable" autocomplete="off"
+           placeholder="Add player&hellip;">
+    <datalist id="addable"></datalist>
+    <label class="chk"><input type="checkbox" id="rookies"> rookies only</label>
     <span class="spacer"></span>
     <button id="export">Export answers</button>
     <button id="clear">Reset all</button>
@@ -144,10 +176,19 @@
     <div>
       <h2>Live ranking (<span id="rankcount"></span>)</h2>
       <div class="scroll">
-        <table><thead><tr><th class="n">#</th><th>Player</th><th>Pos</th>
-          <th class="n">Seen</th><th class="n">Board</th></tr></thead>
+        <table><thead><tr><th class="act"></th><th class="n">#</th><th>Player</th><th>Pos</th>
+          <th class="n">Seen</th><th class="n">Board</th><th class="act"></th></tr></thead>
           <tbody id="rank"></tbody></table>
       </div>
+      <div class="note" style="margin-top:6px">
+        &#9650;&#9660; move a player. Inside a round that records an answer; across a
+        round boundary it sets his round outright, which is the only way to move
+        a player more than a round. &#10005; removes him from the draft entirely.
+      </div>
+      <details id="dnd">
+        <summary>Do not draft (<span id="dndn">0</span>)</summary>
+        <div id="dndlist"></div>
+      </details>
     </div>
     <div>
       <h2>Export</h2>
@@ -170,7 +211,6 @@
 <script>
 const DATA = __DATA__;
 const P = DATA.players;
-const N = P.length;
 const KEY = 'queue-prefs-' + DATA.season;
 
 //: Where to push answers so the laptop can pull them back down. Null when the
@@ -186,6 +226,23 @@ let reveal = true;   // ADP/VORP visible unless hidden
 let pair = null;
 let churnHistory = [];
 let lastTop = [];
+
+// Everything the ranking page's own controls produce. All three ride in the
+// same prefs object the answers do, because that object is the only thing that
+// syncs both ways: the page POSTs it whole to queue_server, which writes it
+// through untouched, so a player removed on a phone reaches the laptop's queue
+// export with no plumbing of its own.
+let extras = [];             // board-tail ids pulled into the ranked pool
+let rounds = {};             // id -> hand-set round, where answers can't reach
+let excluded = new Set();    // do not draft
+// How many comparisons each ▲/▼ tap recorded, so Undo takes back a tap rather
+// than a sixth of one. Session-only: after a reload Undo pops one answer at a
+// time. ponytail: fixable by tagging comparisons, if it ever bites.
+let taps = [];
+
+// The rest of the board, in the same shape as `players`. Not in the pool, but
+// searchable into it -- this is where the rookies and the late fliers live.
+const ADDABLE = Object.fromEntries((DATA.addable || []).map(p => [p.id, p]));
 
 // --- live ratings: Elo, purely so the page can react instantly. The Python
 // --- Bradley-Terry fit is what actually produces the queue.
@@ -224,8 +281,23 @@ function pairKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
 
 const ROUNDS = DATA.rounds;
 const TARGET = DATA.targets;
+// The last round of the draft, captured before ROUNDS starts moving under the
+// hand-set rounds -- nobody can be pushed past the end of the draft.
+const LAST_ROUND = Math.max(...ROUNDS);
 const byRound = {};
-ROUNDS.forEach(r => byRound[r] = P.filter(p => p.rnd === r).map(p => p.id));
+// Rebuilt rather than built once: adding a player and overriding a round both
+// change it, and an excluded player leaves it so the scheduler stops asking
+// about him and his round stops budgeting questions for him.
+function indexRounds() {
+  // A hand-set round can be one the payload never had (nobody's ADP landed
+  // there), so the round list is rederived too -- queue_builder.round_target,
+  // mirrored, or a player in a new round would never be asked about.
+  const live = [...new Set(P.filter(p => !excluded.has(p.id)).map(p => p.rnd))].sort((a, b) => a - b);
+  ROUNDS.splice(0, ROUNDS.length, ...live);
+  for (const r of ROUNDS) { byRound[r] = []; TARGET[r] = TARGET[r] || Math.max(2, Math.min(8, 9 - r)); }
+  for (const p of P) if (!excluded.has(p.id)) byRound[p.rnd].push(p.id);
+}
+indexRounds();
 
 function roundProgress(r) {
   const ids = byRound[r];
@@ -272,9 +344,11 @@ function choosePair() {
     const b = near[(Math.random() * near.length) | 0];
     if (a !== b && !asked.has(pairKey(a, b))) return [a, b];
   }
-  const ids = P.map(p => p.id);
+  // The pool grows when a player is added and shrinks when one is removed, so
+  // this is read fresh rather than from a length captured at load.
+  const ids = P.filter(p => !excluded.has(p.id)).map(p => p.id);
   for (let t = 0; t < 4000; t++) {
-    const a = ids[(Math.random() * N) | 0], b = ids[(Math.random() * N) | 0];
+    const a = ids[(Math.random() * ids.length) | 0], b = ids[(Math.random() * ids.length) | 0];
     if (a !== b && !asked.has(pairKey(a, b))) return [a, b];
   }
   return [ids[0], ids[1]];
@@ -311,7 +385,13 @@ function card(el, p, keyHint) {
 // ratings scored rho 0.404 against known preferences, worse than asking
 // nothing. Elo here, Bradley-Terry there, but the z-score per round is on the
 // same footing either way, so this previews the real order.
-const ROUND_SLACK = 1.0, CONFIDENCE_AT = 6;
+// SLACK_GROWTH widens the drift in the late rounds, where ADP is a guess:
+// round 1 keeps ±1.0, round 16 gets ±3.3. RISE_FLOOR is the ceiling on the ▲
+// button, not on drift -- a 10th-rounder cannot be moved above round 4.
+const ROUND_SLACK = 1.0, CONFIDENCE_AT = 6, SLACK_GROWTH = 0.15, RISE_FLOOR = 0.4;
+const roundSlack = r => ROUND_SLACK * (1 + SLACK_GROWTH * (r - 1));
+const riseFloor = r => Math.max(1, Math.ceil(RISE_FLOOR * r));
+
 function order() {
   const byRnd = {};
   P.forEach(p => (byRnd[p.rnd] = byRnd[p.rnd] || []).push(elo[p.id]));
@@ -326,13 +406,18 @@ function order() {
   const key = {};
   for (const p of P) {
     const z = (elo[p.id] - centre[p.rnd]) / spread[p.rnd];
-    const drift = Math.max(-ROUND_SLACK, Math.min(ROUND_SLACK, -z * ROUND_SLACK / 2));
+    const room = roundSlack(p.rnd);
+    const drift = Math.max(-room, Math.min(room, -z * room / 2));
     key[p.id] = p.rnd + drift * Math.min(1, seen[p.id] / CONFIDENCE_AT);
   }
-  return P.map(p => p.id).sort((a, b) => (key[a] - key[b]) || (boardRank[a] - boardRank[b]));
+  return P.filter(p => !excluded.has(p.id)).map(p => p.id)
+    .sort((a, b) => (key[a] - key[b]) || (boardRank[a] - boardRank[b]));
 }
 
-function render() {
+// `anchor` is a player id to hold still: the table is rewritten wholesale on
+// every answer, which otherwise throws the list back to the top and puts a
+// different player under the thumb that just tapped ▲.
+function render(anchor) {
   const [a, b] = pair;
   card(document.getElementById('cardA'), byId[a], '← LEFT ARROW');
   card(document.getElementById('cardB'), byId[b], 'RIGHT ARROW →');
@@ -362,12 +447,32 @@ function render() {
   // The whole pool, not a top-N slice: the pool is sized to the draft (every
   // live pick), so a cut-off would hide players the queue still has to order.
   document.getElementById('rankcount').textContent = `all ${ord.length}`;
+  const box = document.querySelector('.scroll');
+  const held = anchor && document.getElementById('r_' + anchor);
+  const wasAt = held ? held.offsetTop : 0, wasScrolled = box.scrollTop;
   document.getElementById('rank').innerHTML = ord.map((id, i) => {
     const p = byId[id], move = boardRank[id] - (i + 1);
     const cls = move > 0 ? 'move-up' : move < 0 ? 'move-dn' : '';
-    return `<tr><td class="n">${i + 1}</td><td>${p.name}</td>` +
+    return `<tr id="r_${id}"><td class="act">` +
+      `<button class="rb" data-mv="-1" data-id="${id}" title="move up">&#9650;</button>` +
+      `<button class="rb" data-mv="1" data-id="${id}" title="move down">&#9660;</button></td>` +
+      `<td class="n">${i + 1}</td><td>${p.name}</td>` +
       `<td class="pos pos-${p.pos}">${p.pos}</td><td class="n">${seen[id]}</td>` +
-      `<td class="n ${cls}">${boardRank[id]}${move ? ` (${move > 0 ? '+' : ''}${move})` : ''}</td></tr>`;
+      `<td class="n ${cls}">${boardRank[id]}${move ? ` (${move > 0 ? '+' : ''}${move})` : ''}</td>` +
+      `<td class="act"><button class="rb x" data-x="${id}" title="do not draft">&#10005;</button></td></tr>`;
+  }).join('');
+  if (held) {
+    const now = document.getElementById('r_' + anchor);
+    if (now) box.scrollTop = wasScrolled + (now.offsetTop - wasAt);
+  }
+
+  const dnd = [...excluded];
+  document.getElementById('dndn').textContent = dnd.length;
+  document.getElementById('dndlist').innerHTML = dnd.map(id => {
+    const p = byId[id] || ADDABLE[id];
+    return `<div class="row"><button class="rb" data-undo="${id}" title="put back">&#8634;</button>` +
+      `<span>${p ? p.name : id}</span>` +
+      `<span class="pos pos-${p ? p.pos : ''}">${p ? p.pos : ''}</span></div>`;
   }).join('');
 
   document.getElementById('dump').value = JSON.stringify(payload());
@@ -375,7 +480,8 @@ function render() {
 }
 
 function payload() {
-  return { season: DATA.season, pool: DATA.pool, comparisons };
+  return { season: DATA.season, pool: DATA.pool, comparisons, extras, rounds,
+           excluded: [...excluded] };
 }
 
 // --- actions ---------------------------------------------------------------
@@ -385,6 +491,8 @@ function pick(side) {
   comparisons.push({ winner, loser });
   applyElo(winner, loser);
   asked.add(pairKey(a, b));
+
+  taps.push(1);
 
   if (comparisons.length % 10 === 0) {
     const top = order().slice(0, 20);
@@ -399,6 +507,73 @@ function pick(side) {
   save(); next();
 }
 function next() { pair = choosePair(); render(); }
+
+// --- ranking-table controls ------------------------------------------------
+// ▲/▼ against the neighbouring row. Inside a round that is a real comparison,
+// recorded exactly as an answered pair, so the live Elo here and the Python
+// Bradley-Terry fit are always looking at the same evidence -- a separate
+// "manual position" would be a second ranking the fit knows nothing about.
+//
+// Across a round boundary a comparison cannot get there at all: drift is capped
+// at roundSlack and scaled by seen/CONFIDENCE_AT, so answers move a player a
+// round at most. Moving him further has to be said outright, and that is what
+// `rounds` is -- bounded by riseFloor, or enough taps would walk a round-12
+// flier into round 1.
+function move(id, dir) {
+  const ord = order(), i = ord.indexOf(id), j = i + dir;
+  if (i < 0 || j < 0 || j >= ord.length) return;
+  const me = byId[id], other = byId[ord[j]];
+
+  if (me.rnd !== other.rnd) {
+    // One round per tap, never "adopt the neighbour's round". Rounds overlap on
+    // purpose -- a well-rated round-12 player sits above a weak round-11 one --
+    // so the row above can be in a *later* round, and adopting it walks him
+    // back down. Stepping is monotone, so a held thumb always makes progress.
+    const want = dir < 0 ? Math.max(riseFloor(me.adpRnd), me.rnd - 1)
+                         : Math.min(LAST_ROUND, me.rnd + 1);
+    if (want === me.rnd) return;          // at the rise ceiling, or the last round
+    rounds[id] = me.rnd = want;
+    indexRounds();
+  } else {
+    // A player with no record is pinned to within a sixth of his round, so one
+    // answer moves him a sixth of the way and the button looks dead. Repeat it
+    // until the row actually moves, capped at CONFIDENCE_AT -- which is exactly
+    // the evidence that buys full confidence, and reads to Bradley-Terry as
+    // "strongly prefer", which is what the tap meant. An established player
+    // exits after one.
+    const win = dir < 0 ? id : other.id, lose = dir < 0 ? other.id : id;
+    let n = 0;
+    do {
+      comparisons.push({ winner: win, loser: lose });
+      applyElo(win, lose);
+      n++;
+    } while (n < CONFIDENCE_AT && (order().indexOf(id) - i) * dir <= 0);
+    asked.add(pairKey(id, other.id));
+    taps.push(n);
+  }
+  save(); sync(); render(id);
+}
+
+function addPlayer(id) {
+  const p = ADDABLE[id];
+  if (!p || byId[id]) return;
+  P.push(p); byId[id] = p; p.adpRnd = p.rnd;
+  // Last on the board by construction -- he is behind everyone the pool kept,
+  // which is exactly why he was cut. The ranking's ± column reads from here.
+  boardRank[id] = P.length;
+  elo[id] = 0; seen[id] = 0;
+  if (!extras.includes(id)) extras.push(id);
+  excluded.delete(id);
+  indexRounds(); save(); sync(); render(id);
+}
+
+function setExcluded(id, on) {
+  on ? excluded.add(id) : excluded.delete(id);
+  indexRounds(); save(); sync();
+  // A player removed mid-question has to be replaced, or the card still asks
+  // about someone who is off the draft.
+  pair.includes(id) ? next() : render(id);
+}
 
 // localStorage is the system of record. The server copy is a transport, so
 // that the laptop can pull answers down from the phone -- it is pushed on a
@@ -457,7 +632,42 @@ document.addEventListener('keydown', e => {
 document.getElementById('skip').onclick = () => { asked.add(pairKey(...pair)); next(); };
 document.getElementById('undo').onclick = () => {
   if (!comparisons.length) return;
-  comparisons.pop(); rebuild(); save(); next();
+  // One ▲ tap can be several comparisons, so undo takes back the whole tap.
+  comparisons.splice(-(taps.pop() || 1));
+  rebuild(); save(); next();
+};
+
+// One delegated listener: the rows are rewritten on every answer, so per-button
+// handlers would be re-bound hundreds of times. `click`, not `touchstart` --
+// the browser swallows the click that ends a scroll fling, which is what keeps
+// a thumb scrolling the table from removing somebody by accident.
+document.getElementById('rank').onclick = e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.x) setExcluded(b.dataset.x, true);
+  else move(b.dataset.id, +b.dataset.mv);
+};
+document.getElementById('dndlist').onclick = e => {
+  const b = e.target.closest('button');
+  if (b) setExcluded(b.dataset.undo, false);
+};
+
+// --- add a player ----------------------------------------------------------
+// Native datalist: the browser does the type-ahead, including on a phone, so
+// there is no search box to write. The label carries position and team because
+// names collide and a bare surname is not enough to pick the right rookie.
+const label = p => `${p.name} · ${p.pos} ${p.team || 'FA'}${p.exp === 0 ? ' · R' : ''}`;
+function fillSearch() {
+  const rookiesOnly = document.getElementById('rookies').checked;
+  const options = Object.values(ADDABLE)
+    .filter(p => !byId[p.id] && (!rookiesOnly || p.exp === 0));
+  document.getElementById('addable').innerHTML =
+    options.map(p => `<option value="${label(p)}">`).join('');
+}
+document.getElementById('rookies').onchange = fillSearch;
+document.getElementById('search').onchange = e => {
+  const hit = Object.values(ADDABLE).find(p => label(p) === e.target.value);
+  if (hit) { addPlayer(hit.id); e.target.value = ''; fillSearch(); }
 };
 document.getElementById('reveal').onclick = e => {
   reveal = !reveal;
@@ -466,7 +676,10 @@ document.getElementById('reveal').onclick = e => {
 };
 document.getElementById('clear').onclick = () => {
   if (!confirm('Discard all ' + comparisons.length + ' answers?')) return;
-  comparisons = []; churnHistory = []; lastTop = []; asked.clear();
+  comparisons = []; churnHistory = []; lastTop = []; taps = []; asked.clear();
+  // The do-not-draft list and the hand-set rounds are not answers -- they are
+  // decisions, and "discard all answers" is not a request to un-remove the
+  // players I have taken off the draft. Reset those in their own panel.
   rebuild(); save(); next();
 };
 document.getElementById('export').onclick = () => {
@@ -481,29 +694,62 @@ document.getElementById('import').onclick = () => {
   try {
     const parsed = JSON.parse(document.getElementById('paste').value);
     comparisons = parsed.comparisons || parsed;
+    apply(parsed);
+    taps = [];
     for (const c of comparisons) asked.add(pairKey(c.winner, c.loser));
     rebuild(); save(); next();
   } catch (e) { alert('Could not read that JSON: ' + e.message); }
 };
 
 // --- boot ------------------------------------------------------------------
-document.getElementById('season').textContent = DATA.season + ' · ' + N + ' players';
-resetRatings();
-// Whichever run is further along wins. Taking localStorage unconditionally
-// loses an exported file rebuilt into the page (answered elsewhere, saved to
-// data/queue-prefs-{season}.json) behind a stale copy in this browser, with no
-// sign that it happened. Ties go to localStorage: same length usually means
-// the same run, and it is the one that survived a reload here.
+// Pull one saved run's decisions into the page: the players it added, the
+// rounds it set by hand, and the players it took off the draft.
+function apply(saved) {
+  if (!saved) return;
+  for (const id of saved.extras || []) if (!byId[id]) addTo(id);
+  Object.assign(rounds, saved.rounds || {});
+  for (const id of saved.excluded || []) excluded.add(id);
+}
+function addTo(id) {                       // addPlayer without the save/render
+  const p = ADDABLE[id];
+  if (!p) return;
+  P.push(p); byId[id] = p; boardRank[id] = P.length;
+  if (!extras.includes(id)) extras.push(id);
+}
+
+// Whichever run is further along wins -- for the *answers*. Taking localStorage
+// unconditionally loses an exported file rebuilt into the page (answered
+// elsewhere, saved to data/queue-prefs-{season}.json) behind a stale copy in
+// this browser, with no sign that it happened. Ties go to localStorage: same
+// length usually means the same run, and it is the one that survived a reload
+// here.
+//
+// The other three keys are merged from both sides instead, never chosen
+// between. They are decisions rather than a run: a rookie added on the phone
+// must not vanish because the laptop's file happens to hold more answers.
 let restored = DATA.resume;
-try {
-  const local = JSON.parse(localStorage.getItem(KEY));
-  const n = r => (r && r.comparisons ? r.comparisons.length : -1);
-  if (n(local) >= n(restored)) restored = local || restored;
-} catch (e) {}
+let local = null;
+try { local = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+const answers = r => (r && r.comparisons ? r.comparisons.length : -1);
+if (answers(local) >= answers(restored)) restored = local || restored;
+apply(DATA.resume); apply(local);
+
+// The ADP round each player actually came with, kept before any override lands
+// on `rnd`, because riseFloor is measured against the market's opinion and not
+// against wherever the last tap left him.
+for (const p of P) p.adpRnd = p.rnd;
+for (const p of P) if (rounds[p.id]) p.rnd = Math.max(riseFloor(p.adpRnd), rounds[p.id]);
+indexRounds();
+
+// After the extras are in P, so their answers survive the filter below and the
+// ratings cover them.
+resetRatings();
 if (restored && restored.comparisons) {
   comparisons = restored.comparisons.filter(c => byId[c.winner] && byId[c.loser]);
   for (const c of comparisons) asked.add(pairKey(c.winner, c.loser));
   rebuild();
 }
+document.getElementById('season').textContent = DATA.season + ' · ' + P.length + ' players';
+fillSearch();
 next();
 </script>

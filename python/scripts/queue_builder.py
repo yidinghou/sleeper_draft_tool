@@ -52,7 +52,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from html_page import write_local  # noqa: E402
-from queue_export import draft_slots, load_manual, load_pool  # noqa: E402
+from queue_export import (  # noqa: E402
+    draft_slots,
+    load_board,
+    load_manual,
+    load_pool,
+    load_prefs,
+    prefs_path,
+)
 from vorp.csv_loader import REPO_ROOT, projections_csv_path  # noqa: E402
 from vorp.league.config import SNAKE_CONFIG  # noqa: E402
 
@@ -222,6 +229,38 @@ ROUND_SLACK = 1.0
 #: proportionally less, so a 2-comparison record can't relocate anyone.
 CONFIDENCE_AT = 6
 
+#: How much more a late round may drift than round 1, per round. ADP in round
+#: 12 is a guess in a way ADP in round 1 is not -- the market disagrees with
+#: itself by whole rounds down there -- so answers are allowed to say more
+#: about it. Round 1 keeps +-1.0 round; round 16 gets +-3.3.
+#:
+#: This loosens the round backbone, which is load-bearing (see `queue_order`:
+#: raw ratings scored rho 0.404 against known preferences, round-blocked 0.847).
+#: It is loosened at the end of the draft only, where ADP is worth least. If the
+#: tail order ever starts looking random, set this to 0 and keep `RISE_FLOOR`.
+SLACK_GROWTH = 0.15
+
+#: The earliest round a hand-set override may move a player into, as a fraction
+#: of his ADP round: a 10th-rounder tops out in round 4, a 16th in round 7.
+#:
+#: This bounds the ranking page's up button, not drift. Drift is already bounded
+#: by `round_slack`, which is tighter everywhere (round 10 drifts 2.4 rounds
+#: against a 6-round ceiling), and clamping the key itself would be worse than
+#: useless -- `rise_floor(1) == 1` would flatten every round-1 key to exactly
+#: 1.0 and destroy the within-round ordering the whole page exists to produce.
+#: The override is the only thing that can reach far enough to need a limit.
+RISE_FLOOR = 0.4
+
+
+def round_slack(rnd: int, base: float = ROUND_SLACK) -> float:
+    """How far, in rounds, a player in `rnd` may drift on his comparisons."""
+    return base * (1 + SLACK_GROWTH * (rnd - 1))
+
+
+def rise_floor(rnd: int) -> int:
+    """The earliest round `rnd`'s player may be promoted into."""
+    return max(1, math.ceil(RISE_FLOOR * rnd))
+
 
 def queue_order(
     rounds: dict[str, int],
@@ -258,7 +297,9 @@ def queue_order(
     key = {}
     for pid, rnd in rounds.items():
         z = (ratings.get(pid, 0.0) - centre[rnd]) / spread[rnd]
-        drift = max(-slack, min(slack, -z * slack / 2))
+        # Widened for the late rounds, where ADP is a guess -- see SLACK_GROWTH.
+        room = round_slack(rnd, slack)
+        drift = max(-room, min(room, -z * room / 2))
         confidence = min(1.0, counts.get(pid, 0) / CONFIDENCE_AT)
         key[pid] = rnd + drift * confidence
     return key
@@ -271,10 +312,6 @@ def comparison_counts(player_ids: list[str], comparisons: list[dict]) -> dict[st
             if c.get(side) in counts:
                 counts[c[side]] += 1
     return counts
-
-
-def prefs_path(season: int) -> Path:
-    return REPO_ROOT / "data" / f"queue-prefs-{season}.json"
 
 
 def ratings_path(season: int) -> Path:
@@ -297,6 +334,23 @@ def load_week1(season: int) -> dict[str, float]:
         }
 
 
+def load_experience(season: int) -> dict[str, int]:
+    """Seasons played by player_id, from the projections CSV.
+
+    Only the search box uses it, to offer a rookies-only filter -- `years_exp`
+    0 is a rookie. Absent for anyone Sleeper has no number for, and empty
+    wholesale against a projections CSV exported before the column existed,
+    which is why the filter has to treat "unknown" as "not a rookie" rather
+    than assume.
+    """
+    with projections_csv_path(season).open(newline="", encoding="utf-8") as f:
+        return {
+            row["player_id"]: int(row["years_exp"])
+            for row in csv.DictReader(f)
+            if (row.get("years_exp") or "").strip().isdigit()
+        }
+
+
 def season_points(player: dict) -> float | None:
     """The blended season projection: Sleeper and Boberto averaged over
     whichever of the two actually has a number. None when neither does, which
@@ -310,7 +364,7 @@ def payload_path(season: int) -> Path:
     return REPO_ROOT / "data" / f"queue-payload-{season}.json"
 
 
-def build_payload(season: int, pool_size: int) -> dict:
+def build_payload(season: int, pool_size: int, prefs: dict | None = None) -> dict:
     """Everything the page needs, with no answers in it.
 
     Split out from `build_page` and written to disk because the Railway server
@@ -318,12 +372,18 @@ def build_payload(season: int, pool_size: int) -> dict:
     are gitignored, so a deploy has no board to read. This one file is
     committed instead of shipping the whole VORP pipeline to a web dyno.
     """
+    prefs = load_prefs(season) if prefs is None else prefs
     players = load_pool(season, pool_size)
+    # Everyone the pool cut off. Still fully priced -- these are board rows,
+    # not fabrications -- so a rookie pulled out of here arrives with his real
+    # ADP, VORP and projections, and queue_export already had him all along.
+    tail = load_board(season)[pool_size:]
     week1 = load_week1(season)
+    exp = load_experience(season)
     teams, last = SNAKE_CONFIG.teams, SNAKE_CONFIG.roster_size
 
-    entries = [
-        {
+    def entry(p: dict) -> dict:
+        return {
             "id": p["player_id"],
             "name": p["player"],
             "pos": p["position"],
@@ -340,9 +400,30 @@ def build_payload(season: int, pool_size: int) -> dict:
             # does, which is every defense.
             "pts": season_points(p),
             "wk1": round(week1[p["player_id"]], 1) if p["player_id"] in week1 else None,
+            "exp": exp.get(p["player_id"]),
         }
-        for p in players
+
+    pooled = {p["player_id"] for p in players}
+    # Board-tail players pulled into the ranked pool by hand -- a rookie, or a
+    # flier the top-`pool_size` cut left out. Folded back in here so that a
+    # rebuild does not orphan them: `fit_bradley_terry` and the page's own boot
+    # filter both silently drop comparisons naming a player they cannot see.
+    wanted = set(prefs.get("extras", ()))
+    entries = [entry(p) for p in players] + [
+        entry(p) for p in tail if p["player_id"] in wanted and p["player_id"] not in pooled
     ]
+
+    # Round overrides from the ranking page's up/down buttons. Comparisons move
+    # a player at most `round_slack` across a boundary, so anything further --
+    # a round-16 rookie I read as a round-6 pick -- has to be said outright
+    # rather than argued for with answers. Clamped to the same rise floor the
+    # key is, so an override cannot do what drift is forbidden to do.
+    overrides = prefs.get("rounds", {})
+    for e in entries:
+        if e["id"] in overrides:
+            e["rnd"] = max(rise_floor(e["rnd"]), min(last, int(overrides[e["id"]])))
+
+    ranked = {e["id"] for e in entries}
     rounds = sorted({e["rnd"] for e in entries})
     return {
         "season": season,
@@ -351,6 +432,9 @@ def build_payload(season: int, pool_size: int) -> dict:
         # this back in its export so `--fit` rebuilds the identical pool.
         "pool": pool_size,
         "players": entries,
+        # The rest of the board in the same shape, so the page can search it and
+        # pull one in live. ~530 rows, ~60KB, loaded once per phone session.
+        "addable": [entry(p) for p in tail if p["player_id"] not in ranked],
         "rounds": rounds,
         "targets": {str(r): round_target(r) for r in rounds},
     }
@@ -411,8 +495,11 @@ def fit_and_write(season: int, path: Path) -> None:
     # players are all still in it -- and the extra players need ratings to be
     # queued at all. Shrinking it is the case that would drop answers, so the
     # answers' own pool sets the floor.
+    #
+    # `saved` is passed as the prefs so that `--prefs somewhere-else.json` fits
+    # against that file's own extras and round overrides, not the repo's.
     on_disk = json.loads(payload_path(season).read_text()).get("pool", 0) if payload_path(season).exists() else 0
-    payload = build_payload(season, max(saved.get("pool", default_pool(season)), on_disk))
+    payload = build_payload(season, max(saved.get("pool", default_pool(season)), on_disk), saved)
     players = payload["players"]
     by_id = {p["id"]: p for p in players}
     ids = [p["id"] for p in players]
@@ -575,6 +662,35 @@ def demo() -> None:
     weakest_r1 = max(crossed[p] for p in ids[:10])
     assert crossed[ids[10]] < weakest_r1, "no cross-round promotion possible"
     assert crossed[ids[10]] > min(crossed[p] for p in ids[:10]), "promotion jumped the whole round"
+
+    # Late rounds drift further than early ones -- ADP is a guess down there --
+    # but nobody outruns his rise floor, which is the ceiling on the ranking
+    # page's up button as much as on drift.
+    assert round_slack(1) == ROUND_SLACK and round_slack(10) > round_slack(1)
+    assert rise_floor(10) == 4, "a 10th-rounder must top out in round 4"
+    assert rise_floor(16) == 7 and rise_floor(1) == 1
+
+    # A saturated rating with full confidence: drift reaches its widened room in
+    # a late round, and still stops at the floor.
+    late = {pid: 12 for pid in ids}
+    hot = {pid: 0.0 for pid in ids}
+    hot[ids[0]] = 9.0
+    full = {pid: 10 for pid in ids}
+    far = queue_order(late, hot, full)
+    assert far[ids[0]] >= 12 - round_slack(12) - 1e-9, "drift exceeded its room"
+    assert far[ids[0]] < 12 - ROUND_SLACK, "late rounds did not drift further than round 1"
+    # Drift alone still cannot reach the rise floor, which is why the up button
+    # switches to an override the moment the row above is in another round.
+    assert far[ids[0]] > rise_floor(12), "drift reached the ceiling meant for overrides"
+
+    # An override lands where answers cannot -- round 12 into round 5.
+    moved = queue_order({**late, ids[0]: 5}, hot, full)
+    assert moved[ids[0]] < min(far[p] for p in ids[1:]), "override did not land"
+
+    # And a player with one comparison stays pinned to his round: the up button
+    # has to repeat itself for a fresh player, which is why it loops.
+    thin = queue_order(late, hot, {pid: 1 for pid in ids})
+    assert abs(thin[ids[0]] - 12) <= round_slack(12) / CONFIDENCE_AT + 1e-9
 
     assert [round_target(r) for r in (1, 2, 5, 10)] == [8, 7, 4, 2], "budget curve changed"
     assert adp_round(16.4, 10, 99) == 2 and adp_round(1.3, 10, 99) == 1
