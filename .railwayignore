@@ -1,6 +1,6 @@
 # What `railway up` uploads. The Dockerfile copies only python/ and
-# data/queue-payload-*.json, so everything else is upload time spent on files
-# the image discards -- 60MB of repo for a build that needs about 1MB.
+# data/snake/queue-payload-*.json, so everything else is upload time spent on
+# files the image discards -- 60MB of repo for a build that needs about 1MB.
 #
 # Every path here is anchored with a leading slash, and has to be: these are
 # gitignore-style patterns, so a bare `scripts` matches at any depth and would
@@ -16,4 +16,6 @@
 # ADP CSVs are gitignored anyway; the drafts and demo pages are megabytes of
 # things the queue builder never reads.
 /data/*
-!/data/queue-payload-*.json
+!/data/snake
+/data/snake/*
+!/data/snake/queue-payload-*.json
