@@ -47,6 +47,14 @@ def test_draft_fingerprint_stable_when_nothing_relevant_changes():
     assert draft_fingerprint(draft) == draft_fingerprint(dict(draft))
 
 
+def test_draft_fingerprint_changes_on_a_snake_pick():
+    """A snake draft populates none of the auction metadata, so `last_picked`
+    is the only thing that moves when a pick lands."""
+    before = {**_draft(), "type": "snake", "last_picked": 1788391033499}
+    after = {**before, "last_picked": 1788391051204}
+    assert draft_fingerprint(before) != draft_fingerprint(after)
+
+
 def test_parse_nomination_reports_none_when_board_is_empty():
     nomination = parse_nomination(_draft())
     assert nomination.player_id is None

@@ -54,9 +54,9 @@ consistent.
 
 ### What's the output, precisely?
 
-A ten-column CSV: `player_id`, `player`, `position`, `team`, `sleeper_rank`,
-`bye_week`, `sleeper_proj_dollar`, `season_pts_half_ppr`, `pts_source`,
-`wk1_3_pts_half_ppr`. One row per eligible player; board-only columns
+An eleven-column CSV: `player_id`, `player`, `position`, `team`,
+`sleeper_rank`, `bye_week`, `sleeper_proj_dollar`, `season_pts_half_ppr`,
+`pts_source`, `wk1_3_pts_league`, `wk1_pts_league`. One row per eligible player; board-only columns
 (`sleeper_rank`, `bye_week`, `sleeper_proj_dollar`) are blank for players absent
 from the board. The Python side (`python/vorp/csv_loader.py`) reads exactly one
 of these columns — `season_pts_half_ppr` — and skips any row whose points cell
@@ -71,8 +71,9 @@ is blank.
 - **Worked example:** Jahmyr Gibbs (`player_id` 9221) is on the 2026 board at
   `rank 1, bye 6, $58`, board PTS `299.9`. Because a board PTS exists, the row
   emits `season_pts_half_ppr = 299.9` with `pts_source = board` — the board's
-  number, not the API's — plus `wk1_3_pts_half_ppr = 61.43` summed from weeks
-  1-3.
+  number, not the API's — plus `wk1_3_pts_league = 61.11` summed from weeks 1-3
+  and `wk1_pts_league = 20.27` for week 1 alone, both scored in league rules
+  rather than read off the API's `pts_half_ppr`.
 
 ### What about a player with no board entry *and* no API projection?
 
@@ -97,8 +98,25 @@ The early-season window is a coverage signal, not the pricing number. Sleeper
 only publishes weekly projections for players expected to play, so at a thin
 position the weeks-1-3 pool can list fewer bodies than the league has slots —
 which is exactly the QB pool-exhaustion `../vorp/03-vorp-to-bid.md` flags. It
-lives in its own `wk1_3_pts_half_ppr` column so it can be inspected without
-disturbing the season points the engine prices on.
+lives in its own `wk1_3_pts_league` column so it can be inspected without
+disturbing the season points the engine prices on. `wk1_pts_league` carries
+week 1 on its own, for the queue builder's comparison cards.
+
+### Why are the weekly columns scored here instead of read off the API?
+
+Because Sleeper's `pts_half_ppr` is not this league's scoring. It pays 6 for a
+passing TD; both leagues here pay 4, so the API's number inflates every QB by
+about four points a game — Jared Goff's week 1 reads 20.34 there and 17.0 in
+the app. The season column does not have this problem, because it comes from
+the hand-scraped board, which is already in league scoring; taking the API's
+weekly number put two different scorings side by side in one row.
+
+`scoreProjection` (`src/sleeper.ts`) fixes it by scoring the projected stat
+line, which the same response carries, against the league's own
+`scoring_settings`. Scoring keys and stat keys share a namespace, so it is a
+dot product. The settings come from the snake league; the auction league scores
+offence identically and differs only in `fum` and in kicker/defence rules,
+neither of which reaches these columns.
 
 ### Does a re-run pick up fresh Sleeper data?
 
@@ -112,13 +130,14 @@ by hand. Commit it and re-scrape closer to draft day if values drift.
 ## Reference
 
 **Depends on:** the Sleeper REST API via `src/sleeper.ts` (`fetchPlayers`,
-`fetchSeasonProjections`, `fetchWeeklyProjections`, `sleeperPlayerFullName`), the
+`fetchSeasonProjections`, `fetchWeeklyProjections`, `fetchLeague`,
+`scoreProjection`, `sleeperPlayerFullName`), the
 hand-scraped `data/sleeper-board-{season}.csv`, and the endpoint contract in
 `../../sleeper-api.md`. **Implemented in:** `scripts/export-projections.ts`
 (`loadBoard`, `main`, `EARLY_WEEKS`), consumed on the Python side by
 `python/vorp/csv_loader.py` (`load_players_from_csv`, which reads
 `season_pts_half_ppr`). **Done when:** `npm run export:projections 2026` writes
-`data/projections-{season}.csv` with the ten-column header above, every
+`data/projections-{season}.csv` with the eleven-column header above, every
 board-listed player carries `pts_source = board`, and `load_players_from_csv`
 loads a `RosterFillPlayer` for every QB/RB/WR/TE/K/DEF row with a non-blank
 points cell.
@@ -127,13 +146,15 @@ points cell.
 | --- | --- |
 | `GET /players/nfl` | full player dump; filtered client-side to `{QB,RB,WR,TE,K,DEF}` and `active !== false` |
 | `GET /projections/nfl/regular/{season}` | season-total projections; supplies `pts_half_ppr` |
-| `GET /projections/nfl/regular/{season}/{week}` | weeks 1, 2, 3; summed into `wk1_3_pts_half_ppr` |
+| `GET /projections/nfl/regular/{season}/{week}` | weeks 1, 2, 3; stat lines scored into `wk1_3_pts_league` and `wk1_pts_league` |
+| `GET /league/{league_id}` | the snake league's `scoring_settings`, which the weekly columns are scored with |
 | `data/sleeper-board-{season}.csv` | hand-scraped `player_id,sleeper_rank,bye_week,sleeper_proj_dollar,sleeper_board_pts_half_ppr` |
 
 | Output | Description |
 | --- | --- |
-| `data/projections-{season}.csv` | one row per eligible player, ten columns |
+| `data/projections-{season}.csv` | one row per eligible player, eleven columns |
 | `season_pts_half_ppr` | the pricing number; board PTS if listed, else API `pts_half_ppr` |
 | `pts_source` | `board`, `api`, or `""` — where `season_pts_half_ppr` came from |
 | `sleeper_proj_dollar` / `sleeper_rank` / `bye_week` | board-only; blank for players off the scrape |
-| `wk1_3_pts_half_ppr` | weeks-1-3 half-PPR sum; an early-season coverage signal |
+| `wk1_3_pts_league` | weeks-1-3 sum in league scoring; an early-season coverage signal |
+| `wk1_pts_league` | week 1 alone in league scoring; shown on the queue builder's cards |

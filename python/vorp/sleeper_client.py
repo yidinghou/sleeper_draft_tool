@@ -60,12 +60,20 @@ def draft_fingerprint(draft: Dict[str, Any]) -> str:
     """The cheap-poll signature: change means something worth an expensive
     `/picks` refetch happened. Unchanged means the poller can keep hitting
     the cheap `/draft` endpoint for free.
+
+    `last_picked` is what makes this work for a snake draft. The auction
+    signals are all in `metadata`, and a snake draft populates none of them --
+    a live 10-team snake fingerprints as `paused||||`, identical before and
+    after every pick, so a gate reading only those would never open and picks
+    would never refetch. `last_picked` is a top-level epoch-ms stamp that both
+    draft types bump on every pick.
     """
     meta = draft.get("metadata") or {}
     return "|".join(
         str(v) if v is not None else ""
         for v in (
             draft.get("status"),
+            draft.get("last_picked"),
             meta.get("nominated_player_id"),
             meta.get("highest_offer"),
             meta.get("offering_slot"),

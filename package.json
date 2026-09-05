@@ -2,8 +2,9 @@
   "name": "sleeper_draft_tool",
   "version": "0.0.1",
   "type": "module",
-  "description": "Sleeper draft tool — projections export and draft polling",
+  "description": "Sleeper draft tool \u2014 projections export and draft polling",
   "scripts": {
+    "export:board": "tsx scripts/export-sleeper-board.ts",
     "export:projections": "tsx scripts/export-projections.ts",
     "export:boberto": "tsx scripts/export-boberto.ts",
     "test": "node --import tsx --test src/**/*.test.ts src/**/*.test.js"

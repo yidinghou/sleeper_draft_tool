@@ -1,0 +1,431 @@
+<title>Live Rank</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #05091a;
+    --surface: #0f1730;
+    --surface-raised: #182144;
+    --border: #2a3258;
+    --border-soft: #1c2547;
+    --text-primary: #f5f7ff;
+    --text-secondary: #93a3c9;
+    --text-faint: #5c6790;
+    --accent-vorp: #f6ad37;
+    --accent-volr: #2dd4da;
+    --pos-qb: #fb7185;
+    --pos-rb: #34d399;
+    --pos-wr: #60a5fa;
+    --pos-te: #c084fc;
+    --pos-k: #94a3b8;
+    --up: #34d399;
+    --warn: #fb7185;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { max-width: 900px; margin: 0 auto; padding: 28px 24px 60px;
+         display: flex; flex-direction: column; gap: 18px; }
+
+  .masthead { display: flex; align-items: baseline; justify-content: space-between;
+              flex-wrap: wrap; gap: 10px 24px; border-bottom: 1px solid var(--border-soft);
+              padding-bottom: 14px; }
+  h1 { font-family: 'Barlow Condensed', sans-serif; font-size: 30px; font-weight: 700;
+       letter-spacing: 0.04em; margin: 0; text-transform: uppercase; }
+  .sub { color: var(--text-secondary); font-size: 13px; }
+
+  .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button { font-family: inherit; font-size: 13px; color: var(--text-primary);
+           background: var(--surface-raised); border: 1px solid var(--border);
+           border-radius: 7px; padding: 7px 13px; cursor: pointer; }
+  button:hover { border-color: var(--accent-volr); }
+  .pos { font-weight: 600; }
+  .pos-QB { color: var(--pos-qb); } .pos-RB { color: var(--pos-rb); }
+  .pos-WR { color: var(--pos-wr); } .pos-TE { color: var(--pos-te); }
+  .pos-K  { color: var(--pos-k);  } .pos-DEF { color: var(--pos-k); }
+
+  h2 { font-family: 'Barlow Condensed', sans-serif; font-size: 17px; letter-spacing: .08em;
+       text-transform: uppercase; color: var(--text-secondary); margin: 0 0 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border-soft); }
+  th { color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+  td.n, th.n { text-align: right; font-family: 'IBM Plex Mono', monospace; }
+  .move-up { color: var(--up); } .move-dn { color: var(--warn); }
+  .rook { display: inline-block; margin-left: 4px; font-size: 10px; font-weight: 700;
+          color: var(--bg); background: var(--accent-volr); border-radius: 3px;
+          padding: 0 3px; line-height: 1.5; vertical-align: 1px; }
+  /* A row that lines up with one of my draft turns -- see MY_PICK_AT. The left
+     border reads at a glance while scrolling; the badge says which turn. */
+  tr.pickrow { background: color-mix(in srgb, var(--accent-vorp) 12%, transparent);
+               box-shadow: inset 3px 0 0 var(--accent-vorp); }
+  .pick { display: inline-block; margin-left: 5px; font-size: 10px; font-weight: 700;
+          color: var(--bg); background: var(--accent-vorp); border-radius: 3px;
+          padding: 0 4px; line-height: 1.5; vertical-align: 1px; }
+  .scroll { max-height: 80vh; overflow: auto; overscroll-behavior: contain; }
+  /* 200+ rows: the header has to stay put or the columns are unreadable
+     halfway down. `.scroll` is already the scroll container, so top:0 is it. */
+  .scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
+
+  details#dnd { margin-top: 10px; }
+  details#dnd summary { color: var(--text-secondary); font-size: 12px; cursor: pointer;
+                        text-transform: uppercase; letter-spacing: .08em; }
+  #dndlist { margin-top: 6px; }
+  #dndlist .row { display: flex; align-items: center; gap: 8px; padding: 3px 0;
+                  border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+
+  /* Drag-and-drop reorder: grab the handle, drop anywhere. `manual[]` records
+     the result the same way ▲/▼ does -- see moveTo(). */
+  .drag { cursor: grab; color: var(--text-faint); text-align: center; }
+  tr.dragging { opacity: .35; }
+  tr.drag-over { box-shadow: inset 0 2px 0 var(--accent-volr); }
+
+  /* Row controls. Sized for a thumb during a live draft, and
+     `touch-action: manipulation` drops the 300ms double-tap-zoom wait that
+     otherwise makes every tap feel like it missed. */
+  td.act, th.act { width: 1%; white-space: nowrap; padding: 1px 2px; }
+  .rb { min-width: 34px; height: 32px; padding: 0; font-size: 15px; line-height: 1;
+        background: transparent; border-color: var(--border-soft); color: var(--text-secondary);
+        touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .rb:hover { color: var(--text-primary); }
+  .rb.x:hover { border-color: var(--warn); color: var(--warn); }
+  #rankSearch { font-family: inherit; font-size: 13px; color: var(--text-primary);
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 7px; padding: 7px 11px; min-width: 190px; }
+  @media (max-width: 620px) {
+    .app { padding: 14px 10px 40px; gap: 12px; }
+    .scroll { max-height: 74vh; }
+    .rb { min-width: 38px; height: 36px; }
+    /* Two button columns cost the table ~33px it does not have on a phone.
+       Taking it out of the cell padding keeps every column visible; the
+       overflow-x above is only the backstop for a narrower screen still. */
+    #rank td, .scroll th { padding: 2px 3px; }
+  }
+  .note { color: var(--text-faint); font-size: 12px; }
+</style>
+
+<div class="app">
+  <div class="masthead">
+    <div>
+      <h1>Live Rank</h1>
+      <div class="sub">Drag a row, or tap &#9650;&#9660;, to reorder.</div>
+    </div>
+    <div class="sub" id="season"></div>
+  </div>
+
+  <div>
+    <h2>Live ranking (<span id="rankcount"></span>)</h2>
+    <div class="bar" style="margin-bottom:8px">
+      <input id="rankSearch" type="search" placeholder="Find a player&hellip;" autocomplete="off">
+      <button id="rankSearchBtn" title="jump to first match">&#128269; Search</button>
+      <button id="exportCsv" title="write data/queue-snake-SEASON.csv">&#11015; Save ranking</button>
+      <button id="loadCsv" title="reload data/queue-snake-SEASON.csv">&#11014; Load ranking</button>
+      <input id="loadFile" type="file" accept=".csv,text/csv" hidden>
+      <span class="note" id="saveNote"></span>
+    </div>
+    <div class="scroll">
+      <table><thead><tr><th class="act"></th><th class="act"></th><th class="n">#</th><th>Player</th><th>Pos</th>
+        <th class="n">Proj</th><th class="n">Wk1</th><th class="n">ADP</th><th class="n">VORP</th><th class="n">Board</th><th class="act"></th></tr></thead>
+        <tbody id="rank"></tbody></table>
+    </div>
+    <div class="note" style="margin-top:6px">
+      &#9650;&#9660; moves a player exactly one spot, however far you tap it.
+      &#10005; removes him once he's drafted &mdash; undo it from Removed below.
+      <span class="pick" style="margin-left:0">P#</span> marks a row around one of my draft turns.
+    </div>
+    <details id="dnd">
+      <summary>Removed (<span id="dndn">0</span>)</summary>
+      <div id="dndlist"></div>
+    </details>
+  </div>
+</div>
+
+<script>
+const DATA = __DATA__;
+const P = DATA.players;
+const KEY = 'live-rank-' + DATA.season;
+const byId = Object.fromEntries(P.map(p => [p.id, p]));
+const boardRank = Object.fromEntries(P.map((p, i) => [p.id, i + 1]));
+
+// Which live-ranking row is my Nth draft turn -- see queue_builder.my_pick_ranks.
+const MY_PICK_AT = Object.fromEntries((DATA.myPicks || []).map((row, i) => [row, i + 1]));
+
+// id -> a key that sorts strictly between the two players it was inserted
+// between. Set by the ▲/▼ buttons and drag-and-drop -- see moveTo().
+let manual = {};
+// Drafted players, removed from the list for good -- see the ✕ button.
+let excluded = new Set();
+try {
+  const saved = JSON.parse(localStorage.getItem(KEY)) || {};
+  Object.assign(manual, saved.manual || {});
+  excluded = new Set(saved.excluded || []);
+} catch (e) {}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify({ manual, excluded: [...excluded] })); } catch (e) {}
+}
+
+const num = (v, digits = 1) => (v === null || v === undefined ? '--' : v.toFixed(digits));
+
+// No duel/Elo scheduler on this page, so a player's key is just its manual
+// override or its original board position -- see queue_builder.html's
+// allKeys() for the fuller version this page has no use for.
+function rank(id) { return manual[id] !== undefined ? manual[id] : boardRank[id]; }
+function order() {
+  return P.filter(p => !excluded.has(p.id)).map(p => p.id)
+    .sort((a, b) => (rank(a) - rank(b)) || (boardRank[a] - boardRank[b]));
+}
+
+function remove(id) { excluded.add(id); save(); render(); }
+
+// `anchor` is a player id to hold still: the table is rewritten wholesale on
+// every move, which otherwise throws the list back to the top.
+function render(anchor) {
+  const ord = order();
+  document.getElementById('rankcount').textContent = `all ${ord.length}`;
+  const box = document.querySelector('.scroll');
+  const held = anchor && document.getElementById('r_' + anchor);
+  const wasAt = held ? held.offsetTop : 0, wasScrolled = box.scrollTop;
+  document.getElementById('rank').innerHTML = ord.map((id, i) => {
+    const p = byId[id], move = boardRank[id] - (i + 1);
+    const cls = move > 0 ? 'move-up' : move < 0 ? 'move-dn' : '';
+    const rookie = p.exp === 0 ? '<span class="rook" title="rookie">R</span>' : '';
+    const turn = MY_PICK_AT[i + 1];
+    const pickRow = turn ? ' pickrow' : '';
+    const pickTag = turn ? `<span class="pick" title="around my pick ${turn}">P${turn}</span>` : '';
+    return `<tr id="r_${id}" class="${pickRow}" draggable="true" data-id="${id}">` +
+      `<td class="act drag" title="drag to reorder">&#8942;&#8942;</td>` +
+      `<td class="act">` +
+      `<button class="rb" data-mv="-1" data-id="${id}" title="move up">&#9650;</button>` +
+      `<button class="rb" data-mv="1" data-id="${id}" title="move down">&#9660;</button></td>` +
+      `<td class="n">${i + 1}${pickTag}</td><td>${p.name}${rookie}</td>` +
+      `<td class="pos pos-${p.pos}">${p.pos}</td>` +
+      `<td class="n">${num(p.pts)}</td><td class="n">${num(p.wk1)}</td>` +
+      `<td class="n">${num(p.adp)}</td><td class="n">${num(p.vorp)}</td>` +
+      `<td class="n ${cls}">${boardRank[id]}${move ? ` (${move > 0 ? '+' : ''}${move})` : ''}</td>` +
+      `<td class="act"><button class="rb x" data-x="${id}" title="drafted -- remove">&#10005;</button></td></tr>`;
+  }).join('');
+  if (held) {
+    const now = document.getElementById('r_' + anchor);
+    if (now) box.scrollTop = wasScrolled + (now.offsetTop - wasAt);
+  }
+  applyRankFilter();   // table is rebuilt wholesale above -- reapply the live filter
+
+  const gone = [...excluded];
+  document.getElementById('dndn').textContent = gone.length;
+  document.getElementById('dndlist').innerHTML = gone.map(id => {
+    const p = byId[id];
+    return `<div class="row"><button class="rb" data-undo="${id}" title="put back">&#8634;</button>` +
+      `<span>${p ? p.name : id}</span>` +
+      `<span class="pos pos-${p ? p.pos : ''}">${p ? p.pos : ''}</span></div>`;
+  }).join('');
+}
+
+// ▲/▼ moves a player exactly one spot -- pins a key that sorts strictly
+// between the row's new neighbours, same as queue_builder.html's move().
+function move(id, dir) {
+  const ord = order();
+  const i = ord.indexOf(id), j = i + dir;
+  if (i < 0 || j < 0 || j >= ord.length) return;   // already at the top or bottom
+  moveTo(id, j, ord);
+}
+
+function moveTo(id, targetIndex, ord) {
+  ord = (ord || order()).filter(x => x !== id);
+  if (!ord.length) return;   // nothing else in the pool to sort against
+  targetIndex = Math.max(0, Math.min(targetIndex, ord.length));
+
+  const before = ord[targetIndex - 1], after = ord[targetIndex];
+  const near = before !== undefined ? rank(before) : rank(after);
+  const beyond = after !== undefined && before !== undefined ? rank(after)
+    : before !== undefined ? near + 1 : near - 1;
+  manual[id] = (near + beyond) / 2;
+  save(); render(id);
+}
+
+document.getElementById('rank').onclick = e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.x) remove(b.dataset.x);
+  else move(b.dataset.id, +b.dataset.mv);
+};
+
+// A ✕ was a mistake, or the pick got reversed -- put him back where his
+// manual key (or his board rank) still has him.
+document.getElementById('dndlist').onclick = e => {
+  const b = e.target.closest('button[data-undo]');
+  if (!b) return;
+  excluded.delete(b.dataset.undo);
+  save(); render(b.dataset.undo);
+};
+
+// --- drag-and-drop reorder ---------------------------------------------
+const rankBody = document.getElementById('rank');
+let dragId = null;
+rankBody.addEventListener('dragstart', e => {
+  const tr = e.target.closest('tr[draggable]');
+  if (!tr) return;
+  dragId = tr.dataset.id;
+  e.dataTransfer.effectAllowed = 'move';
+  tr.classList.add('dragging');
+});
+rankBody.addEventListener('dragend', e => {
+  const tr = e.target.closest('tr[draggable]');
+  if (tr) tr.classList.remove('dragging');
+  rankBody.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+});
+rankBody.addEventListener('dragover', e => {
+  if (!dragId) return;
+  e.preventDefault();
+  const rows = [...rankBody.querySelectorAll('tr[draggable]')];
+  rankBody.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  const over = rows.find(r => {
+    const box = r.getBoundingClientRect();
+    return e.clientY < box.top + box.height / 2;
+  });
+  (over || rows[rows.length - 1]).classList.add('drag-over');
+});
+rankBody.addEventListener('drop', e => {
+  if (!dragId) return;
+  e.preventDefault();
+  const rows = [...rankBody.querySelectorAll('tr[draggable]')];
+  const over = rankBody.querySelector('.drag-over');
+  const id = dragId;
+  dragId = null;
+  if (!over) return;
+  let targetIndex = rows.indexOf(over);
+  // Dropping past the midpoint of the last row means "after it", not "before it".
+  if (over === rows[rows.length - 1]) {
+    const box = over.getBoundingClientRect();
+    if (e.clientY >= box.top + box.height / 2) targetIndex += 1;
+  }
+  // `rows` still includes the dragged row itself (DOM hasn't re-rendered yet),
+  // but moveTo()'s `ord` does not -- once the drop point is past where the
+  // dragged row currently sits, its removal shifts everything after it down one.
+  const dragIndex = rows.findIndex(r => r.dataset.id === id);
+  if (dragIndex >= 0 && dragIndex < targetIndex) targetIndex -= 1;
+  moveTo(id, targetIndex);
+});
+
+// --- search the live ranking (find a player among 200+ rows) ---------------
+let rankFilter = '';
+function applyRankFilter() {
+  const q = rankFilter.trim().toLowerCase();
+  document.querySelectorAll('#rank tr[draggable]').forEach(tr => {
+    const name = tr.children[3].textContent.toLowerCase();
+    const pos = tr.children[4].textContent.toLowerCase();
+    tr.hidden = !!q && !name.includes(q) && !pos.includes(q);
+  });
+}
+function jumpToFirstMatch() {
+  const first = [...document.querySelectorAll('#rank tr[draggable]')].find(tr => !tr.hidden);
+  if (!first) return;
+  first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  first.style.outline = '2px solid var(--accent-volr)';
+  setTimeout(() => { first.style.outline = ''; }, 1200);
+}
+document.getElementById('rankSearch').oninput = e => { rankFilter = e.target.value; applyRankFilter(); };
+document.getElementById('rankSearch').addEventListener('keydown', e => {
+  if (e.key === 'Enter') jumpToFirstMatch();
+});
+document.getElementById('rankSearchBtn').onclick = jumpToFirstMatch;
+
+// Quoting for the saved CSV. It carries proj/wk1/rookie where queue_export
+// carries bye; every consumer reads only queue_pos, player_id, player and
+// position, so the two spellings are interchangeable.
+function csvCell(v) {
+  const s = String(v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+// The canonical ranking -- data/queue-snake-{season}.csv, the file
+// queue_export.py writes and draft_auto reads. Save and load both go through
+// it, and it sits next to this page, so the URL is just its name.
+const QUEUE_CSV = 'queue-snake-' + DATA.season + '.csv';
+
+function note(text) {
+  const el = document.getElementById('saveNote');
+  el.textContent = text;
+  setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, 4000);
+}
+
+function currentCsv() {
+  const header = 'queue_pos,player_id,player,position,team,proj,wk1_pts,adp,vorp_avg,rookie';
+  const rows = order().map((id, i) => {
+    const p = byId[id];
+    return [i + 1, id, p.name, p.pos, p.team || '', p.pts ?? '', p.wk1 ?? '', p.adp ?? '', p.vorp ?? '', p.exp === 0 ? 'R' : ''];
+  });
+  return [header].concat(rows.map(r => r.map(csvCell).join(','))).join('\n');
+}
+
+function download(csv) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = QUEUE_CSV;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// PUT lands the file in data/ where the drafter reads it. The download is the
+// file:// fallback and nothing more -- Downloads is not where this file lives,
+// and moving it by hand after every save is the thing this replaces.
+document.getElementById('exportCsv').onclick = async () => {
+  const csv = currentCsv();
+  try {
+    const r = await fetch(QUEUE_CSV, { method: 'PUT', body: csv });
+    if (r.ok) { note('saved to data/' + QUEUE_CSV); return; }
+  } catch (e) { /* no server -- fall through */ }
+  download(csv);
+  note('no server: check Downloads, or run rank_server.py');
+};
+
+// --- load a saved ranking --------------------------------------------------
+// The saved file is the canonical queue -- data/queue-snake-{season}.csv, the
+// one queue_export.py writes and draft_auto reads -- so save and load
+// round-trip through the artifact the drafter already uses. No second format.
+//
+// Position in the file becomes the manual key, which is the same thing a drag
+// sets, so a loaded order is editable exactly like a hand-built one. A player
+// the file does not mention keeps his board rank rather than being guessed at:
+// the export is depth-capped, and absent is not the same claim as excluded.
+function loadRanking(text) {
+  const lines = text.trim().split(/\r?\n/);
+  // queue_pos is never quoted and comes first, so a plain split is safe up to
+  // the player_id column whatever the later columns hold.
+  const col = lines[0].split(',').indexOf('player_id');
+  if (col < 0) { alert('Not a queue CSV -- no player_id column.'); return; }
+  let n = 0;
+  lines.slice(1).forEach((line, i) => {
+    const id = line.split(',')[col];
+    if (byId[id]) { manual[id] = i + 1; n++; }
+  });
+  if (!n) { alert('No player in that file is on this board.'); return; }
+  save(); render();
+  document.getElementById('rankcount').title = n + ' of ' + P.length + ' loaded from file';
+}
+// Loads the saved ranking itself rather than asking which file it is: served
+// from data/, the canonical one is right there. The picker is the file://
+// fallback, and the way to load some other export.
+document.getElementById('loadCsv').onclick = async () => {
+  try {
+    const r = await fetch(QUEUE_CSV, { cache: 'no-store' });
+    if (r.ok) { loadRanking(await r.text()); note('loaded data/' + QUEUE_CSV); return; }
+  } catch (e) { /* no server -- fall through to the picker */ }
+  document.getElementById('loadFile').click();
+};
+document.getElementById('loadFile').onchange = async e => {
+  const file = e.target.files[0];
+  if (file) loadRanking(await file.text());
+  e.target.value = '';   // same file twice in a row still fires onchange
+};
+
+document.getElementById('season').textContent = DATA.season + ' · ' + P.length + ' players';
+render();
+</script>
