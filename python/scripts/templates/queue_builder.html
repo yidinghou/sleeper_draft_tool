@@ -1,0 +1,506 @@
+<title>Queue Builder</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #05091a;
+    --surface: #0f1730;
+    --surface-raised: #182144;
+    --border: #2a3258;
+    --border-soft: #1c2547;
+    --text-primary: #f5f7ff;
+    --text-secondary: #93a3c9;
+    --text-faint: #5c6790;
+    --accent-vorp: #f6ad37;
+    --accent-volr: #2dd4da;
+    --pos-qb: #fb7185;
+    --pos-rb: #34d399;
+    --pos-wr: #60a5fa;
+    --pos-te: #c084fc;
+    --pos-k: #94a3b8;
+    --up: #34d399;
+    --warn: #fb7185;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { max-width: 1180px; margin: 0 auto; padding: 28px 24px 60px;
+         display: flex; flex-direction: column; gap: 18px; }
+
+  .masthead { display: flex; align-items: baseline; justify-content: space-between;
+              flex-wrap: wrap; gap: 10px 24px; border-bottom: 1px solid var(--border-soft);
+              padding-bottom: 14px; }
+  h1 { font-family: 'Barlow Condensed', sans-serif; font-size: 30px; font-weight: 700;
+       letter-spacing: 0.04em; margin: 0; text-transform: uppercase; }
+  .sub { color: var(--text-secondary); font-size: 13px; }
+
+  .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button { font-family: inherit; font-size: 13px; color: var(--text-primary);
+           background: var(--surface-raised); border: 1px solid var(--border);
+           border-radius: 7px; padding: 7px 13px; cursor: pointer; }
+  button:hover { border-color: var(--accent-volr); }
+  button[disabled] { opacity: .4; cursor: default; border-color: var(--border); }
+  .spacer { flex: 1; }
+
+  .duel { display: grid; grid-template-columns: 1fr 64px 1fr; gap: 14px; align-items: stretch; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+          padding: 22px; cursor: pointer; text-align: center; transition: border-color .12s,
+          transform .08s; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+  .card:hover { border-color: var(--accent-vorp); transform: translateY(-2px); }
+  .card .nm { font-family: 'Barlow Condensed', sans-serif; font-size: 30px; font-weight: 600;
+              letter-spacing: .02em; line-height: 1.1; }
+  .card .meta { color: var(--text-secondary); font-size: 13px; }
+  .card .stat { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-faint); }
+  .card .key { font-size: 11px; color: var(--text-faint); letter-spacing: .12em; }
+  .pos { font-weight: 600; }
+  .pos-QB { color: var(--pos-qb); } .pos-RB { color: var(--pos-rb); }
+  .pos-WR { color: var(--pos-wr); } .pos-TE { color: var(--pos-te); }
+  .pos-K  { color: var(--pos-k);  } .pos-DEF { color: var(--pos-k); }
+
+  .vs { display: flex; align-items: center; justify-content: center;
+        font-family: 'Barlow Condensed', sans-serif; color: var(--text-faint);
+        font-size: 18px; letter-spacing: .1em; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .tile { background: var(--surface); border: 1px solid var(--border-soft); border-radius: 10px;
+          padding: 12px 14px; }
+  .tile .lab { color: var(--text-faint); font-size: 11px; text-transform: uppercase;
+               letter-spacing: .1em; }
+  .tile .val { font-family: 'IBM Plex Mono', monospace; font-size: 20px; margin-top: 3px; }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+  /* Cards stay side by side on a phone -- swiping left or right has to map to
+     a card on the left or right. Only the chrome shrinks. */
+  @media (max-width: 620px) {
+    .app { padding: 14px 10px 40px; gap: 12px; }
+    .duel { grid-template-columns: 1fr 26px 1fr; gap: 8px; }
+    .card { padding: 14px 8px; gap: 6px; }
+    .card .nm { font-size: 20px; }
+    .card .meta, .card .stat { font-size: 11px; }
+    .card .key { display: none; }          /* no arrow keys on a phone */
+    .vs { font-size: 12px; }
+    .tile .val { font-size: 16px; }
+  }
+
+  h2 { font-family: 'Barlow Condensed', sans-serif; font-size: 17px; letter-spacing: .08em;
+       text-transform: uppercase; color: var(--text-secondary); margin: 0 0 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border-soft); }
+  th { color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+  td.n, th.n { text-align: right; font-family: 'IBM Plex Mono', monospace; }
+  .move-up { color: var(--up); } .move-dn { color: var(--warn); }
+  .scroll { max-height: 460px; overflow-y: auto; }
+  .note { color: var(--text-faint); font-size: 12px; }
+  textarea { width: 100%; height: 90px; background: var(--surface); color: var(--text-secondary);
+             border: 1px solid var(--border); border-radius: 8px; font-family: 'IBM Plex Mono', monospace;
+             font-size: 11px; padding: 8px; }
+</style>
+
+<div class="app">
+  <div class="masthead">
+    <div>
+      <h1>Queue Builder</h1>
+      <div class="sub">Which would you rather have on your roster? Ratings start equal &mdash; only your answers move them.</div>
+    </div>
+    <div class="sub" id="season"></div>
+  </div>
+
+  <div class="bar">
+    <button id="undo">&larr; Undo</button>
+    <button id="skip">Skip pair</button>
+    <button id="reveal">Hide ADP / VORP</button>
+    <span class="spacer"></span>
+    <button id="export">Export answers</button>
+    <button id="clear">Reset all</button>
+  </div>
+
+  <div class="duel">
+    <div class="card" id="cardA"></div>
+    <div class="vs">VS</div>
+    <div class="card" id="cardB"></div>
+  </div>
+
+  <div class="stats">
+    <div class="tile"><div class="lab">Answered</div><div class="val" id="mAns">0</div></div>
+    <div class="tile"><div class="lab">On round</div><div class="val" id="mRound">1</div></div>
+    <div class="tile"><div class="lab">This round</div><div class="val" id="mRoundProg">0/0</div></div>
+    <div class="tile"><div class="lab">Rounds left</div><div class="val" id="mLeft">0</div></div>
+    <div class="tile"><div class="lab">Top-20 churn</div><div class="val" id="mChurn">&mdash;</div></div>
+  </div>
+  <div class="note" id="advice"></div>
+
+  <div class="cols">
+    <div>
+      <h2>Live ranking (top 100)</h2>
+      <div class="scroll">
+        <table><thead><tr><th class="n">#</th><th>Player</th><th>Pos</th>
+          <th class="n">Seen</th><th class="n">Board</th></tr></thead>
+          <tbody id="rank"></tbody></table>
+      </div>
+    </div>
+    <div>
+      <h2>Export</h2>
+      <div class="note" style="margin-bottom:8px">
+        Saves automatically in this browser. <b>Export answers</b> downloads
+        <code>queue-prefs-__SEASON__.json</code> &mdash; put it in <code>data/</code>, then run
+        <code>python scripts/queue_builder.py --fit</code>. The Python fit is the authoritative
+        one; the ranking on the left is a fast live approximation.
+      </div>
+      <textarea id="dump" readonly></textarea>
+      <div class="note" style="margin-top:8px">Paste answers back in and press Import to resume elsewhere.</div>
+      <div class="bar" style="margin-top:8px">
+        <textarea id="paste" placeholder="paste exported JSON here"></textarea>
+      </div>
+      <div class="bar"><button id="import">Import</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = __DATA__;
+const P = DATA.players;
+const N = P.length;
+const KEY = 'queue-prefs-' + DATA.season;
+
+//: Where to push answers so the laptop can pull them back down. Null when the
+//: page is opened off disk, which is still a supported way to run it -- then
+//: localStorage and the Export button are the whole round-trip. The query
+//: string carries the access token straight through.
+const SYNC_URL = location.protocol.startsWith('http') ? '/prefs' + location.search : null;
+const byId = Object.fromEntries(P.map(p => [p.id, p]));
+const boardRank = Object.fromEntries(P.map((p, i) => [p.id, i + 1]));
+
+let comparisons = [];
+let reveal = true;   // ADP/VORP visible unless hidden
+let pair = null;
+let churnHistory = [];
+let lastTop = [];
+
+// --- live ratings: Elo, purely so the page can react instantly. The Python
+// --- Bradley-Terry fit is what actually produces the queue.
+let elo = {}, seen = {};
+function resetRatings() {
+  elo = Object.fromEntries(P.map(p => [p.id, 0]));
+  seen = Object.fromEntries(P.map(p => [p.id, 0]));
+}
+function applyElo(winner, loser) {
+  const pw = 1 / (1 + Math.exp(-(elo[winner] - elo[loser])));
+  // K shrinks as a player accumulates a record, so early answers move fast
+  // and later ones refine rather than overwrite.
+  const k = w => 0.7 / (1 + seen[w] / 6);
+  elo[winner] += k(winner) * (1 - pw);
+  elo[loser]  -= k(loser)  * (1 - pw);
+  seen[winner]++; seen[loser]++;
+}
+function rebuild() {
+  resetRatings();
+  for (const c of comparisons) applyElo(c.winner, c.loser);
+}
+
+// --- pair choice -----------------------------------------------------------
+// Questions come from one ADP round at a time, because two players in the same
+// round are two players I could actually be choosing between at one turn.
+// Comparing a round-1 back against a round-9 tight end asks about a decision
+// that will never arise, and spends a question to learn nothing.
+//
+// About 30% of pairs deliberately cross into the round above. That overlap is
+// the only thing joining the rounds into one comparison graph -- without it
+// Bradley-Terry would fit each round on its own scale and the rounds could not
+// be ordered against each other. It also leaves room to promote a round-3
+// player above a round-2 one, through a chain of realistic comparisons.
+const asked = new Set();
+function pairKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
+
+const ROUNDS = DATA.rounds;
+const TARGET = DATA.targets;
+const byRound = {};
+ROUNDS.forEach(r => byRound[r] = P.filter(p => p.rnd === r).map(p => p.id));
+
+function roundProgress(r) {
+  const ids = byRound[r];
+  const target = TARGET[r] * ids.length;
+  const got = ids.reduce((s, i) => s + seen[i], 0);
+  return { got, target, done: got >= target };
+}
+
+function focusRound() {
+  for (const r of ROUNDS) if (!roundProgress(r).done) return r;
+  return ROUNDS[ROUNDS.length - 1];
+}
+
+const CROSS_ROUND = 0.3;
+
+function choosePair() {
+  const r = focusRound();
+  const here = byRound[r];
+  const prevRound = ROUNDS[ROUNDS.indexOf(r) - 1];
+  const above = prevRound === undefined ? [] : byRound[prevRound];
+  // Cross-round pairs need somewhere to cross to; round 1 has nothing above it.
+  const crossing = above.length && Math.random() < CROSS_ROUND;
+  const left = here, right = crossing ? above : here;
+
+  let best = null, bestScore = Infinity;
+  for (let t = 0; t < 300; t++) {
+    const a = left[(Math.random() * left.length) | 0];
+    const b = right[(Math.random() * right.length) | 0];
+    if (a === b || asked.has(pairKey(a, b))) continue;
+    // Within the candidate set, the most informative question is the one
+    // closest to a coin flip, tilted toward players with the thinnest record.
+    const gap = Math.abs(elo[a] - elo[b]);
+    const thin = (seen[a] + seen[b]) / 12;
+    const score = gap + thin + Math.random() * 0.15;
+    if (score < bestScore) { bestScore = score; best = [a, b]; }
+  }
+  if (best) return best;
+
+  // This round is exhausted -- every pair in it has been asked. Widen to the
+  // neighbouring rounds rather than to the whole board.
+  const near = [].concat(above, here, byRound[ROUNDS[ROUNDS.indexOf(r) + 1]] || []);
+  for (let t = 0; t < 2000; t++) {
+    const a = near[(Math.random() * near.length) | 0];
+    const b = near[(Math.random() * near.length) | 0];
+    if (a !== b && !asked.has(pairKey(a, b))) return [a, b];
+  }
+  const ids = P.map(p => p.id);
+  for (let t = 0; t < 4000; t++) {
+    const a = ids[(Math.random() * N) | 0], b = ids[(Math.random() * N) | 0];
+    if (a !== b && !asked.has(pairKey(a, b))) return [a, b];
+  }
+  return [ids[0], ids[1]];
+}
+
+// --- rendering -------------------------------------------------------------
+// Every stat can legitimately be absent, so none of them may be formatted
+// blind: defenses have no VORP and no season projection (they are off the VORP
+// board entirely), kickers have no ADP once past the market's tail, and a
+// player Sleeper does not project this week has no wk1. Absent is "--", never
+// 0 -- a zero here reads as a real projection of nothing.
+const num = (v, digits = 1) => (v === null || v === undefined ? '--' : v.toFixed(digits));
+
+function card(el, p, keyHint) {
+  el.className = 'card';
+  el.innerHTML =
+    `<div class="nm">${p.name}</div>` +
+    `<div class="meta"><span class="pos pos-${p.pos}">${p.pos}</span> &middot; ${p.team} &middot; bye ${p.bye || '--'} &middot; rd ${p.rnd}</div>` +
+    `<div class="stat">${num(p.pts)} proj pts &middot; ${num(p.wk1)} wk1` +
+      (reveal ? ` &middot; adp ${num(p.adp)} &middot; vorp ${num(p.vorp)}` : '') +
+    `</div>` +
+    `<div class="key">${keyHint}</div>`;
+}
+
+// The same round-blocked key as queue_builder.queue_order -- ADP round is the
+// backbone, ratings order players inside a round, and a well-evidenced player
+// drifts at most ROUND_SLACK across the boundary.
+//
+// Sorting the raw ratings instead is what this used to do, and it made the
+// live table disagree with the queue it is previewing: rounds are only joined
+// by the ~30% crossing questions, so a round-3 player who swept his own round
+// outranks a round-1 player who went even in a much harder one, and the table
+// shows a preference you never expressed. See queue_order's docstring -- raw
+// ratings scored rho 0.404 against known preferences, worse than asking
+// nothing. Elo here, Bradley-Terry there, but the z-score per round is on the
+// same footing either way, so this previews the real order.
+const ROUND_SLACK = 1.0, CONFIDENCE_AT = 6;
+function order() {
+  const byRnd = {};
+  P.forEach(p => (byRnd[p.rnd] = byRnd[p.rnd] || []).push(elo[p.id]));
+  const centre = {}, spread = {};
+  for (const r in byRnd) {
+    const v = byRnd[r].slice().sort((x, y) => x - y), n = v.length;
+    centre[r] = n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2;
+    const mean = v.reduce((s, x) => s + x, 0) / n;  // pstdev is about the mean
+    const sd = Math.sqrt(v.reduce((s, x) => s + (x - mean) ** 2, 0) / n);
+    spread[r] = sd || 1;
+  }
+  const key = {};
+  for (const p of P) {
+    const z = (elo[p.id] - centre[p.rnd]) / spread[p.rnd];
+    const drift = Math.max(-ROUND_SLACK, Math.min(ROUND_SLACK, -z * ROUND_SLACK / 2));
+    key[p.id] = p.rnd + drift * Math.min(1, seen[p.id] / CONFIDENCE_AT);
+  }
+  return P.map(p => p.id).sort((a, b) => (key[a] - key[b]) || (boardRank[a] - boardRank[b]));
+}
+
+function render() {
+  const [a, b] = pair;
+  card(document.getElementById('cardA'), byId[a], '← LEFT ARROW');
+  card(document.getElementById('cardB'), byId[b], 'RIGHT ARROW →');
+
+  const r = focusRound();
+  const prog = roundProgress(r);
+  const left = ROUNDS.filter(x => !roundProgress(x).done).length;
+  document.getElementById('mAns').textContent = comparisons.length;
+  document.getElementById('mRound').textContent = r;
+  document.getElementById('mRoundProg').textContent =
+    Math.min(prog.got, prog.target) + '/' + prog.target;
+  document.getElementById('mLeft').textContent = left;
+  document.getElementById('mChurn').textContent =
+    churnHistory.length ? churnHistory[churnHistory.length - 1] : '—';
+
+  const ra = byId[a].rnd, rb = byId[b].rnd;
+  const where = ra === rb
+    ? `Both round ${ra} — players you'd choose between at the same pick.`
+    : `Round ${Math.min(ra, rb)} vs round ${Math.max(ra, rb)} — a crossing question, which is what lets the rounds be ranked against each other.`;
+  const settled = churnHistory.length && churnHistory[churnHistory.length - 1] <= 2;
+  document.getElementById('advice').textContent =
+    where + (left === 0
+      ? '  All rounds have met their budget — export whenever you like.'
+      : settled && r > 3 ? '  Top 20 has settled; the rest only sharpens the tail.' : '');
+
+  const ord = order();
+  document.getElementById('rank').innerHTML = ord.slice(0, 100).map((id, i) => {
+    const p = byId[id], move = boardRank[id] - (i + 1);
+    const cls = move > 0 ? 'move-up' : move < 0 ? 'move-dn' : '';
+    return `<tr><td class="n">${i + 1}</td><td>${p.name}</td>` +
+      `<td class="pos pos-${p.pos}">${p.pos}</td><td class="n">${seen[id]}</td>` +
+      `<td class="n ${cls}">${boardRank[id]}${move ? ` (${move > 0 ? '+' : ''}${move})` : ''}</td></tr>`;
+  }).join('');
+
+  document.getElementById('dump').value = JSON.stringify(payload());
+  document.getElementById('undo').disabled = !comparisons.length;
+}
+
+function payload() {
+  return { season: DATA.season, pool: DATA.pool, comparisons };
+}
+
+// --- actions ---------------------------------------------------------------
+function pick(side) {
+  const [a, b] = pair;
+  const winner = side === 'A' ? a : b, loser = side === 'A' ? b : a;
+  comparisons.push({ winner, loser });
+  applyElo(winner, loser);
+  asked.add(pairKey(a, b));
+
+  if (comparisons.length % 10 === 0) {
+    const top = order().slice(0, 20);
+    if (lastTop.length) {
+      let moved = 0;
+      top.forEach((id, i) => { if (lastTop[i] !== id) moved++; });
+      churnHistory.push(moved);
+    }
+    lastTop = top;
+    sync();                     // batched with the churn tick, every 10 answers
+  }
+  save(); next();
+}
+function next() { pair = choosePair(); render(); }
+
+// localStorage is the system of record. The server copy is a transport, so
+// that the laptop can pull answers down from the phone -- it is pushed on a
+// batch of answers and whenever the page is backgrounded (locking a phone
+// fires visibilitychange, and nothing after it is guaranteed to run). A failed
+// push is dropped on purpose: swiping through a tunnel must not block or lose
+// an answer that is already safe in localStorage.
+function save() { try { localStorage.setItem(KEY, JSON.stringify(payload())); } catch (e) {} }
+
+function sync() {
+  if (!SYNC_URL) return;
+  try {
+    fetch(SYNC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload()),
+      keepalive: true,          // survives the page being backgrounded
+    }).catch(() => {});
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') sync();
+});
+
+// --- swipe -----------------------------------------------------------------
+// A swipe counts only when it is decisively horizontal: past SWIPE_MIN px and
+// longer across than down. Otherwise scrolling the ranking table with a thumb
+// would answer a pair by accident, and an accidental answer is worse than a
+// missed one -- it is a preference recorded that you never held.
+const SWIPE_MIN = 50;
+let touch = null;
+const duel = document.querySelector('.duel');
+duel.addEventListener('touchstart', e => {
+  const t = e.changedTouches[0];
+  touch = { x: t.clientX, y: t.clientY };
+}, { passive: true });
+duel.addEventListener('touchend', e => {
+  if (!touch) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - touch.x, dy = t.clientY - touch.y;
+  touch = null;
+  if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) <= Math.abs(dy)) return;
+  // Swipe toward the card you want -- the same mapping the arrow keys use, so
+  // the two inputs cannot teach opposite habits.
+  pick(dx < 0 ? 'A' : 'B');
+}, { passive: true });
+
+document.getElementById('cardA').onclick = () => pick('A');
+document.getElementById('cardB').onclick = () => pick('B');
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft') pick('A');
+  else if (e.key === 'ArrowRight') pick('B');
+  else if (e.key === 's') next();
+  else if (e.key === 'u') document.getElementById('undo').click();
+});
+document.getElementById('skip').onclick = () => { asked.add(pairKey(...pair)); next(); };
+document.getElementById('undo').onclick = () => {
+  if (!comparisons.length) return;
+  comparisons.pop(); rebuild(); save(); next();
+};
+document.getElementById('reveal').onclick = e => {
+  reveal = !reveal;
+  e.target.textContent = reveal ? 'Hide ADP / VORP' : 'Show ADP / VORP';
+  render();
+};
+document.getElementById('clear').onclick = () => {
+  if (!confirm('Discard all ' + comparisons.length + ' answers?')) return;
+  comparisons = []; churnHistory = []; lastTop = []; asked.clear();
+  rebuild(); save(); next();
+};
+document.getElementById('export').onclick = () => {
+  const blob = new Blob([JSON.stringify(payload(), null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'queue-prefs-' + DATA.season + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+document.getElementById('import').onclick = () => {
+  try {
+    const parsed = JSON.parse(document.getElementById('paste').value);
+    comparisons = parsed.comparisons || parsed;
+    for (const c of comparisons) asked.add(pairKey(c.winner, c.loser));
+    rebuild(); save(); next();
+  } catch (e) { alert('Could not read that JSON: ' + e.message); }
+};
+
+// --- boot ------------------------------------------------------------------
+document.getElementById('season').textContent = DATA.season + ' · ' + N + ' players';
+resetRatings();
+// Whichever run is further along wins. Taking localStorage unconditionally
+// loses an exported file rebuilt into the page (answered elsewhere, saved to
+// data/queue-prefs-{season}.json) behind a stale copy in this browser, with no
+// sign that it happened. Ties go to localStorage: same length usually means
+// the same run, and it is the one that survived a reload here.
+let restored = DATA.resume;
+try {
+  const local = JSON.parse(localStorage.getItem(KEY));
+  const n = r => (r && r.comparisons ? r.comparisons.length : -1);
+  if (n(local) >= n(restored)) restored = local || restored;
+} catch (e) {}
+if (restored && restored.comparisons) {
+  comparisons = restored.comparisons.filter(c => byId[c.winner] && byId[c.loser]);
+  for (const c of comparisons) asked.add(pairKey(c.winner, c.loser));
+  rebuild();
+}
+next();
+</script>
