@@ -1,4 +1,4 @@
-from vorp.league_config import LeagueConfig
+from vorp.league.config import LeagueConfig
 from vorp.models import Player, points_proportional, progressive_blend, starters_only
 from vorp.principles import (
     LAW,
@@ -73,7 +73,7 @@ def test_blending_the_bars_is_monotonic_at_every_weight():
     # so price does too — at any floor weight, with no tuning.
     ctx = context()
     for w_floor in (0.0, 0.25, 0.5, 0.75, 1.0):
-        finding = monotonic_within_position(progressive_blend(0.75, w_floor), ctx)
+        finding = monotonic_within_position(progressive_blend(w_floor), ctx)
         assert finding.passed, f"w_floor={w_floor}: {finding.detail}"
 
 

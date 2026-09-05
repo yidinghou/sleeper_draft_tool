@@ -187,7 +187,7 @@ dynamic/live layer exists.
 
 **Depends on:** `01-calculating-replacement.md`'s replacement level and
 selected set, `02-value-over-last-rostered.md`'s last-rostered level and
-selected set, league config (`python/vorp/league_config.py`).
+selected set, league config (`python/vorp/league/config.py`).
 **Implemented in:** `python/scripts/bid_value.py` — both lenses via
 `apportion_with_floor` from `python/vorp/bid_value.py`, which is now just
 the shared apportionment (`apportion`, `apportion_with_floor`,

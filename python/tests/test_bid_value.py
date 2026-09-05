@@ -7,7 +7,7 @@ from vorp.bid_value import (
     floor_pressure,
 )
 from vorp.last_rostered import calculate_last_rostered_levels
-from vorp.league_config import LEAGUE_CONFIG, LeagueConfig
+from vorp.league.config import LEAGUE_CONFIG, LeagueConfig
 from vorp.replacement_level import calculate_replacement_levels
 
 

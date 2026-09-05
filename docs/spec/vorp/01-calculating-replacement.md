@@ -54,9 +54,9 @@ after each sale.
 
 ## Reference
 
-**Depends on:** league config (`python/vorp/league_config.py`), the board of
+**Depends on:** league config (`python/vorp/league/config.py`), the board of
 projected points. **Implemented in:** `python/vorp/replacement_level.py`
-(matching logic in `python/vorp/roster_fill.py`). **Done when:** on a
+(matching logic in `python/vorp/league/roster_fill.py`). **Done when:** on a
 fixture board, the optimal fill picks the right flex players, and
 replacement level equals the best player left outside that selection.
 

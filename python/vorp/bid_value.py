@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from .roster_fill import RosterFillPlayer
+from .league.roster_fill import RosterFillPlayer
 
 BidPlayer = RosterFillPlayer
 

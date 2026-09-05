@@ -1,0 +1,1231 @@
+<title>Auction Drift</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+/>
+<style>
+  :root {
+    --ground: #eff2f5;
+    --surface: #ffffff;
+    --surface-sunk: #e7ebf0;
+    --line: #d3dae2;
+    --line-soft: #e3e8ee;
+    --ink: #16202b;
+    --ink-soft: #47576a;
+    --ink-faint: #7b8b9c;
+    --accent: #1f4e79;
+    --accent-soft: #dbe6f1;
+    --up: #0e7c66;
+    --up-soft: #d5ece5;
+    --down: #b4432c;
+    --down-soft: #f6ddd7;
+    --brass: #8a6413;
+    --qb: #6d4b9e;
+    --rb: #0e7c66;
+    --wr: #1f4e79;
+    --te: #a8621c;
+    --def: #5c6b7a;
+    --radius: 6px;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: Archivo, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1720;
+      --surface: #16202b;
+      --surface-sunk: #101821;
+      --line: #2a3846;
+      --line-soft: #212e3a;
+      --ink: #e3eaf1;
+      --ink-soft: #a3b2c1;
+      --ink-faint: #71818f;
+      --accent: #7aaad6;
+      --accent-soft: #1c2f42;
+      --up: #46bfa0;
+      --up-soft: #14312a;
+      --down: #e3806c;
+      --down-soft: #3a1f19;
+      --brass: #d1a94a;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0f1720;
+    --surface: #16202b;
+    --surface-sunk: #101821;
+    --line: #2a3846;
+    --line-soft: #212e3a;
+    --ink: #e3eaf1;
+    --ink-soft: #a3b2c1;
+    --ink-faint: #71818f;
+    --accent: #7aaad6;
+    --accent-soft: #1c2f42;
+    --up: #46bfa0;
+    --up-soft: #14312a;
+    --down: #e3806c;
+    --down-soft: #3a1f19;
+    --brass: #d1a94a;
+  }
+
+  html {
+    color-scheme: light dark;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1360px;
+    margin: 0 auto;
+    padding: 28px 24px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  h1 {
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .lede {
+    margin: 0;
+    max-width: 72ch;
+    color: var(--ink-soft);
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .back-link {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent);
+    text-decoration: none;
+    width: fit-content;
+  }
+
+  .back-link:hover {
+    text-decoration: underline;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+
+  /* ---------------------------------------------------------- transport */
+
+  .transport {
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 6;
+  }
+
+  .transport-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--surface-sunk);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+
+  button:hover {
+    border-color: var(--accent);
+  }
+
+  button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--surface);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) button.primary {
+      color: var(--surface-sunk);
+    }
+  }
+
+  :root[data-theme="dark"] button.primary {
+    color: var(--surface-sunk);
+  }
+
+  input[type="range"] {
+    flex: 1;
+    min-width: 220px;
+    accent-color: var(--accent);
+  }
+
+  .pick-count {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  /* --------------------------------------------------------- stat strip */
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .stat {
+    background: var(--surface);
+    padding: 13px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .stat b {
+    font-family: var(--mono);
+    font-size: 21px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .stat .delta {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .up {
+    color: var(--up);
+  }
+  .down {
+    color: var(--down);
+  }
+  .money {
+    color: var(--brass);
+  }
+
+  /* ------------------------------------------------------------- layout */
+
+  .cols {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(260px, 0.85fr);
+    gap: 20px;
+    align-items: start;
+  }
+
+  @media (max-width: 1080px) {
+    .cols {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line-soft);
+    flex-wrap: wrap;
+  }
+
+  .panel-head h2 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  .panel-note {
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+
+  .board-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line-soft);
+    flex-wrap: wrap;
+  }
+
+  .board-controls input[type="text"] {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--surface-sunk);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    width: 170px;
+  }
+
+  .board-controls input[type="text"]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .pos-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .pos-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--surface);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .pos-btn.active {
+      color: var(--surface-sunk);
+    }
+  }
+  :root[data-theme="dark"] .pos-btn.active {
+    color: var(--surface-sunk);
+  }
+
+  .row-count {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+
+  .scroller {
+    max-height: 620px;
+    overflow: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  th:hover {
+    color: var(--ink-soft);
+  }
+
+  th.sorted {
+    color: var(--accent);
+  }
+
+  th:first-child,
+  th:nth-child(2) {
+    text-align: left;
+  }
+
+  td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: middle;
+  }
+
+  tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .num {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .player {
+    white-space: nowrap;
+  }
+
+  .player .nm {
+    font-weight: 600;
+  }
+
+  .player .tm {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    margin-left: 4px;
+  }
+
+  .pos {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--surface);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .pos {
+      color: #0f1720;
+    }
+  }
+  :root[data-theme="dark"] .pos {
+    color: #0f1720;
+  }
+
+  .pos-QB {
+    background: var(--qb);
+  }
+  .pos-RB {
+    background: var(--rb);
+  }
+  .pos-WR {
+    background: var(--wr);
+  }
+  .pos-TE {
+    background: var(--te);
+  }
+  .pos-DEF {
+    background: var(--def);
+  }
+
+  tr.sold td {
+    color: var(--ink-faint);
+    background: var(--surface-sunk);
+  }
+
+  tr.sold .nm {
+    text-decoration: line-through;
+    text-decoration-color: var(--ink-faint);
+  }
+
+  /* lean: where the current price sits between its own VORP$ and VOLR$ ends */
+  .lean-track {
+    position: relative;
+    height: 6px;
+    width: 56px;
+    background: linear-gradient(to right, var(--wr), var(--up));
+    opacity: 0.35;
+    border-radius: 3px;
+  }
+
+  .lean-track.flat {
+    opacity: 0.15;
+  }
+
+  .lean-dot {
+    position: absolute;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    border-radius: 50%;
+    background: var(--ink);
+    border: 1.5px solid var(--surface);
+  }
+
+  /* the drift track: opening price vs now */
+  .track {
+    position: relative;
+    height: 14px;
+    min-width: 78px;
+    background: var(--surface-sunk);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .track .delta {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+  }
+
+  .track .delta.pos {
+    background: var(--up);
+  }
+
+  .track .delta.neg {
+    background: var(--down);
+  }
+
+  .track .tick {
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    width: 2px;
+    background: var(--ink);
+    opacity: 0.55;
+  }
+
+  /* ------------------------------------------------------------- levels */
+
+  .levels {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 14px 16px;
+  }
+
+  .level {
+    display: grid;
+    grid-template-columns: 34px 1fr 96px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .level-track {
+    position: relative;
+    height: 8px;
+    background: var(--surface-sunk);
+    border-radius: 4px;
+  }
+
+  .level-span {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: var(--accent-soft);
+    border-radius: 4px;
+  }
+
+  .level-dot {
+    position: absolute;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 1.5px solid var(--surface);
+  }
+
+  .level-dot.bottom {
+    background: var(--ink-faint);
+  }
+
+  .level-nums {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft);
+    text-align: right;
+  }
+
+  /* ------------------------------------------------------------- seats */
+
+  .seats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 8px;
+    padding: 14px 16px;
+  }
+
+  .seat {
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--surface);
+  }
+
+  .seat.active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .seat .who {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .seat .budget {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .seat .sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ------------------------------------------------------------ ledger */
+
+  .ledger-row {
+    display: grid;
+    grid-template-columns: 26px 1fr auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 7px 16px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 13px;
+  }
+
+  .ledger-row:last-child {
+    border-bottom: 0;
+  }
+
+  .ledger-row .no {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .verdict {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    padding: 2px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+
+  .verdict.over {
+    background: var(--down-soft);
+    color: var(--down);
+  }
+
+  .verdict.under {
+    background: var(--up-soft);
+    color: var(--up);
+  }
+
+  .verdict.fair {
+    background: var(--surface-sunk);
+    color: var(--ink-soft);
+  }
+
+  .side-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  footer {
+    color: var(--ink-faint);
+    font-size: 12px;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+    max-width: 82ch;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    background: var(--surface-sunk);
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+</style>
+
+<div class="wrap">
+  <header style="display: flex; flex-direction: column; gap: 8px">
+    <a class="back-link" id="back-link" href="#">&larr; All scenarios</a>
+    <span class="eyebrow">docs/spec/vorp/06 &middot; league, teams and slots</span>
+    <h1 id="page-title">Auction Drift</h1>
+    <p class="lede" id="page-blurb">
+      The same board as the pre-draft price list, replayed pick by pick.
+      Drag the scrubber and watch every remaining price reprice off the
+      players, slots and money actually left in the room.
+    </p>
+  </header>
+
+  <div class="card transport">
+    <div class="transport-row">
+      <button id="play" class="primary" type="button">Play</button>
+      <button id="reset" type="button">Reset</button>
+      <input id="scrub" type="range" min="0" value="0" step="1" aria-label="Pick number" />
+      <span class="pick-count" id="pick-count"></span>
+    </div>
+    <div class="transport-row" id="now-selling" style="min-height: 22px"></div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="cols">
+    <div class="card">
+      <div class="panel-head">
+        <h2>The board</h2>
+        <span class="panel-note" id="board-note"></span>
+      </div>
+      <div class="board-controls">
+        <input id="search" type="text" placeholder="Search player or team&hellip;" autocomplete="off" />
+        <div class="pos-filters" id="pos-filters"></div>
+        <span class="row-count" id="row-count"></span>
+      </div>
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr id="thead-row"></tr>
+          </thead>
+          <tbody id="board"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="side-stack">
+      <div class="card">
+        <div class="panel-head">
+          <h2>Where the bars sit</h2>
+          <span class="panel-note">last-rostered &rarr; replacement</span>
+        </div>
+        <div class="levels" id="levels"></div>
+      </div>
+
+      <div class="card">
+        <div class="panel-head">
+          <h2>Seats</h2>
+          <span class="panel-note">budget &middot; spots &middot; max bid</span>
+        </div>
+        <div class="seats" id="seats"></div>
+      </div>
+
+      <div class="card">
+        <div class="panel-head">
+          <h2>Sold</h2>
+          <span class="panel-note">newest first</span>
+        </div>
+        <div class="scroller" id="ledger"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer id="footer"></footer>
+</div>
+
+<script id="demo-data" type="application/json">__DATA__</script>
+<script>
+  (function () {
+    var D = JSON.parse(document.getElementById("demo-data").textContent);
+    var frames = D.frames;
+    var players = D.players;
+    var byId = {};
+    players.forEach(function (p) {
+      byId[p.player_id] = p;
+    });
+
+    var state = { i: 0, playing: false, timer: null, pos: "ALL", query: "", sort: "price", dir: -1 };
+
+    var scrub = document.getElementById("scrub");
+    scrub.max = String(frames.length - 1);
+
+    var money = function (v) {
+      return v === null || v === undefined ? "&mdash;" : "$" + v;
+    };
+    var signed = function (v) {
+      return (v > 0 ? "+" : v < 0 ? "&minus;" : "") + "$" + Math.abs(v);
+    };
+    var cls = function (v) {
+      return v > 0 ? "up" : v < 0 ? "down" : "";
+    };
+
+    // The widest opening-vs-now drift across the whole run, so the drift
+    // track's scale never jumps between frames.
+    var maxDrift = 1;
+    frames.forEach(function (f) {
+      players.forEach(function (p) {
+        var row = f.rows[p.player_id];
+        if (row) maxDrift = Math.max(maxDrift, Math.abs(row.price - p.opening));
+      });
+    });
+
+    var levelRange = {};
+    frames.forEach(function (f) {
+      Object.keys(f.levels).forEach(function (pos) {
+        var l = f.levels[pos];
+        var r = levelRange[pos] || { lo: Infinity, hi: -Infinity };
+        r.lo = Math.min(r.lo, l.last_rostered, l.replacement);
+        r.hi = Math.max(r.hi, l.last_rostered, l.replacement);
+        levelRange[pos] = r;
+      });
+    });
+
+    var columns = [
+      { key: "name", label: "Player" },
+      { key: "position", label: "Pos" },
+      { key: "points", label: "Pts" },
+      { key: "vorp_dollar", label: "VORP $" },
+      { key: "lean", label: "Blend" },
+      { key: "volr_dollar", label: "VOLR $" },
+      { key: "price", label: "Price" },
+      { key: "opening", label: "Open" },
+      { key: "drift", label: "Drift" },
+      { key: "market", label: "Sleeper $" },
+      { key: "delta", label: "vs Sleeper" }
+    ];
+
+    var posEl = document.getElementById("pos-filters");
+    var positions = ["ALL"].concat(
+      Array.from(new Set(players.map(function (p) { return p.position; })))
+    );
+    posEl.innerHTML = positions
+      .map(function (p) {
+        return '<button class="pos-btn" data-pos="' + p + '">' + p + "</button>";
+      })
+      .join("");
+    posEl.addEventListener("click", function (e) {
+      var btn = e.target.closest(".pos-btn");
+      if (btn) {
+        state.pos = btn.dataset.pos;
+        render();
+      }
+    });
+
+    document.getElementById("search").addEventListener("input", function (e) {
+      state.query = e.target.value.trim().toLowerCase();
+      render();
+    });
+
+    document.getElementById("thead-row").addEventListener("click", function (e) {
+      var th = e.target.closest("th");
+      if (!th) return;
+      var key = th.dataset.key;
+      if (state.sort === key) {
+        state.dir = -state.dir;
+      } else {
+        state.sort = key;
+        state.dir = key === "name" || key === "position" ? 1 : -1;
+      }
+      render();
+    });
+
+    function renderStats(f) {
+      var open = frames[0];
+      // What VORP pricing actually runs on: after every priced player is
+      // guaranteed min_bid, the rest of the pool splits in proportion to
+      // points-over-replacement at one rate. This *is* the exchange rate --
+      // not an average over roster spots, which was never the unit price is
+      // quoted in.
+      var rateDrift = f.vorp_rate - open.vorp_rate;
+      var tiles = [
+        ["Money in the room", "$" + f.pool, signed(f.pool - open.pool), f.pool - open.pool],
+        ["Spots left", String(f.spots_left), f.spots_left - open.spots_left + " slots", 0],
+        [
+          "$ / VORP pt",
+          "$" + f.vorp_rate.toFixed(2),
+          (rateDrift >= 0 ? "+" : "&minus;") + "$" + Math.abs(rateDrift).toFixed(2) + " vs open",
+          rateDrift
+        ],
+        ["Picks made", String(f.pick), f.pick === 0 ? "opening bell" : "of " + (frames.length - 1), 0]
+      ];
+      document.getElementById("stats").innerHTML = tiles
+        .map(function (t) {
+          return (
+            '<div class="stat"><span class="eyebrow">' +
+            t[0] +
+            "</span><b>" +
+            t[1] +
+            '</b><span class="delta ' +
+            cls(t[3]) +
+            '">' +
+            t[2] +
+            "</span></div>"
+          );
+        })
+        .join("");
+    }
+
+    function renderNowSelling(f) {
+      var el = document.getElementById("now-selling");
+      if (!f.sold) {
+        el.innerHTML =
+          '<span class="panel-note">The opening board, before a single dollar has moved. Press Play.</span>';
+        return;
+      }
+      var s = f.sold;
+      var delta = s.amount - (s.our_price || 0);
+      var verdict = delta > 2 ? "over" : delta < -2 ? "under" : "fair";
+      var label = verdict === "over" ? "over our price" : verdict === "under" ? "under our price" : "at our price";
+      el.innerHTML =
+        '<span class="pos pos-' +
+        s.position +
+        '">' +
+        s.position +
+        "</span>" +
+        '<strong style="font-size:15px">' +
+        s.name +
+        "</strong>" +
+        '<span class="pick-count">sold to seat ' +
+        (s.seat + 1) +
+        ' for <b class="money">$' +
+        s.amount +
+        "</b> &middot; we said " +
+        money(s.our_price) +
+        "</span>" +
+        '<span class="verdict ' +
+        verdict +
+        '">' +
+        signed(delta) +
+        " " +
+        label +
+        "</span>";
+    }
+
+    function renderBoard(f) {
+      var rows = players.map(function (p) {
+        var row = f.rows[p.player_id];
+        var sold = !row;
+        var price = sold ? null : row.price;
+        var vorpDollar = sold ? null : row.vorp_dollar;
+        var volrDollar = sold ? null : row.volr_dollar;
+        var range = sold ? 0 : volrDollar - vorpDollar;
+        var lean = sold || range === 0 ? 0.5 : (price - vorpDollar) / range;
+        var drift = sold ? null : price - p.opening;
+        var delta =
+          sold || p.market === null || p.market === undefined ? null : price - p.market;
+        return {
+          p: p,
+          sold: sold,
+          price: price,
+          vorp_dollar: vorpDollar,
+          volr_dollar: volrDollar,
+          lean: Math.max(0, Math.min(1, lean)),
+          flat: range === 0,
+          opening: p.opening,
+          drift: drift,
+          market: p.market,
+          delta: delta
+        };
+      });
+
+      if (state.pos !== "ALL") rows = rows.filter(function (r) { return r.p.position === state.pos; });
+      if (state.query) {
+        rows = rows.filter(function (r) {
+          return (
+            r.p.name.toLowerCase().indexOf(state.query) !== -1 ||
+            (r.p.team || "").toLowerCase().indexOf(state.query) !== -1
+          );
+        });
+      }
+
+      var k = state.sort,
+        dir = state.dir;
+      var onRow = { vorp_dollar: 1, volr_dollar: 1, lean: 1, price: 1, opening: 1, drift: 1, market: 1, delta: 1 };
+      rows.sort(function (a, b) {
+        var av = onRow[k] ? a[k] : a.p[k];
+        var bv = onRow[k] ? b[k] : b.p[k];
+        if (av === null || av === undefined) return 1;
+        if (bv === null || bv === undefined) return -1;
+        if (av < bv) return -dir;
+        if (av > bv) return dir;
+        return b.p.points - a.p.points;
+      });
+
+      document.getElementById("row-count").textContent = rows.length + " of " + players.length;
+      document.getElementById("board-note").textContent =
+        "w_floor " + D.w_floor.toFixed(2) + " &middot; re-solved after pick " + f.pick;
+
+      document.getElementById("thead-row").innerHTML = columns
+        .map(function (c) {
+          return (
+            "<th data-key=\"" +
+            c.key +
+            '"' +
+            (state.sort === c.key ? ' class="sorted"' : "") +
+            ">" +
+            c.label +
+            (state.sort === c.key ? (state.dir === 1 ? " &uarr;" : " &darr;") : "") +
+            "</th>"
+          );
+        })
+        .join("");
+
+      document.getElementById("board").innerHTML = rows
+        .map(function (r) {
+          var p = r.p;
+          var dc = r.delta === null || r.delta === undefined ? "" : cls(r.delta);
+          var w = r.drift === null ? 0 : (Math.abs(r.drift) / maxDrift) * 50;
+          var track = r.sold
+            ? '<div class="track"></div>'
+            : '<div class="track"><div class="tick" style="left:50%"></div>' +
+              '<div class="delta ' +
+              (r.drift >= 0 ? "pos" : "neg") +
+              '" style="left:' +
+              (r.drift >= 0 ? 50 : 50 - w) +
+              "%;width:" +
+              w +
+              '%"></div></div>';
+          return (
+            '<tr class="' +
+            (r.sold ? "sold" : "") +
+            '"><td class="player"><span class="nm">' +
+            p.name +
+            "</span>" +
+            (p.team ? '<span class="tm">' + p.team + "</span>" : "") +
+            '</td><td><span class="pos pos-' +
+            p.position +
+            '">' +
+            p.position +
+            '</span></td><td class="num">' +
+            p.points.toFixed(1) +
+            '</td><td class="num">' +
+            money(r.vorp_dollar) +
+            '</td><td><div class="lean-track' +
+            (r.flat ? " flat" : "") +
+            '"><div class="lean-dot" style="left:' +
+            (r.sold ? 50 : 100 * r.lean) +
+            '%"></div></div></td><td class="num">' +
+            money(r.volr_dollar) +
+            '</td><td class="num"><b>' +
+            (r.sold ? "sold" : money(r.price)) +
+            '</b></td><td class="num">' +
+            money(r.opening) +
+            "</td><td>" +
+            track +
+            '</td><td class="num">' +
+            money(r.market) +
+            '</td><td class="num ' +
+            dc +
+            '">' +
+            (r.delta === null || r.delta === undefined ? "&mdash;" : signed(r.delta)) +
+            "</td></tr>"
+          );
+        })
+        .join("");
+    }
+
+    function renderLevels(f) {
+      var open = frames[0].levels;
+      document.getElementById("levels").innerHTML = Object.keys(f.levels)
+        .map(function (pos) {
+          var l = f.levels[pos];
+          var r = levelRange[pos];
+          var span = Math.max(1, r.hi - r.lo);
+          var pct = function (v) {
+            return ((v - r.lo) / span) * 100;
+          };
+          var moved = l.replacement - open[pos].replacement;
+          return (
+            '<div class="level"><span class="pos pos-' +
+            pos +
+            '">' +
+            pos +
+            '</span><div class="level-track">' +
+            '<div class="level-span" style="left:' +
+            pct(l.last_rostered) +
+            "%;width:" +
+            (pct(l.replacement) - pct(l.last_rostered)) +
+            '%"></div>' +
+            '<div class="level-dot bottom" style="left:' +
+            pct(l.last_rostered) +
+            '%"></div>' +
+            '<div class="level-dot" style="left:' +
+            pct(l.replacement) +
+            '%"></div>' +
+            '</div><span class="level-nums">' +
+            l.last_rostered.toFixed(1) +
+            " &rarr; " +
+            l.replacement.toFixed(1) +
+            (Math.abs(moved) >= 0.05
+              ? ' <b class="' +
+                cls(-moved) +
+                '">' +
+                (moved > 0 ? "+" : "&minus;") +
+                Math.abs(moved).toFixed(1) +
+                "</b>"
+              : "") +
+            "</span></div>"
+          );
+        })
+        .join("");
+    }
+
+    function renderSeats(f) {
+      var active = f.sold ? f.sold.seat : -1;
+      document.getElementById("seats").innerHTML = f.seats
+        .map(function (s) {
+          return (
+            '<div class="seat' +
+            (s.seat === active ? " active" : "") +
+            '"><span class="who">Seat ' +
+            (s.seat + 1) +
+            '</span><span class="budget money">$' +
+            s.budget +
+            '</span><span class="sub">' +
+            s.spots +
+            " spots &middot; max $" +
+            s.max_bid +
+            "</span></div>"
+          );
+        })
+        .join("");
+    }
+
+    function renderLedger(f) {
+      var rows = D.ledger.slice(0, f.pick).reverse();
+      document.getElementById("ledger").innerHTML = rows.length
+        ? rows
+            .map(function (s) {
+              var delta = s.amount - (s.our_price || 0);
+              var verdict = delta > 2 ? "over" : delta < -2 ? "under" : "fair";
+              return (
+                '<div class="ledger-row"><span class="no">' +
+                s.pick +
+                '</span><span><span class="pos pos-' +
+                s.position +
+                '">' +
+                s.position +
+                "</span> " +
+                s.name +
+                '</span><span class="num money">$' +
+                s.amount +
+                '</span><span class="verdict ' +
+                verdict +
+                '">' +
+                signed(delta) +
+                "</span></div>"
+              );
+            })
+            .join("")
+        : '<div class="ledger-row"><span class="panel-note">Nothing sold yet.</span></div>';
+    }
+
+    function render() {
+      var f = frames[state.i];
+      scrub.value = String(state.i);
+      document.getElementById("pick-count").innerHTML =
+        "Pick " + f.pick + " / " + (frames.length - 1);
+      renderStats(f);
+      renderNowSelling(f);
+      renderBoard(f);
+      renderLevels(f);
+      renderSeats(f);
+      renderLedger(f);
+    }
+
+    function stop() {
+      state.playing = false;
+      clearInterval(state.timer);
+      document.getElementById("play").textContent = "Play";
+    }
+
+    document.getElementById("play").addEventListener("click", function () {
+      if (state.playing) return stop();
+      if (state.i >= frames.length - 1) state.i = 0;
+      state.playing = true;
+      this.textContent = "Pause";
+      state.timer = setInterval(function () {
+        if (state.i >= frames.length - 1) return stop();
+        state.i += 1;
+        render();
+      }, 700);
+    });
+
+    document.getElementById("reset").addEventListener("click", function () {
+      stop();
+      state.i = 0;
+      render();
+    });
+
+    scrub.addEventListener("input", function () {
+      stop();
+      state.i = +this.value;
+      render();
+    });
+
+    document.getElementById("page-title").textContent = D.title || "Auction Drift";
+    if (D.title) document.title = D.title + " — Auction Drift";
+    if (D.blurb) document.getElementById("page-blurb").textContent = D.blurb;
+    document.getElementById("back-link").href = "draft-demo-" + D.season + ".html";
+
+    document.getElementById("footer").innerHTML =
+      D.league.teams +
+      " seats &times; $" +
+      D.league.budget +
+      ", " +
+      D.league.roster_size +
+      " roster spots each. Sale order is the market's, richest first; this " +
+      "scenario controls only what each sale actually goes for. Prices are " +
+      "re-solved from scratch after every sale against the players, slots " +
+      "and money actually left &mdash; VORP $, VOLR $ and price are the " +
+      "same three columns the pre-draft list shows, at <code>w_floor = " +
+      D.w_floor +
+      "</code>. Pre-draft (pick 0) these are exactly the numbers the " +
+      "shipped price list prints; everything after is what the " +
+      "seat-and-slot model makes possible.";
+
+    render();
+  })();
+</script>

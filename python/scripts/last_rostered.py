@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from vorp.csv_loader import load_players_from_csv, projections_csv_path, REPO_ROOT  # noqa: E402
 from vorp.last_rostered import calculate_last_rostered_levels  # noqa: E402
-from vorp.league_config import LEAGUE_CONFIG, POSITIONS  # noqa: E402
+from vorp.league.config import LEAGUE_CONFIG, POSITIONS  # noqa: E402
 
 
 def print_table(by_position: dict, player_count: int, season: int) -> None:

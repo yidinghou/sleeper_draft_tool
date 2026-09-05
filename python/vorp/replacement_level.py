@@ -8,8 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
 
-from .league_config import FLEX_ELIGIBILITY, POSITIONS, LeagueConfig
-from .roster_fill import RosterFillPlayer, Slot, solve_optimal_fill, summarize_by_position
+from .league.config import POSITIONS, LeagueConfig
+from .league.teams import LeagueState
+from .league.roster_fill import RosterFillPlayer, Slot, solve_optimal_fill, summarize_by_position
 
 #: Same shape as RosterFillPlayer; aliased for readability at call sites.
 ReplacementPlayer = RosterFillPlayer
@@ -45,29 +46,23 @@ class ReplacementResult:
 def _build_starting_slots(config: LeagueConfig) -> List[Slot]:
     """Pool every team's starting slots (concrete + flex) into one flat list
     of slot instances.
+
+    The expansion itself lives in league.teams, so that mid-draft the same
+    list can be built from what each seat has actually filled rather than
+    from `count * teams` — see docs/spec/league/03-seats-and-sales.md.
     """
-    slots: List[Slot] = []
-    next_id = 0
-
-    for position in POSITIONS:
-        count = config.starting_slots.get(position, 0) * config.teams
-        for _ in range(count):
-            slots.append(Slot(id=next_id, eligible_positions=(position,)))
-            next_id += 1
-
-    for flex, count_per_team in config.flex_slots.items():
-        count = count_per_team * config.teams
-        for _ in range(count):
-            slots.append(Slot(id=next_id, eligible_positions=tuple(FLEX_ELIGIBILITY[flex])))
-            next_id += 1
-
-    return slots
+    return LeagueState.opening(config).starting_slots()
 
 
 def calculate_replacement_levels(
-    players: List[ReplacementPlayer], config: LeagueConfig
+    players: List[ReplacementPlayer],
+    config: LeagueConfig,
+    state: Optional[LeagueState] = None,
 ) -> ReplacementResult:
-    slots = _build_starting_slots(config)
+    """`state` is the live league; omit it for the pre-draft board, where
+    every slot is open and the answer is the same either way.
+    """
+    slots = state.starting_slots() if state is not None else _build_starting_slots(config)
     selected_player_ids = solve_optimal_fill(players, slots)
     summary = summarize_by_position(players, slots, selected_player_ids, list(POSITIONS))
 

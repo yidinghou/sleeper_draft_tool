@@ -8,8 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
 
-from .league_config import FLEX_ELIGIBILITY, POSITIONS, STREAMING_POSITIONS, LeagueConfig
-from .roster_fill import RosterFillPlayer, Slot, solve_optimal_fill, summarize_by_position
+from .league.config import POSITIONS, LeagueConfig
+from .league.teams import LeagueState
+from .league.roster_fill import RosterFillPlayer, Slot, solve_optimal_fill, summarize_by_position
 
 LastRosteredPlayer = RosterFillPlayer
 
@@ -56,31 +57,11 @@ def _build_full_roster_slots(config: LeagueConfig) -> List[Slot]:
     draftable, but real managers stream it off waivers rather than bench a
     second one, so it's excluded from the bench pool even though it's
     otherwise draftable.
+
+    The expansion itself lives in league.teams, which owns the bench
+    eligibility rule described above — see docs/spec/league/03-seats-and-sales.md.
     """
-    slots: List[Slot] = []
-    next_id = 0
-
-    for position in POSITIONS:
-        count = config.starting_slots.get(position, 0) * config.teams
-        for _ in range(count):
-            slots.append(Slot(id=next_id, eligible_positions=(position,)))
-            next_id += 1
-
-    for flex, count_per_team in config.flex_slots.items():
-        count = count_per_team * config.teams
-        for _ in range(count):
-            slots.append(Slot(id=next_id, eligible_positions=tuple(FLEX_ELIGIBILITY[flex])))
-            next_id += 1
-
-    bench_eligible = tuple(
-        p for p in config.draftable_positions() if p not in STREAMING_POSITIONS
-    )
-    bench_count = config.bench_slots * config.teams
-    for _ in range(bench_count):
-        slots.append(Slot(id=next_id, eligible_positions=bench_eligible))
-        next_id += 1
-
-    return slots
+    return LeagueState.opening(config).full_roster_slots()
 
 
 def _flex_peer_floor(
@@ -116,9 +97,16 @@ def _flex_peer_floor(
 
 
 def calculate_last_rostered_levels(
-    players: List[LastRosteredPlayer], config: LeagueConfig
+    players: List[LastRosteredPlayer],
+    config: LeagueConfig,
+    state: Optional[LeagueState] = None,
 ) -> LastRosteredResult:
-    slots = _build_full_roster_slots(config)
+    """`state` is the live league; omit it for the pre-draft board, where
+    every slot is open and the answer is the same either way.
+    """
+    slots = (
+        state.full_roster_slots() if state is not None else _build_full_roster_slots(config)
+    )
     selected_player_ids = solve_optimal_fill(players, slots)
     summary = summarize_by_position(players, slots, selected_player_ids, list(POSITIONS))
 

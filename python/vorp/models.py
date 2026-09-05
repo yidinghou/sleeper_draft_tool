@@ -16,9 +16,9 @@ from typing import Callable, Dict, List, Optional, Set
 
 from .bid_value import apportion_with_floor, floor_pressure, _effective_bar
 from .last_rostered import calculate_last_rostered_levels
-from .league_config import FLEX_ELIGIBILITY, POSITIONS, STREAMING_POSITIONS, LeagueConfig
+from .league.config import FLEX_ELIGIBILITY, POSITIONS, STREAMING_POSITIONS, LeagueConfig
 from .replacement_level import calculate_replacement_levels
-from .roster_fill import RosterFillPlayer
+from .league.roster_fill import RosterFillPlayer
 
 Player = RosterFillPlayer
 
@@ -48,12 +48,15 @@ class Valuation:
 Model = Callable[[List[Player], LeagueConfig], Valuation]
 
 
-def _bars(players: List[Player], config: LeagueConfig):
+def _bars(players: List[Player], config: LeagueConfig, state=None):
     """Both solved bars, plus who each fill selected. Shared by the models
     that use the optimal fill; a model is free to ignore it.
+
+    `state` is the live league (docs/spec/league/03-seats-and-sales.md); None means the pre-draft
+    board, where every slot is open.
     """
-    replacement = calculate_replacement_levels(players, config)
-    last_rostered = calculate_last_rostered_levels(players, config)
+    replacement = calculate_replacement_levels(players, config, state)
+    last_rostered = calculate_last_rostered_levels(players, config, state)
     vorp_bar = {
         pos: _effective_bar(s.replacement_level, pos, players)
         for pos, s in replacement.by_position.items()
@@ -198,11 +201,18 @@ def fixed_flex(players: List[Player], config: LeagueConfig) -> Valuation:
 # --------------------------------------------------------------------------
 
 
+#: Where the ramp starts: the top `FULL_WEIGHT_SHARE` of starters at a
+#: position are never blended at all. Part of the model's shape, not a knob
+#: -- `w_floor` is the one dial a human sets, and adding a second one only
+#: gives two ways to say the same thing. See docs/spec/vorp/04.
+FULL_WEIGHT_SHARE = 0.75
+
+
 def full_weight_points(
-    starters: Set[str], by_id: Dict[str, Player], position: str, share: float
+    starters: Set[str], by_id: Dict[str, Player], position: str
 ) -> Optional[float]:
-    """Points of the starter sitting at `share` down the ranking at this
-    position -- the point above which nobody is blended at all.
+    """Points of the starter sitting `FULL_WEIGHT_SHARE` down the ranking at
+    this position -- the point above which nobody is blended at all.
     """
     ranked = sorted(
         (by_id[pid].points for pid in starters if by_id[pid].position == position),
@@ -210,21 +220,18 @@ def full_weight_points(
     )
     if not ranked:
         return None
-    return ranked[min(int(len(ranked) * share), len(ranked) - 1)]
+    return ranked[min(int(len(ranked) * FULL_WEIGHT_SHARE), len(ranked) - 1)]
 
 
-def blend_weights(
-    players: List[Player],
-    config: LeagueConfig,
-    full_weight_share: float,
-    w_floor: float,
-):
-    """The per-position ramp: where it starts, where it ends, and how steep.
+def blend_weights(players: List[Player], config: LeagueConfig, state=None):
+    """The per-position ramp: where it starts and where it ends.
 
-    Returned separately from the pricing so `principles.ramp_slope_is_safe`
-    can check the steepness without re-deriving it.
+    Independent of `w_floor` -- the dial changes how far the bar slides
+    inside this band, never where the band is. Returned separately from the
+    pricing so `principles.ramp_slope_is_safe` can check the steepness
+    without re-deriving it.
     """
-    replacement, last_rostered, vorp_bar, volr_bar = _bars(players, config)
+    replacement, last_rostered, vorp_bar, volr_bar = _bars(players, config, state)
     by_id = {p.player_id: p for p in players}
     starters = set(replacement.selected_player_ids)
 
@@ -237,7 +244,7 @@ def blend_weights(
         # says exactly that, rather than dropping the position and pricing
         # everyone there at nothing.
         top_bar = vorp_bar.get(position, bottom)
-        full_weight = full_weight_points(starters, by_id, position, full_weight_share)
+        full_weight = full_weight_points(starters, by_id, position)
         ramps[position] = {
             "top": full_weight if full_weight is not None else top_bar,
             "bottom": bottom,
@@ -247,11 +254,14 @@ def blend_weights(
     return replacement, last_rostered, vorp_bar, volr_bar, ramps
 
 
-def progressive_blend(
-    full_weight_share: float = 0.75, w_floor: float = 0.5
-) -> Model:
+def progressive_blend(w_floor: float = 0.5) -> Model:
     """The shipped model: blend the BARS, and blend them only where the
     starter/bench distinction is genuinely ambiguous.
+
+    **`w_floor` is the only dial, and a human sets it.** Everything else
+    about the shape -- where the band starts, that the ramp is linear in
+    points, that the top of the board is never blended -- is fixed, so
+    there is exactly one number to argue about and one slider to move.
 
     `03`'s bid broke because it measured different players against different
     bars -- starters against replacement level, bench against the
@@ -264,7 +274,7 @@ def progressive_blend(
         bar(p) = w(p) * replacement_level + (1 - w(p)) * last_rostered_level
         margin = max(0, points - bar(p))
 
-    The top `full_weight_share` of starters at a position sit above the ramp
+    The top `FULL_WEIGHT_SHARE` of starters at a position sit above the ramp
     entirely: w = 1, measured against replacement level, exactly as a starter
     should be. Below them the bar slides toward the last-rostered level, so a
     marginal starter and a strong bench pick are priced on the same
@@ -280,9 +290,9 @@ def progressive_blend(
     way to the last-rostered level at the bottom.
     """
 
-    def model(players: List[Player], config: LeagueConfig) -> Valuation:
+    def model(players: List[Player], config: LeagueConfig, state=None) -> Valuation:
         replacement, last_rostered, vorp_bar, volr_bar, ramps = blend_weights(
-            players, config, full_weight_share, w_floor
+            players, config, state
         )
         by_id = {p.player_id: p for p in players}
         starters = set(replacement.selected_player_ids)
@@ -305,11 +315,12 @@ def progressive_blend(
             bar = w * ramp["replacement"] + (1 - w) * ramp["last_rostered"]
             weights[pid] = max(0.0, player.points - bar)
 
-        prices = apportion_with_floor(
-            config.teams * config.budget, weights, config.min_bid
-        )
+        # The money actually left in the room. Pre-draft this is exactly
+        # teams * budget; mid-draft it is what the seats still hold.
+        pool = state.pool() if state is not None else config.teams * config.budget
+        prices = apportion_with_floor(pool, weights, config.min_bid)
         return Valuation(
-            name=f"progressive blend (top {full_weight_share:.0%}, floor {w_floor:.2f})",
+            name=f"progressive blend (floor {w_floor:.2f})",
             prices=prices,
             starters=starters,
             bench=drafted - starters,
@@ -319,10 +330,10 @@ def progressive_blend(
             ),
             diagnostics={
                 "floor_pressure_starters": floor_pressure(
-                    config.teams * config.budget, len(weights), config.min_bid
+                    pool, len(weights), config.min_bid
                 ),
                 "floor_pressure_bench": floor_pressure(
-                    config.teams * config.budget, len(weights), config.min_bid
+                    pool, len(weights), config.min_bid
                 ),
             },
         )
@@ -357,17 +368,16 @@ def points_proportional(players: List[Player], config: LeagueConfig) -> Valuatio
     )
 
 
-#: The shipped defaults. `w_floor = 0.5` is where the ramp's starter/bench
-#: split and market error both land best -- see docs/spec/vorp/04.
-DEFAULT_FULL_WEIGHT_SHARE = 0.75
+#: Where the one dial ships set. 0.5 is where the ramp's starter/bench split
+#: and market error both land best -- see docs/spec/vorp/04.
 DEFAULT_W_FLOOR = 0.5
 
 REGISTRY: Dict[str, Model] = {
-    "shipped": progressive_blend(DEFAULT_FULL_WEIGHT_SHARE, DEFAULT_W_FLOOR),
-    "ramp-0.75": progressive_blend(0.75, 0.75),
-    "ramp-0.25": progressive_blend(0.75, 0.25),
-    "ramp-0.00": progressive_blend(0.75, 0.00),
-    "pure-vorp": progressive_blend(0.75, 1.00),
+    "shipped": progressive_blend(DEFAULT_W_FLOOR),
+    "ramp-0.75": progressive_blend(0.75),
+    "ramp-0.25": progressive_blend(0.25),
+    "ramp-0.00": progressive_blend(0.00),
+    "pure-vorp": progressive_blend(1.00),
     "starters-only": starters_only,
     "fixed-flex": fixed_flex,
     "strawman": points_proportional,

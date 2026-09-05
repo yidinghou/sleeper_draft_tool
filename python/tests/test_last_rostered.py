@@ -1,5 +1,5 @@
 from vorp.last_rostered import LastRosteredPlayer, calculate_last_rostered_levels
-from vorp.league_config import LEAGUE_CONFIG, LeagueConfig
+from vorp.league.config import LEAGUE_CONFIG, LeagueConfig
 from vorp.replacement_level import calculate_replacement_levels
 
 

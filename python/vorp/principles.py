@@ -24,7 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Callable, Dict, List, Optional, Sequence
 
-from .league_config import FLEX_ELIGIBILITY, POSITIONS, STREAMING_POSITIONS, LeagueConfig
+from .league.config import FLEX_ELIGIBILITY, POSITIONS, STREAMING_POSITIONS, LeagueConfig
 from .models import Model, Player, Valuation
 
 LAW = "law"
@@ -245,11 +245,11 @@ def ramp_slope_is_safe(model: Model, ctx: Context) -> Finding:
     any board, which is what makes the guarantee worth relying on. A model
     that doesn't ramp at all trivially satisfies it.
     """
-    from .models import DEFAULT_FULL_WEIGHT_SHARE, DEFAULT_W_FLOOR, blend_weights
+    from .models import blend_weights
 
-    *_, ramps = blend_weights(
-        ctx.players, ctx.config, DEFAULT_FULL_WEIGHT_SHARE, DEFAULT_W_FLOOR
-    )
+    # The band is the same at every dial setting, so checking it once covers
+    # every w_floor a human could pick.
+    *_, ramps = blend_weights(ctx.players, ctx.config)
     tight = []
     worst = None
     for position, ramp in ramps.items():
