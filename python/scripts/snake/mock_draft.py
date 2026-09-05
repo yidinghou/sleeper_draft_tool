@@ -32,6 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from keeper_vorp import load_keepers, pick_schedule  # noqa: E402
 from queue_export import load_board, load_manual, load_my_keepers  # noqa: E402
@@ -53,7 +54,7 @@ FLEX_SLOTS = 2
 def load_queue(season: int) -> list[str]:
     import csv
 
-    path = Path(__file__).resolve().parent.parent.parent / "data" / f"queue-snake-{season}.csv"
+    path = Path(__file__).resolve().parent.parent.parent.parent / "data" / "snake" / f"queue-snake-{season}.csv"
     with path.open(newline="", encoding="utf-8") as f:
         return [row["player"] for row in csv.DictReader(f)]
 

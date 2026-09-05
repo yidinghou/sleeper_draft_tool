@@ -4,7 +4,7 @@
 > exists, lifted out of `scripts/draft_demo.py`'s repricing logic and pinned
 > by `python/tests/test_board.py`. The **live server** described in
 > [`../board/`](../board/index.md) — ingestion, seat identity, the rendering
-> contract, the scrubber, `python/scripts/draft_board.py` — is still not
+> contract, the scrubber, `python/scripts/auction/draft_board.py` — is still not
 > built; `price_board` has no HTTP surface yet.
 
 ### What does this compute?
@@ -104,7 +104,7 @@ input this needs.
 state, `01-calculating-replacement.md` and `02-value-over-last-rostered.md` for
 the two bars, `04-blended-bar-pricing.md` for the pricing model.
 **Implemented in:** `python/vorp/board.py` (`price_board`), over
-`python/vorp/league/teams.py`; served by `python/scripts/draft_board.py`.
+`python/vorp/league/teams.py`; served by `python/scripts/auction/draft_board.py`.
 **Done when:** with nothing sold the
 board reproduces `data/blended-price-2026.json`'s prices exactly, one sale
 removes exactly one player and one slot from the priced board, and the laws in

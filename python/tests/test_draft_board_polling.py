@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "auction"))
 
 import draft_board  # noqa: E402
 from draft_board import Board  # noqa: E402

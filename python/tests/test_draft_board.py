@@ -27,7 +27,7 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "auction"))
 
 from draft_board import Board, block_info, build_payload, build_state, seat_matrix  # noqa: E402
 

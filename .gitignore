@@ -1,18 +1,18 @@
 node_modules
 dist
-data/*.csv
+data/**/*.csv
 !data/projections-*.csv
 !data/boberto-*.csv
-!data/sleeper-board-*.csv
-data/*.json
+!data/auction/sleeper-board-*.csv
+data/**/*.json
 # The queue builder's page data. Committed because the Railway server has to
 # serve it and cannot rebuild it: the board it derives from (data/vorp-snake-*.csv,
 # data/adp-*.csv) is ignored above. Answers -- queue-prefs-*.json -- stay out.
-!data/queue-payload-*.json
+!data/snake/queue-payload-*.json
 # The board server's disk-persisted scrub frames -- see
 # docs/spec/board/04-time-travel-scrubber.md. One dir per draft id/picks-file
-# stem, deep enough that data/*.json above doesn't already cover it.
-data/frames-*/
+# stem, deep enough that data/**/*.json above doesn't already cover it.
+data/auction/frames-*/
 .env
 .env.local
 .DS_Store
