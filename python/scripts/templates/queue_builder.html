@@ -78,7 +78,12 @@
                letter-spacing: .1em; }
   .tile .val { font-family: 'IBM Plex Mono', monospace; font-size: 20px; margin-top: 3px; }
 
+  /* min-width: 0 overrides a grid item's default min-width: auto, which
+     otherwise sizes the column to its widest content (the ranking table) and
+     pushes the whole page wider than the screen instead of letting the table
+     scroll sideways inside its own box. */
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .cols > div { min-width: 0; }
   @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
   /* Cards stay side by side on a phone -- swiping left or right has to map to
      a card on the left or right. Only the chrome shrinks. */
@@ -100,6 +105,16 @@
   th { color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
   td.n, th.n { text-align: right; font-family: 'IBM Plex Mono', monospace; }
   .move-up { color: var(--up); } .move-dn { color: var(--warn); }
+  .rook { display: inline-block; margin-left: 4px; font-size: 10px; font-weight: 700;
+          color: var(--bg); background: var(--accent-volr); border-radius: 3px;
+          padding: 0 3px; line-height: 1.5; vertical-align: 1px; }
+  /* A row that lines up with one of my draft turns -- see MY_PICK_AT. The left
+     border reads at a glance while scrolling; the badge says which turn. */
+  tr.pickrow { background: color-mix(in srgb, var(--accent-vorp) 12%, transparent);
+               box-shadow: inset 3px 0 0 var(--accent-vorp); }
+  .pick { display: inline-block; margin-left: 5px; font-size: 10px; font-weight: 700;
+          color: var(--bg); background: var(--accent-vorp); border-radius: 3px;
+          padding: 0 4px; line-height: 1.5; vertical-align: 1px; }
   .scroll { max-height: 460px; overflow: auto; overscroll-behavior: contain; }
 
   /* Row controls. Sized for a thumb during a live draft, and
@@ -177,13 +192,14 @@
       <h2>Live ranking (<span id="rankcount"></span>)</h2>
       <div class="scroll">
         <table><thead><tr><th class="act"></th><th class="n">#</th><th>Player</th><th>Pos</th>
+          <th class="n">Proj</th><th class="n">VORP</th>
           <th class="n">Seen</th><th class="n">Board</th><th class="act"></th></tr></thead>
           <tbody id="rank"></tbody></table>
       </div>
       <div class="note" style="margin-top:6px">
-        &#9650;&#9660; move a player. Inside a round that records an answer; across a
-        round boundary it sets his round outright, which is the only way to move
-        a player more than a round. &#10005; removes him from the draft entirely.
+        &#9650;&#9660; moves a player exactly one spot, however far you tap it.
+        &#10005; removes him from the draft entirely.
+        <span class="pick" style="margin-left:0">P#</span> marks a row around one of my draft turns.
       </div>
       <details id="dnd">
         <summary>Do not draft (<span id="dndn">0</span>)</summary>
@@ -221,6 +237,12 @@ const SYNC_URL = location.protocol.startsWith('http') ? '/prefs' + location.sear
 const byId = Object.fromEntries(P.map(p => [p.id, p]));
 const boardRank = Object.fromEntries(P.map((p, i) => [p.id, i + 1]));
 
+// Which live-ranking row is my Nth draft turn -- see queue_builder.my_pick_ranks.
+// A row number, not a player id: it moves with whoever the ranking currently
+// has there, which is the point -- a fixed player would go stale the moment
+// anyone answers a comparison. row (1-indexed) -> which turn, e.g. {9: 1, 12: 2}.
+const MY_PICK_AT = Object.fromEntries((DATA.myPicks || []).map((row, i) => [row, i + 1]));
+
 let comparisons = [];
 let reveal = true;   // ADP/VORP visible unless hidden
 let pair = null;
@@ -233,12 +255,12 @@ let lastTop = [];
 // through untouched, so a player removed on a phone reaches the laptop's queue
 // export with no plumbing of its own.
 let extras = [];             // board-tail ids pulled into the ranked pool
-let rounds = {};             // id -> hand-set round, where answers can't reach
+// id -> a key that sorts strictly between the two players it was inserted
+// between. Set by the ranking page's up/down buttons -- see `move()` -- and
+// once set, overrides whatever comparisons or ADP round would otherwise place
+// that player. Nothing else writes to it.
+let manual = {};
 let excluded = new Set();    // do not draft
-// How many comparisons each ▲/▼ tap recorded, so Undo takes back a tap rather
-// than a sixth of one. Session-only: after a reload Undo pops one answer at a
-// time. ponytail: fixable by tagging comparisons, if it ever bites.
-let taps = [];
 
 // The rest of the board, in the same shape as `players`. Not in the pool, but
 // searchable into it -- this is where the rookies and the late fliers live.
@@ -281,17 +303,12 @@ function pairKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
 
 const ROUNDS = DATA.rounds;
 const TARGET = DATA.targets;
-// The last round of the draft, captured before ROUNDS starts moving under the
-// hand-set rounds -- nobody can be pushed past the end of the draft.
-const LAST_ROUND = Math.max(...ROUNDS);
 const byRound = {};
-// Rebuilt rather than built once: adding a player and overriding a round both
-// change it, and an excluded player leaves it so the scheduler stops asking
-// about him and his round stops budgeting questions for him.
+// Rebuilt rather than built once: adding a player changes it (his ADP round
+// might be one the ranked pool never had a member of), and an excluded player
+// leaves it so the scheduler stops asking about him and his round stops
+// budgeting questions for him.
 function indexRounds() {
-  // A hand-set round can be one the payload never had (nobody's ADP landed
-  // there), so the round list is rederived too -- queue_builder.round_target,
-  // mirrored, or a player in a new round would never be asked about.
   const live = [...new Set(P.filter(p => !excluded.has(p.id)).map(p => p.rnd))].sort((a, b) => a - b);
   ROUNDS.splice(0, ROUNDS.length, ...live);
   for (const r of ROUNDS) { byRound[r] = []; TARGET[r] = TARGET[r] || Math.max(2, Math.min(8, 9 - r)); }
@@ -365,7 +382,7 @@ const num = (v, digits = 1) => (v === null || v === undefined ? '--' : v.toFixed
 function card(el, p, keyHint) {
   el.className = 'card';
   el.innerHTML =
-    `<div class="nm">${p.name}</div>` +
+    `<div class="nm">${p.name}${p.exp === 0 ? ' <span class="rook" title="rookie">R</span>' : ''}</div>` +
     `<div class="meta"><span class="pos pos-${p.pos}">${p.pos}</span> &middot; ${p.team} &middot; bye ${p.bye || '--'} &middot; rd ${p.rnd}</div>` +
     `<div class="stat">${num(p.pts)} proj pts &middot; ${num(p.wk1)} wk1` +
       (reveal ? ` &middot; adp ${num(p.adp)} &middot; vorp ${num(p.vorp)}` : '') +
@@ -386,13 +403,13 @@ function card(el, p, keyHint) {
 // nothing. Elo here, Bradley-Terry there, but the z-score per round is on the
 // same footing either way, so this previews the real order.
 // SLACK_GROWTH widens the drift in the late rounds, where ADP is a guess:
-// round 1 keeps ±1.0, round 16 gets ±3.3. RISE_FLOOR is the ceiling on the ▲
-// button, not on drift -- a 10th-rounder cannot be moved above round 4.
-const ROUND_SLACK = 1.0, CONFIDENCE_AT = 6, SLACK_GROWTH = 0.15, RISE_FLOOR = 0.4;
+// round 1 keeps ±1.0, round 16 gets ±3.3.
+const ROUND_SLACK = 1.0, CONFIDENCE_AT = 6, SLACK_GROWTH = 0.15;
 const roundSlack = r => ROUND_SLACK * (1 + SLACK_GROWTH * (r - 1));
-const riseFloor = r => Math.max(1, Math.ceil(RISE_FLOOR * r));
 
-function order() {
+// Every player's sort key: the round-blocked comparison key, except a player
+// in `manual` uses that pinned number instead and ignores this entirely.
+function allKeys() {
   const byRnd = {};
   P.forEach(p => (byRnd[p.rnd] = byRnd[p.rnd] || []).push(elo[p.id]));
   const centre = {}, spread = {};
@@ -405,11 +422,17 @@ function order() {
   }
   const key = {};
   for (const p of P) {
+    if (manual[p.id] !== undefined) { key[p.id] = manual[p.id]; continue; }
     const z = (elo[p.id] - centre[p.rnd]) / spread[p.rnd];
     const room = roundSlack(p.rnd);
     const drift = Math.max(-room, Math.min(room, -z * room / 2));
     key[p.id] = p.rnd + drift * Math.min(1, seen[p.id] / CONFIDENCE_AT);
   }
+  return key;
+}
+
+function order() {
+  const key = allKeys();
   return P.filter(p => !excluded.has(p.id)).map(p => p.id)
     .sort((a, b) => (key[a] - key[b]) || (boardRank[a] - boardRank[b]));
 }
@@ -453,11 +476,21 @@ function render(anchor) {
   document.getElementById('rank').innerHTML = ord.map((id, i) => {
     const p = byId[id], move = boardRank[id] - (i + 1);
     const cls = move > 0 ? 'move-up' : move < 0 ? 'move-dn' : '';
-    return `<tr id="r_${id}"><td class="act">` +
+    const rookie = p.exp === 0 ? '<span class="rook" title="rookie">R</span>' : '';
+    // MY_PICK_AT is keyed by row number (1-indexed), not player id -- the
+    // anchor is "who's here for my Nth turn", which follows the row as
+    // answers reorder it, not whoever happened to be there when the page
+    // loaded.
+    const turn = MY_PICK_AT[i + 1];
+    const pickRow = turn ? ' pickrow' : '';
+    const pickTag = turn ? `<span class="pick" title="around my pick ${turn}">P${turn}</span>` : '';
+    return `<tr id="r_${id}" class="${pickRow}"><td class="act">` +
       `<button class="rb" data-mv="-1" data-id="${id}" title="move up">&#9650;</button>` +
       `<button class="rb" data-mv="1" data-id="${id}" title="move down">&#9660;</button></td>` +
-      `<td class="n">${i + 1}</td><td>${p.name}</td>` +
-      `<td class="pos pos-${p.pos}">${p.pos}</td><td class="n">${seen[id]}</td>` +
+      `<td class="n">${i + 1}${pickTag}</td><td>${p.name}${rookie}</td>` +
+      `<td class="pos pos-${p.pos}">${p.pos}</td>` +
+      `<td class="n">${num(p.pts)}</td><td class="n">${num(p.vorp)}</td>` +
+      `<td class="n">${seen[id]}</td>` +
       `<td class="n ${cls}">${boardRank[id]}${move ? ` (${move > 0 ? '+' : ''}${move})` : ''}</td>` +
       `<td class="act"><button class="rb x" data-x="${id}" title="do not draft">&#10005;</button></td></tr>`;
   }).join('');
@@ -480,7 +513,7 @@ function render(anchor) {
 }
 
 function payload() {
-  return { season: DATA.season, pool: DATA.pool, comparisons, extras, rounds,
+  return { season: DATA.season, pool: DATA.pool, comparisons, extras, manual,
            excluded: [...excluded] };
 }
 
@@ -491,8 +524,6 @@ function pick(side) {
   comparisons.push({ winner, loser });
   applyElo(winner, loser);
   asked.add(pairKey(a, b));
-
-  taps.push(1);
 
   if (comparisons.length % 10 === 0) {
     const top = order().slice(0, 20);
@@ -509,55 +540,34 @@ function pick(side) {
 function next() { pair = choosePair(); render(); }
 
 // --- ranking-table controls ------------------------------------------------
-// ▲/▼ against the neighbouring row. Inside a round that is a real comparison,
-// recorded exactly as an answered pair, so the live Elo here and the Python
-// Bradley-Terry fit are always looking at the same evidence -- a separate
-// "manual position" would be a second ranking the fit knows nothing about.
+// ▲/▼ moves a player exactly one spot, no more and no less. It pins a key
+// that sorts strictly between the row's new neighbours -- not a comparison
+// replayed until something budges, not a round jumped whole, just "put him
+// here, between these two" -- so the move is exact and instant regardless of
+// round or how much evidence anyone involved has.
 //
-// Across a round boundary a comparison cannot get there at all: drift is capped
-// at roundSlack and scaled by seen/CONFIDENCE_AT, so answers move a player a
-// round at most. Moving him further has to be said outright, and that is what
-// `rounds` is -- bounded by riseFloor, or enough taps would walk a round-12
-// flier into round 1.
+// This is deliberately a second, independent ranking: a manually placed
+// player no longer moves on the strength of comparisons or ADP round, only on
+// further taps. That trade is the point -- predictable beats "mostly right".
 function move(id, dir) {
-  const ord = order(), i = ord.indexOf(id), j = i + dir;
-  if (i < 0 || j < 0 || j >= ord.length) return;
-  const me = byId[id], other = byId[ord[j]];
+  const key = allKeys();
+  const ord = P.filter(p => !excluded.has(p.id)).map(p => p.id)
+    .sort((a, b) => (key[a] - key[b]) || (boardRank[a] - boardRank[b]));
+  const i = ord.indexOf(id), j = i + dir;
+  if (i < 0 || j < 0 || j >= ord.length) return;   // already at the top or bottom
 
-  if (me.rnd !== other.rnd) {
-    // One round per tap, never "adopt the neighbour's round". Rounds overlap on
-    // purpose -- a well-rated round-12 player sits above a weak round-11 one --
-    // so the row above can be in a *later* round, and adopting it walks him
-    // back down. Stepping is monotone, so a held thumb always makes progress.
-    const want = dir < 0 ? Math.max(riseFloor(me.adpRnd), me.rnd - 1)
-                         : Math.min(LAST_ROUND, me.rnd + 1);
-    if (want === me.rnd) return;          // at the rise ceiling, or the last round
-    rounds[id] = me.rnd = want;
-    indexRounds();
-  } else {
-    // A player with no record is pinned to within a sixth of his round, so one
-    // answer moves him a sixth of the way and the button looks dead. Repeat it
-    // until the row actually moves, capped at CONFIDENCE_AT -- which is exactly
-    // the evidence that buys full confidence, and reads to Bradley-Terry as
-    // "strongly prefer", which is what the tap meant. An established player
-    // exits after one.
-    const win = dir < 0 ? id : other.id, lose = dir < 0 ? other.id : id;
-    let n = 0;
-    do {
-      comparisons.push({ winner: win, loser: lose });
-      applyElo(win, lose);
-      n++;
-    } while (n < CONFIDENCE_AT && (order().indexOf(id) - i) * dir <= 0);
-    asked.add(pairKey(id, other.id));
-    taps.push(n);
-  }
+  const near = key[ord[j]];
+  // One further than the row it's swapping past, or one key-unit past it when
+  // there is nothing further -- either way strictly beyond `near`.
+  const beyond = ord[j + dir] !== undefined ? key[ord[j + dir]] : near + dir;
+  manual[id] = (near + beyond) / 2;
   save(); sync(); render(id);
 }
 
 function addPlayer(id) {
   const p = ADDABLE[id];
   if (!p || byId[id]) return;
-  P.push(p); byId[id] = p; p.adpRnd = p.rnd;
+  P.push(p); byId[id] = p;
   // Last on the board by construction -- he is behind everyone the pool kept,
   // which is exactly why he was cut. The ranking's ± column reads from here.
   boardRank[id] = P.length;
@@ -631,9 +641,10 @@ document.addEventListener('keydown', e => {
 });
 document.getElementById('skip').onclick = () => { asked.add(pairKey(...pair)); next(); };
 document.getElementById('undo').onclick = () => {
+  // Undoes an A/B answer only -- a ▲/▼ move is undone by tapping the other
+  // direction, since a manual move is not something the fit ever "answered".
   if (!comparisons.length) return;
-  // One ▲ tap can be several comparisons, so undo takes back the whole tap.
-  comparisons.splice(-(taps.pop() || 1));
+  comparisons.pop();
   rebuild(); save(); next();
 };
 
@@ -676,10 +687,10 @@ document.getElementById('reveal').onclick = e => {
 };
 document.getElementById('clear').onclick = () => {
   if (!confirm('Discard all ' + comparisons.length + ' answers?')) return;
-  comparisons = []; churnHistory = []; lastTop = []; taps = []; asked.clear();
-  // The do-not-draft list and the hand-set rounds are not answers -- they are
+  comparisons = []; churnHistory = []; lastTop = []; asked.clear();
+  // The do-not-draft list and the manual moves are not answers -- they are
   // decisions, and "discard all answers" is not a request to un-remove the
-  // players I have taken off the draft. Reset those in their own panel.
+  // players I have taken off the draft or put back where the fit had them.
   rebuild(); save(); next();
 };
 document.getElementById('export').onclick = () => {
@@ -695,7 +706,6 @@ document.getElementById('import').onclick = () => {
     const parsed = JSON.parse(document.getElementById('paste').value);
     comparisons = parsed.comparisons || parsed;
     apply(parsed);
-    taps = [];
     for (const c of comparisons) asked.add(pairKey(c.winner, c.loser));
     rebuild(); save(); next();
   } catch (e) { alert('Could not read that JSON: ' + e.message); }
@@ -703,11 +713,11 @@ document.getElementById('import').onclick = () => {
 
 // --- boot ------------------------------------------------------------------
 // Pull one saved run's decisions into the page: the players it added, the
-// rounds it set by hand, and the players it took off the draft.
+// ones it moved by hand, and the players it took off the draft.
 function apply(saved) {
   if (!saved) return;
   for (const id of saved.extras || []) if (!byId[id]) addTo(id);
-  Object.assign(rounds, saved.rounds || {});
+  Object.assign(manual, saved.manual || {});
   for (const id of saved.excluded || []) excluded.add(id);
 }
 function addTo(id) {                       // addPlayer without the save/render
@@ -733,12 +743,6 @@ try { local = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 const answers = r => (r && r.comparisons ? r.comparisons.length : -1);
 if (answers(local) >= answers(restored)) restored = local || restored;
 apply(DATA.resume); apply(local);
-
-// The ADP round each player actually came with, kept before any override lands
-// on `rnd`, because riseFloor is measured against the market's opinion and not
-// against wherever the last tap left him.
-for (const p of P) p.adpRnd = p.rnd;
-for (const p of P) if (rounds[p.id]) p.rnd = Math.max(riseFloor(p.adpRnd), rounds[p.id]);
 indexRounds();
 
 // After the extras are in P, so their answers survive the filter below and the
