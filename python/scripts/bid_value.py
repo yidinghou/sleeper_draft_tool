@@ -55,7 +55,6 @@ from vorp.bid_value import (  # noqa: E402
     _effective_bar,
     apportion_with_floor,
     floor_pressure,
-    split_budget,
 )
 from vorp.csv_loader import load_players_from_csv, projections_csv_path, REPO_ROOT  # noqa: E402
 from vorp.last_rostered import calculate_last_rostered_levels  # noqa: E402
@@ -100,7 +99,7 @@ def main() -> None:
     starters = replacement.selected_player_ids
     drafted = last_rostered.selected_player_ids  # superset of starters
 
-    split = split_budget(LEAGUE_CONFIG)
+    total = LEAGUE_CONFIG.teams * LEAGUE_CONFIG.budget
 
     vorp_bar = {
         pos: _effective_bar(s.replacement_level, pos, players)
@@ -129,14 +128,15 @@ def main() -> None:
     # other. Sizing them 90/10 instead would put VORP $ around $18 and
     # VOLR $ around $3 for the same player -- different scales, nothing a
     # human could weigh. The 90/10 split only ever existed to size the two
-    # halves of a single blended bid, and this export no longer produces
-    # one; see 03.
-    vorp_shares = apportion_with_floor(split.total, vorp_weights, LEAGUE_CONFIG.min_bid)
-    volr_shares = apportion_with_floor(split.total, volr_weights, LEAGUE_CONFIG.min_bid)
+    # halves of a single blended bid; nothing produces one any more, so the
+    # split is gone rather than kept around unused. See 03, and 04 for the
+    # blend that replaced it.
+    vorp_shares = apportion_with_floor(total, vorp_weights, LEAGUE_CONFIG.min_bid)
+    volr_shares = apportion_with_floor(total, volr_weights, LEAGUE_CONFIG.min_bid)
 
     lens_floor_pressure = {
-        "vorp": round(floor_pressure(split.total, len(vorp_weights), LEAGUE_CONFIG.min_bid), 3),
-        "volr": round(floor_pressure(split.total, len(volr_weights), LEAGUE_CONFIG.min_bid), 3),
+        "vorp": round(floor_pressure(total, len(vorp_weights), LEAGUE_CONFIG.min_bid), 3),
+        "volr": round(floor_pressure(total, len(volr_weights), LEAGUE_CONFIG.min_bid), 3),
     }
 
     rows = []
@@ -189,13 +189,13 @@ def main() -> None:
                 # against each other by eye.
                 "lens": {
                     "vorp": {
-                        "pool": split.total,
+                        "pool": total,
                         "members": len(vorp_weights),
                         "floor_pressure": lens_floor_pressure["vorp"],
                         "population": "clears replacement level (starters)",
                     },
                     "volr": {
-                        "pool": split.total,
+                        "pool": total,
                         "members": len(volr_weights),
                         "floor_pressure": lens_floor_pressure["volr"],
                         "population": "clears the last-rostered bar (everyone drafted)",

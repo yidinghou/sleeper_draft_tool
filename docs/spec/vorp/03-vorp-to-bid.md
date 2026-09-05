@@ -50,8 +50,11 @@ and "$16 under VORP thinking" are the same kind of statement.
 
 The 90/10 `starter_budget_pct` split only ever existed to size the two
 halves of a single blended bid. With no blended bid, it has nothing to
-size. `split_budget` and `calculate_bids` remain in the library for a
-future live-draft layer, but the player-pool export does not use them.
+size — so `split_budget` and `calculate_bids` are **gone**, not parked in
+the library against a future that may never call them. `04` combines the
+two lenses by blending the *bars*, which needs no budget split at all; if
+a live-draft layer ever wants one, it can be written then, against what
+that layer actually needs.
 
 ### How should a human read the two together?
 
@@ -186,9 +189,9 @@ dynamic/live layer exists.
 selected set, `02-value-over-last-rostered.md`'s last-rostered level and
 selected set, league config (`python/vorp/league_config.py`).
 **Implemented in:** `python/scripts/bid_value.py` — both lenses via
-`apportion_with_floor` from `python/vorp/bid_value.py`. `split_budget`
-and `calculate_bids` remain in that module for a future live-draft layer
-but are **not** used by the player-pool export, which produces no bid.
+`apportion_with_floor` from `python/vorp/bid_value.py`, which is now just
+the shared apportionment (`apportion`, `apportion_with_floor`,
+`floor_pressure`, `_effective_bar`) and holds no budget split of its own.
 **Done when:** for a hand-written fixture board, every player in a
 lens's population gets a figure `>= min_bid`, each lens independently
 sums to exactly `teams × budget`, a player outside a lens is `null`
