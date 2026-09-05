@@ -112,3 +112,59 @@ LEAGUE_CONFIG = LeagueConfig(
     flex_slots={"FLEX": 1, "REC_FLEX": 1, "SUPER_FLEX": 1},
     bench_slots=6,
 )
+
+
+# --------------------------------------------------------------------------
+# Division/identity — board-labelling metadata, independent of the VORP math
+# above. See docs/spec/board/02-seat-identity-and-divisions.md.
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Division:
+    name: str
+    #: Sleeper usernames, case-sensitive as Sleeper reports them; matched
+    #: case-insensitively by `division_index_for`.
+    members: Tuple[str, ...]
+
+
+#: The handle `resolve_my_seat` looks for, case-insensitively against a
+#: seat's `username` or `display_name` (Sleeper often leaves one blank).
+MY_USERNAME = "yidinghou"
+
+#: Fixed seed for `random_fill`'s placeholder shuffle, so a mock draft's
+#: seat assignment is identical every run — stable screenshots and tests.
+MOCK_SEED = 20260827
+
+#: Division membership by Sleeper username. **Placeholder members below**:
+#: this league's real usernames aren't wired in yet. Bootstrap with
+#: `python scripts/draft_board.py --draft-id <id> --print-seats` (prints
+#: each seat's real `display_name`/`username`, read-only) and replace the
+#: placeholders here — until every member is real, division grouping falls
+#: back to an even auto-split by seat order, so the board still renders.
+DIVISIONS: Tuple[Division, ...] = (
+    Division(name="Division 1", members=("member1", "member2", "member3", "member4")),
+    Division(name="Division 2", members=("member5", "member6", "member7", "member8")),
+    Division(name="Division 3", members=("member9", "member10", "member11", MY_USERNAME)),
+)
+
+
+def all_members() -> List[str]:
+    """Every Sleeper username across every division, flat — the pool
+    `random_fill` shuffles from to seed placeholder managers."""
+    return [member for division in DIVISIONS for member in division.members]
+
+
+def division_index_for(username: Optional[str]) -> Optional[int]:
+    """Which division a username belongs to, case-insensitive.
+
+    None for a blank/absent username or one that matches no division member
+    — the caller falls back to the auto-split-by-seat-order behavior.
+    """
+    if not username:
+        return None
+    needle = username.lower()
+    for i, division in enumerate(DIVISIONS):
+        if any(member.lower() == needle for member in division.members):
+            return i
+    return None

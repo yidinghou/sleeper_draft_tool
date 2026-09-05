@@ -1,10 +1,12 @@
-# 09 · The best affordable roster (FAQ) — WIP
+# 09 · The best affordable roster (FAQ)
 
-> **Work in progress — not yet implemented.** `python/vorp/optimal_roster.py`
-> doesn't exist yet, and this model spends against `07`'s board price
-> (`price_board`), which is itself not yet implemented — see
-> [`07 · Live draft board`](07-live-draft-board.md). Expect this spec to be
-> revised once `07` and this model land.
+> **Implemented.** `python/vorp/optimal_roster.py` (`plan_roster`,
+> `RosterPlan`, `Target`), printed by `python/scripts/optimal_roster.py`.
+> Pinned by `python/tests/test_optimal_roster.py`: feasibility
+> (`spend + reserve <= budget`, `len(targets) <= open slots`), a monotonic
+> lineup (`points_after >= points_before`), `exclude_positions`/`fill_all`
+> behaving as documented, and greedy matching the brute-forced optimum on a
+> flat-price board small enough to enumerate.
 
 ### What does this compute?
 

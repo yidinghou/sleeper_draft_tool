@@ -1,8 +1,10 @@
 # The live draft board — reproduction guide — WIP
 
-> **Work in progress — not yet implemented.** None of the six layers below
-> exist in this repo yet; see the [module index](index.md) for status. This
-> guide describes the intended build order for when work starts.
+> **Work in progress.** The pricing core and league model this server would
+> sit on are both built (see `../vorp/guide.md` and `../league/guide.md`).
+> None of the six layers below exist yet; see the [module index](index.md)
+> for status. This guide describes the intended build order for when work
+> starts.
 
 How to rebuild the live draft board from scratch, in dependency order. It is one
 server process (`python/scripts/draft_board.py`) on top of the pricing core and

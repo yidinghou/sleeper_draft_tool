@@ -6,7 +6,7 @@
   "scripts": {
     "export:projections": "tsx scripts/export-projections.ts",
     "export:boberto": "tsx scripts/export-boberto.ts",
-    "test": "node --import tsx --test src/**/*.test.ts"
+    "test": "node --import tsx --test src/**/*.test.ts src/**/*.test.js"
   },
   "keywords": [],
   "author": "",

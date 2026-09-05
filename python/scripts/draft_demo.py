@@ -32,11 +32,10 @@ from typing import Callable, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from vorp.bid_value import apportion_with_floor  # noqa: E402
+from vorp.board import price_board  # noqa: E402
 from vorp.csv_loader import load_players_from_csv, projections_csv_path, REPO_ROOT  # noqa: E402
 from vorp.league.config import LEAGUE_CONFIG  # noqa: E402
 from vorp.league.teams import LeagueState  # noqa: E402
-from vorp.models import blend_weights  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -100,93 +99,6 @@ SCENARIOS: Dict[str, Dict] = {
         ),
     },
 }
-
-
-def ramp_weight(points: float, ramp: dict, w_floor: float) -> float:
-    """Same formula as blended_price.py -- the ramp only depends on the
-    bars, so every price (shipped, VORP-only, VOLR-only) is just this
-    evaluated at a different w_floor over one fill, not a separate one.
-    """
-    top, bottom = ramp["top"], ramp["bottom"]
-    if points >= top or top <= bottom:
-        t = 1.0
-    elif points <= bottom:
-        t = 0.0
-    else:
-        t = (points - bottom) / (top - bottom)
-    return w_floor + (1 - w_floor) * t
-
-
-def snapshot(state: LeagueState, remaining: List, config, price_w_floor: float) -> Dict:
-    """The same prices the pre-draft page shows -- price, VORP $, VOLR $ --
-    plus the dollars-per-VORP-point exchange rate, re-solved against
-    whatever is left.
-
-    The fill itself (blend_weights) is the expensive part -- it runs the
-    league-wide matching plus one per-seat matching per seat. Solving it once
-    and re-apportioning at three w_floors is what keeps repricing every
-    remaining player, at every pick, fast enough for a timeline.
-    """
-    replacement, last_rostered, vorp_bar, volr_bar, ramps = blend_weights(
-        remaining, config, state
-    )
-    starters = set(replacement.selected_player_ids)
-    # Only players the full-roster fill actually seats get priced -- the same
-    # restriction blended_price.py applies. Without it every player still in
-    # the CSV gets a min_bid floor price, not just the ~192 with a roster
-    # spot to be worth something in.
-    drafted = set(last_rostered.selected_player_ids)
-    pool = state.pool()
-
-    def apportion_at(w_floor: float):
-        weights = {}
-        for p in remaining:
-            if p.player_id not in drafted:
-                continue
-            ramp = ramps.get(p.position)
-            if ramp is None:
-                continue
-            w = ramp_weight(p.points, ramp, w_floor)
-            bar = w * ramp["replacement"] + (1 - w) * ramp["last_rostered"]
-            weights[p.player_id] = max(0.0, p.points - bar)
-        return apportion_with_floor(pool, weights, config.min_bid), weights
-
-    prices, _ = apportion_at(price_w_floor)
-    vorp_prices, vorp_weights = apportion_at(1.0)
-    volr_prices, _ = apportion_at(0.0)
-
-    # The exchange rate pure-VORP pricing actually runs on: after every priced
-    # player is guaranteed min_bid, the rest of the pool splits in proportion
-    # to points-over-replacement at this one rate. It's what "$/spot" was
-    # standing in for -- the real unit is dollars per point, not per player.
-    floor_total = len(vorp_weights) * config.min_bid
-    total_margin = sum(vorp_weights.values())
-    vorp_rate = (pool - floor_total) / total_margin if total_margin > 0 else 0.0
-
-    rows = {}
-    for p in remaining:
-        pid = p.player_id
-        if pid not in prices:
-            continue
-        rows[pid] = {
-            "price": prices[pid],
-            "vorp_dollar": vorp_prices.get(pid),
-            "volr_dollar": volr_prices.get(pid),
-            "is_starter": pid in starters,
-            "vorp": round(p.points - vorp_bar.get(p.position, p.points), 1),
-            "volr": round(p.points - volr_bar.get(p.position, p.points), 1),
-        }
-    return {
-        "rows": rows,
-        "vorp_rate": round(vorp_rate, 3),
-        "levels": {
-            pos: {
-                "replacement": round(r["replacement"], 1),
-                "last_rostered": round(r["last_rostered"], 1),
-            }
-            for pos, r in ramps.items()
-        },
-    }
 
 
 def seat_rows(state: LeagueState) -> List[Dict]:
@@ -258,7 +170,7 @@ def run_scenario(
 
         state = state.sell(pid, position, amount, seat_id=seat_id)
         remaining = [p for p in remaining if p.player_id != pid]
-        shot = snapshot(state, remaining, config, w_floor)
+        shot = price_board(state, remaining, config, w_floor)
 
         ledger.append(
             {
@@ -394,7 +306,7 @@ def main() -> None:
     # let every scenario start from the same numbers, the same board order,
     # and the same sale sequence. Only the price each sale lands at differs.
     opening_state = LeagueState.opening(config)
-    opening = snapshot(opening_state, players, config, args.w_floor)
+    opening = price_board(opening_state, players, config, args.w_floor)
     board = sorted(opening["rows"], key=lambda pid: (-opening["rows"][pid]["price"], pid))
     order = sorted(
         (pid for pid in opening["rows"] if meta.get(pid, {}).get("sleeper_dollar")),

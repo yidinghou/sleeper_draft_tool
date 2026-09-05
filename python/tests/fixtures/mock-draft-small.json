@@ -1,0 +1,8 @@
+{
+  "picks": [
+    {"player_id": "19", "position": "QB", "amount": 10, "draft_slot": 1},
+    {"player_id": "184", "position": "RB", "amount": 20, "draft_slot": 2},
+    {"player_id": "147", "position": "WR", "amount": 15, "draft_slot": 1},
+    {"player_id": "23", "position": "TE", "amount": 5}
+  ]
+}
