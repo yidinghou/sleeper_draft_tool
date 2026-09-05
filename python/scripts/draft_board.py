@@ -228,6 +228,28 @@ def plan_payload(plan: RosterPlan) -> Dict[str, Any]:
     }
 
 
+def _seat_summaries(state: LeagueState) -> List[Dict[str, Any]]:
+    """Every real seat's roster summary -- what the deck's Rosters slide
+    needs to run `fillSlots` against. `UNKNOWN_SEAT` is excluded; it owns no
+    roster. Doesn't include each pick's opening price (the full contract's
+    `lines[].price`, for over/under-pay tags) -- that needs a second
+    `price_board` solve against the opening board, not wired in here.
+    """
+    return [
+        {
+            "seat_id": seat.seat_id,
+            "budget_left": seat.budget_left,
+            "max_bid": state.max_bid(seat.seat_id),
+            "bought": [
+                {"player_id": b.player_id, "position": b.position, "amount": b.amount}
+                for b in seat.bought
+            ],
+        }
+        for seat in state.seats
+        if seat.seat_id != UNKNOWN_SEAT
+    ]
+
+
 def build_payload(
     state: LeagueState,
     players: List[Player],
@@ -251,7 +273,9 @@ def build_payload(
     live board wants the whole completed roster, not just the value-adding
     buys, with fills clearly tagged (`kind="fill"`) so they never masquerade
     as lineup upgrades. `block` is `None` unless `nomination` names a real,
-    still-unsold, priced player -- see `block_info`.
+    still-unsold, priced player -- see `block_info`. `seats` is every real
+    seat's roster summary (`_seat_summaries`) -- always included, no
+    identity source needed.
     """
     sold_ids = set(state.sold())
     remaining = [p for p in players if p.player_id not in sold_ids]
@@ -279,6 +303,7 @@ def build_payload(
         ],
         "matrix": matrix,
         "block": block_info(nomination, remaining, board, matrix),
+        "seats": _seat_summaries(state),
     }
     if seat_users is not None:
         payload["seat_users"] = seat_users
