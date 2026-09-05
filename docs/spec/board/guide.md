@@ -7,7 +7,7 @@
 > starts.
 
 How to rebuild the live draft board from scratch, in dependency order. It is one
-server process (`python/scripts/draft_board.py`) on top of the pricing core and
+server process (`python/scripts/auction/draft_board.py`) on top of the pricing core and
 league model — build those first (see `../vorp/guide.md` and `../league/guide.md`),
 then add the six layers below in order. Each depends only on the ones before it.
 

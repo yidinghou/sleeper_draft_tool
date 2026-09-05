@@ -135,11 +135,11 @@ watch its size, and it checks against 16 MB explicitly after the merge.
 ([`../vorp/04-blended-bar-pricing.md`](../vorp/04-blended-bar-pricing.md),
 `python/vorp/models.py`); the fragment templates
 `python/artifact/templates/seat_value.html` and
-`python/scripts/templates/blended_price.html`; `data/projections-2026.csv`.
+`python/scripts/auction/templates/blended_price.html`; `data/projections-2026.csv`.
 **Implemented in:** `python/artifact/html_page.py` (`write_pair`,
 `LOCAL_HTML_SKELETON`) and its smaller sibling `python/scripts/html_page.py`
 (`write_local`); driven by `python/artifact/build_seat_value.py` (with
-`--verify`) and `python/scripts/blended_price.py`. **Done when:** a
+`--verify`) and `python/scripts/auction/blended_price.py`. **Done when:** a
 `build_seat_value.py 2026` run writes both `artifacts/seat-value-2026.artifact.html`
 and `pages/seat-value-2026.html` with byte-identical bodies, `--verify` re-solves
 every preset without hitting the affordability or name-resolution guard, and

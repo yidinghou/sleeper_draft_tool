@@ -29,6 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from vorp.league.config import SNAKE_CONFIG  # noqa: E402
 from vorp.sleeper_client import fetch_draft_picks  # noqa: E402
@@ -44,7 +45,7 @@ UPCOMING = 5
 
 
 def load_queue(season: int) -> list[dict]:
-    path = Path(__file__).resolve().parent.parent.parent / "data" / f"queue-snake-{season}.csv"
+    path = Path(__file__).resolve().parent.parent.parent.parent / "data" / "snake" / f"queue-snake-{season}.csv"
     with path.open(newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 

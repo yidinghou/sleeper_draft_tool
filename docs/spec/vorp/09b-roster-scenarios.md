@@ -1,6 +1,6 @@
 # 09b · Roster scenarios (FAQ) — WIP
 
-> **Work in progress — not yet implemented.** `python/scripts/roster_scenarios.py`
+> **Work in progress — not yet implemented.** `python/scripts/auction/roster_scenarios.py`
 > doesn't exist yet. It wraps [`09`'s `plan_roster`](09-optimal-roster.md),
 > which is implemented, so this is now the only missing piece.
 
@@ -113,7 +113,7 @@ for each column's solve; [`07-live-draft-board.md`](07-live-draft-board.md)'s
 config and `data/projections-2026.csv` (see [`../data/`](../data/index.md)) via
 `vorp.csv_loader`; the [`roster-scenarios`](../../../.claude/skills/roster-scenarios/SKILL.md)
 skill, which picks the arguments and runs it. **Implemented in:**
-`python/scripts/roster_scenarios.py` (`jitter_prices` for the price model,
+`python/scripts/auction/roster_scenarios.py` (`jitter_prices` for the price model,
 `build_state` for the residual replay, `_column` / `render` / `robust_note` for
 the layout). **Done when:** re-running one command reproduces the table
 byte-identical; each column is a legal `RosterPlan` (`spend + reserve <=

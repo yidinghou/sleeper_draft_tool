@@ -116,7 +116,7 @@ selected set, `02-value-over-last-rostered.md`'s last-rostered level (flex-peer
 floor included) and selected set, league config (`python/vorp/league/config.py`).
 **Implemented in:** `python/vorp/models.py` (`progressive_blend`, sharing
 `apportion_with_floor` from `python/vorp/bid_value.py`); exported by
-`python/scripts/blended_price.py`. **Done when:** on a hand-written fixture the
+`python/scripts/auction/blended_price.py`. **Done when:** on a hand-written fixture the
 price-blending approach inverts a barely-clearing starter against a strong
 bench pick and bar-blending does not, prices sum to exactly `teams × budget`,
 and the `monotonic` and `ramp-slope` laws in `05` both pass at every `w_floor`.

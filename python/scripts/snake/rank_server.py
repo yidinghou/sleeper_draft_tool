@@ -27,7 +27,7 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-DATA = Path(__file__).resolve().parent.parent.parent / "data"
+DATA = Path(__file__).resolve().parent.parent.parent.parent / "data" / "snake"
 
 #: The one file a PUT may write. Anchored, so no path of any shape -- traversal,
 #: absolute, a second segment -- reaches the filesystem.

@@ -78,7 +78,7 @@ than that.
 
 **Depends on:** `python/vorp/models.py` for the model protocol and registry,
 league config, and the projections CSV for market values. **Implemented in:**
-`python/vorp/principles.py` (runner and principles), `python/scripts/principles.py`
+`python/vorp/principles.py` (runner and principles), `python/scripts/auction/principles.py`
 (report). **Done when:** the strawman fails `baseline-not-points` and passes
 nothing it shouldn't, `progressive_blend` passes every law, and the seam
 regression fixture in `tests/test_principles.py` shows price-blending failing

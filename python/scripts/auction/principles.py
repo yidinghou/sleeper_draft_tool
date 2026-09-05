@@ -16,7 +16,7 @@ import csv
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from vorp.csv_loader import load_players_from_csv, projections_csv_path  # noqa: E402
 from vorp.league.config import LEAGUE_CONFIG  # noqa: E402
