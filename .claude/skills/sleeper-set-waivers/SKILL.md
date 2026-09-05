@@ -12,6 +12,17 @@ See that script's docstring for how the mutations were reverse-engineered
 (downloading Sleeper's own public JS bundle and grepping it, never by
 submitting a live request).
 
+## Step 0: identify the league
+
+The user has (at least) two real Sleeper leagues sharing this repo — see the
+**Leagues** table in the root `README.md` for both league IDs and how to
+tell them apart. Confirm which one before doing anything else; don't assume
+`LEAGUE_CONFIG.league_id` (the auction league) is the right one just because
+it's the default in `python/vorp/league/config.py` — `SNAKE_CONFIG` is a
+different real league with its own roster and waivers. If it isn't obvious
+from context (e.g. the user names a player who's only rostered in one of
+them), ask.
+
 ## Step 1: figure out who to add (and drop)
 
 - Trending adds, public and read-only: `GET https://api.sleeper.app/v1/players/nfl/trending/add?lookback_hours=48&limit=50`.

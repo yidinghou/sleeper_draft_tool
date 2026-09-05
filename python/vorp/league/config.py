@@ -120,9 +120,11 @@ LEAGUE_CONFIG = LeagueConfig(
 #: sharing only the projections. Standard lineup with a single QB (no
 #: superflex) and two RB/WR/TE flexes. `budget`/`min_bid` are unused here:
 #: a snake draft has no money, and nothing in the points-based VORP/VOLR
-#: math reads them.
+#: math reads them. `draft_id` is left blank -- unlike the league id, Sleeper
+#: mints a new draft id every season, so it has to be looked up fresh via
+#: `GET /league/{league_id}/drafts` rather than hardcoded here.
 SNAKE_CONFIG = LeagueConfig(
-    league_id="",
+    league_id="1386051970791378944",
     draft_id="",
     season=2026,
     teams=10,
