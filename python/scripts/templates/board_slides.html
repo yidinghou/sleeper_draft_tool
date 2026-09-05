@@ -3,75 +3,41 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link
   rel="stylesheet"
-  href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+  href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
 />
 <style>
+  /* Fixed dark amber/navy theme, ported from the golden mockup
+     (board-slides-golden-new.html) -- this template no longer follows
+     prefers-color-scheme; draft_demo.html keeps its own light/dark tokens. */
   :root {
-    --ground: #eff2f5;
-    --surface: #ffffff;
-    --surface-sunk: #e7ebf0;
-    --line: #d3dae2;
-    --line-soft: #e3e8ee;
-    --ink: #16202b;
-    --ink-soft: #47576a;
-    --ink-faint: #7b8b9c;
-    --accent: #1f4e79;
-    --accent-soft: #dbe6f1;
-    --up: #0e7c66;
-    --up-soft: #d5ece5;
-    --down: #b4432c;
-    --down-soft: #f6ddd7;
-    --brass: #8a6413;
-    --qb: #6d4b9e;
-    --rb: #0e7c66;
-    --wr: #1f4e79;
-    --te: #a8621c;
-    --def: #5c6b7a;
-    --radius: 6px;
-    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-    --sans: Archivo, ui-sans-serif, system-ui, -apple-system, sans-serif;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --ground: #0f1720;
-      --surface: #16202b;
-      --surface-sunk: #101821;
-      --line: #2a3846;
-      --line-soft: #212e3a;
-      --ink: #e3eaf1;
-      --ink-soft: #a3b2c1;
-      --ink-faint: #71818f;
-      --accent: #7aaad6;
-      --accent-soft: #1c2f42;
-      --up: #46bfa0;
-      --up-soft: #14312a;
-      --down: #e3806c;
-      --down-soft: #3a1f19;
-      --brass: #d1a94a;
-    }
-  }
-
-  :root[data-theme="dark"] {
-    --ground: #0f1720;
-    --surface: #16202b;
-    --surface-sunk: #101821;
-    --line: #2a3846;
-    --line-soft: #212e3a;
-    --ink: #e3eaf1;
-    --ink-soft: #a3b2c1;
-    --ink-faint: #71818f;
-    --accent: #7aaad6;
-    --accent-soft: #1c2f42;
-    --up: #46bfa0;
+    --ground: #04060e;
+    --surface: #0a0f1c;
+    --surface-sunk: #121a2e;
+    --line: #161d30;
+    --line-soft: #232c47;
+    --ink: #eef2fb;
+    --ink-soft: #8b97b4;
+    --ink-faint: #586485;
+    --accent: #f2b64c;
+    --accent-soft: #241a02;
+    --up: #6fe0aa;
     --up-soft: #14312a;
-    --down: #e3806c;
+    --down: #fb7185;
     --down-soft: #3a1f19;
-    --brass: #d1a94a;
+    --brass: #f2b64c;
+    --qb: #ff9caf;
+    --rb: #6fe0aa;
+    --wr: #8fbcff;
+    --te: #d3bbf7;
+    --def: #c1c8d6;
+    --radius: 8px;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --display: "Barlow Condensed", var(--sans);
   }
 
   html {
-    color-scheme: light dark;
+    color-scheme: dark;
   }
   * {
     box-sizing: border-box;
@@ -143,103 +109,417 @@
   }
 
   /* -------------------------------------------------- header / block --- */
+  /* Ported from the golden mockup's .uhead: a hero tile (on-block player), a
+     splittile (bidding + worth, trimmed to the 3 columns this payload can
+     actually fill -- VORP $ / blend / VOLR $, no Sleeper $ or Wk1-3 $), and
+     a seatbars tile. Mounted identically on Live (#head-live) and Market
+     (#head-market). */
 
-  .header {
+  .pos {
+    display: inline-block;
+    min-width: 30px;
+    text-align: center;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .pos.QB {
+    background: #521626;
+    color: var(--qb);
+  }
+  .pos.RB {
+    background: #0f3a27;
+    color: var(--rb);
+  }
+  .pos.WR {
+    background: #12325f;
+    color: var(--wr);
+  }
+  .pos.TE {
+    background: #2b1c49;
+    color: var(--te);
+  }
+  .pos.FLEX,
+  .pos.DEF {
+    background: #1a2236;
+    color: var(--def);
+  }
+
+  .uhead {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+  }
+  .kpi {
+    flex: 1;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 8px 12px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 3px;
+    min-width: 0;
   }
-
-  .block-hero {
+  .kpi .klabel {
+    font-family: var(--display);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--ink-faint);
+    font-weight: 600;
+  }
+  .kpi b {
+    font-family: var(--mono);
+    font-size: 1.15rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
     display: flex;
-    align-items: baseline;
-    gap: 16px;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
   }
-  .block-hero .name {
-    font-size: 26px;
-    font-weight: 800;
-    letter-spacing: -0.01em;
+  .kpi b .pnm {
+    font-family: var(--sans);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .block-hero .price {
-    font-size: 26px;
-    font-weight: 800;
+  .kpi b.money {
     color: var(--accent);
   }
-  .block-hero .empty {
-    font-size: 18px;
+  .kpi .pos {
+    font-size: 0.72rem;
+    flex: none;
+  }
+  .kpi .sub {
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+  }
+  .kpi .empty {
+    font-size: 1rem;
     color: var(--ink-faint);
     font-style: italic;
   }
-  .block-hero .sub {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--ink-soft);
+
+  .uhead .kpi.hero {
+    flex: 1.8;
+  }
+  .uhead .kpi.seatile {
+    flex: 3.4;
   }
 
-  .worth-row {
+  .kpi.splittile {
+    flex: 2.4;
+    padding: 4px 10px;
+    gap: 4px;
     display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+    flex-direction: column;
+    justify-content: center;
   }
-  .worth-tile {
-    font-family: var(--mono);
-    font-size: 12px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    background: var(--surface-sunk);
-    border: 1px solid var(--line-soft);
-    display: flex;
-    gap: 6px;
-    align-items: baseline;
+  .splittile .splitrow {
+    display: grid;
+    align-items: center;
+    column-gap: 12px;
   }
-  .worth-tile.mine {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+  .splittile .bidrow {
+    grid-template-columns: auto repeat(3, 1fr);
+    padding-bottom: 3px;
+    border-bottom: 1px dotted var(--line);
   }
-  .worth-tile .seat {
+  .splittile .worthrow {
+    grid-template-columns: auto 1fr 78px 1fr;
+    padding-top: 3px;
+  }
+  .splittile .rowlabel {
+    font: 700 0.58rem var(--display);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     color: var(--ink-faint);
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    padding: 0 2px;
+    border-right: 1px solid var(--line);
+  }
+  .splittile .statcell {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .splittile .statcell .l {
+    font: 600 0.6rem var(--display);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-faint);
+  }
+  .splittile .statcell .v {
+    font: 600 0.95rem var(--mono);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+  }
+  .splittile .statcell .v.money {
+    color: var(--accent);
+  }
+  .splittile .statcell .v small {
+    color: var(--ink-soft);
+    font-weight: 400;
+    font-size: 0.68rem;
+  }
+  .splittile .worth.vorp .v {
+    color: var(--accent);
+  }
+  .splittile .worth.volr .v {
+    color: #2dd4da;
+  }
+  .splittile .blendcell {
+    align-self: stretch;
+    justify-content: center;
+    gap: 4px;
+  }
+  .splittile .blendcell .l {
+    text-align: center;
+  }
+  .splittile .blendcell .blend-track {
+    width: 100%;
+  }
+  .blend-track {
+    position: relative;
+    height: 5px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), #2dd4da);
+    opacity: 0.85;
+  }
+  .blend-track.flat {
+    background: var(--line-soft);
+  }
+  .blend-dot {
+    position: absolute;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin-top: -4.5px;
+    margin-left: -4.5px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+
+  .seatbars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    flex: 1;
+    min-height: 46px;
+    margin-top: 3px;
+  }
+  .seatbars .sb {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1px;
+    min-width: 0;
+    height: 100%;
+  }
+  .seatbars .sb .sv {
+    font-family: var(--mono);
+    font-size: 0.56rem;
+    font-variant-numeric: tabular-nums;
+    color: transparent;
+    line-height: 1;
+  }
+  .seatbars .sb i {
+    display: block;
+    width: 100%;
+    min-height: 2px;
+    background: var(--surface-sunk);
+    border-radius: 2px 2px 0 0;
+  }
+  .seatbars .sb .sl {
+    font-family: var(--mono);
+    font-size: 0.54rem;
+    color: var(--ink-faint);
+    line-height: 1;
+  }
+  .seatbars .sb.me i {
+    background: var(--accent);
+  }
+  .seatbars .sb.me .sv,
+  .seatbars .sb.me .sl {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .seatbars .sb.setter i {
+    background: var(--ink-soft);
+  }
+  .seatbars .sb.setter .sv {
+    color: var(--ink);
+  }
+  .seatbars .sb.win i {
+    background: var(--up);
+  }
+  .seatbars .sb.win .sv {
+    color: var(--up);
+    font-weight: 700;
+  }
+  .seatbars .sb.exp i {
+    background: transparent;
+    border: 1px dashed var(--up);
+  }
+  .seatbars .sb.exp .sv,
+  .seatbars .sb.exp .sl {
+    color: var(--up);
+    font-weight: 700;
+  }
+  .seatbars .sb.divedge {
+    margin-left: 6px;
+    border-left: 1px solid var(--line);
+    padding-left: 4px;
+  }
+  .seatbars .sb.divedge:first-child {
+    margin-left: 0;
+    border-left: 0;
+    padding-left: 0;
   }
 
   /* --------------------------------------------------- buying power ---- */
+  /* Ported from golden's .barrow/.bar -- height by max_bid only, no
+     bid-activity recency fill or lead-count pill (no bid-ladder data
+     exists server-side to drive those). A .tagsrow of desperation pips
+     sits below: how many of the on-block position each seat still needs. */
 
-  .power-row {
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
+  .barrow {
+    display: flex;
+    align-items: flex-end;
     gap: 6px;
-    align-items: end;
     height: 90px;
+    border-bottom: 1px solid var(--line);
+    padding-top: 22px;
   }
-  .power-bar {
+  .bar {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
     height: 100%;
-    gap: 4px;
   }
-  .power-bar .fill {
+  .bar .amt {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 3px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .bar i {
+    display: block;
     width: 100%;
-    background: var(--accent-soft);
-    border: 1px solid var(--accent);
-    border-radius: 3px 3px 0 0;
-    min-height: 2px;
+    min-height: 3px;
+    background: var(--surface-sunk);
+    border-radius: 2px 2px 0 0;
+    flex-shrink: 0;
   }
-  .power-bar.mine .fill {
-    background: var(--brass);
-    border-color: var(--brass);
+  .bar.mine i {
+    background: var(--accent);
   }
-  .power-bar .label {
+  .power-label {
     font-family: var(--mono);
     font-size: 10px;
     color: var(--ink-faint);
+    text-align: center;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .tagsrow {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .tagsrow .tagcell {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .tagsrow .tagname {
     max-width: 100%;
+    text-align: center;
+    font-size: 0.76rem;
+    color: var(--ink-faint);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .tagsrow .tagcell.me .tagname {
+    color: var(--ink);
+    font-weight: 700;
+  }
+  .tagsrow .tagcell.me .tagname::before {
+    content: "\25B8 ";
+    color: var(--accent);
+  }
+  .pip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--surface-sunk);
+    color: var(--ink-soft);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  /* desperation ramp: --d (0..1) mixes the position colour --pc into the
+     pip; done = satisfied (recedes), empty/part = still wants one, hotter
+     the emptier the seat is at this position. */
+  .pip.done {
+    background: var(--surface-sunk);
+    color: var(--ink-faint);
+  }
+  .pip.part,
+  .pip.empty {
+    background: color-mix(in srgb, var(--pc) calc(var(--d) * 100%), var(--surface-sunk));
+    color: var(--ink);
+  }
+  .pip.empty {
+    color: #fff;
+    font-weight: 800;
+    box-shadow: 0 0 0 1.5px var(--pc);
   }
 
   /* --------------------------------------------------------- nav --------- */
+
+  /* Both float as golden-style pills and auto-hide when idle (pokeNav),
+     returning on mouse move/keydown/hover -- so they don't sit over the
+     run-pressure cards or roster grid while the drafter is just watching. */
+  .nav,
+  .scrub-bar {
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  .nav.faded,
+  .scrub-bar.faded {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+    pointer-events: none;
+  }
 
   .nav {
     position: fixed;
@@ -248,11 +528,13 @@
     transform: translateX(-50%);
     display: flex;
     gap: 6px;
-    background: var(--surface);
+    background: rgba(10, 15, 28, 0.85);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
     border: 1px solid var(--line);
     border-radius: 999px;
     padding: 6px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
     z-index: 10;
   }
   .nav button {
@@ -266,9 +548,12 @@
     border-radius: 999px;
     cursor: pointer;
   }
+  .nav button:hover {
+    color: var(--ink);
+  }
   .nav button.active {
     background: var(--accent);
-    color: white;
+    color: var(--accent-soft);
   }
 
   .scrub-bar {
@@ -279,11 +564,13 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    background: var(--surface);
+    background: rgba(10, 15, 28, 0.85);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
     border: 1px solid var(--line);
     border-radius: 999px;
     padding: 6px 16px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
     z-index: 10;
     width: min(90vw, 480px);
   }
@@ -346,81 +633,516 @@
   .scroller {
     overflow-x: auto;
   }
+
+  /* ------------------------------------------------------- pool matrix -- */
+
+  .poolhd {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .filters {
+    display: flex;
+    gap: 6px;
+  }
+  .filters button {
+    background: var(--surface);
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 4px 13px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    font-weight: 600;
+  }
+  .filters button:hover {
+    color: var(--ink);
+    border-color: var(--ink-soft);
+  }
+  .filters button.active {
+    background: var(--accent);
+    color: var(--accent-soft);
+    border-color: var(--accent);
+  }
+  .knob {
+    flex: 1 1 auto;
+    min-width: 260px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 12px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+  }
+  .knob input[type="range"] {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 80px;
+    margin: 0;
+  }
+  .knob .klabel {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .knob .klabel.vorp {
+    color: var(--accent);
+  }
+  .knob .klabel.volr {
+    color: #2dd4da;
+  }
+  .knob-readout {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .knob-readout b {
+    color: var(--accent);
+  }
+  .knob-readout i {
+    color: #2dd4da;
+    font-style: normal;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), #2dd4da);
+    outline: none;
+    margin: 0;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--ink);
+    border: 3px solid var(--ground);
+    box-shadow: 0 0 0 1px var(--line-soft);
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--ink);
+    border: 3px solid var(--ground);
+    cursor: pointer;
+  }
+
+  .col-vorp {
+    color: var(--accent);
+  }
+  .col-volr {
+    color: #2dd4da;
+  }
+  td.vorp {
+    color: var(--accent);
+  }
+  td.volr {
+    color: #2dd4da;
+  }
+  td.blend {
+    padding-left: 4px;
+    padding-right: 4px;
+    width: 92px;
+  }
+
+  td.seat {
+    min-width: 30px;
+    text-align: right;
+    color: var(--ink-soft);
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+  td.seat.out {
+    color: var(--ink-faint);
+  }
+  th.mecol,
+  td.mecol {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  td.seat.win {
+    background: var(--up);
+    color: var(--ground);
+    font-weight: 700;
+  }
+  td.seat.setter {
+    text-decoration: underline dashed;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--ink-soft);
+  }
+  th.expwin,
+  td.expwin {
+    border-left: 1px solid var(--line-soft);
+  }
+  td.expwin {
+    color: var(--up);
+    font-weight: 700;
+    font-family: var(--mono);
+    text-align: right;
+  }
+  th.seat.divedge,
+  td.seat.divedge {
+    border-left: 2px solid var(--line);
+  }
   .num {
     text-align: right;
     font-family: var(--mono);
     font-variant-numeric: tabular-nums;
   }
-
-  .division {
-    margin-bottom: 20px;
-  }
-  .division .eyebrow {
-    margin-bottom: 8px;
-  }
-  .division.mine .eyebrow {
-    color: var(--accent);
-  }
-  .roster-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-  }
-  @media (max-width: 900px) {
-    .roster-grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
-  .roster-card {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 12px;
-  }
-  .roster-card.mine {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent);
-  }
-  .roster-card-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    font-weight: 600;
-    margin-bottom: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--line-soft);
-  }
-  .roster-line {
-    font-family: var(--mono);
-    font-size: 12px;
-    display: flex;
-    justify-content: space-between;
-    padding: 2px 0;
-    color: var(--ink-soft);
-  }
-  .roster-line.open {
+  tr.open td {
     color: var(--ink-faint);
     font-style: italic;
   }
-  .roster-line.bench {
+  tr.bench {
+    opacity: 0.55;
+  }
+
+  /* ---------------------------------- live-bottom: rosters + run pressure */
+
+  .live-bottom {
+    flex: 1;
+    display: flex;
+    gap: 12px;
+    min-height: 360px;
+  }
+  .rosterbox {
+    flex: 0 0 17vw;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+  }
+  .bidderbox {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  }
+  .miniwrap {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .pressbox {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .presscards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
+  }
+  .presscard {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-sunk);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-height: 0;
+  }
+  .presscard .cap {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .presscard .cliff {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+  .presscard .cliff b {
+    color: var(--ink);
+  }
+  .availlist {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    margin-top: 1px;
+  }
+  .availhd {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 42px 42px 38px;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--surface-sunk);
+    padding: 3px 2px;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--display);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+  }
+  .availhd span {
+    text-align: right;
+    white-space: nowrap;
+  }
+  .availhd span:first-child {
+    text-align: left;
+  }
+  .availhd .vd {
+    color: var(--accent);
+  }
+  .availhd .ld {
+    color: #2dd4da;
+  }
+  .availrow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 42px 42px 38px;
+    gap: 8px;
+    align-items: center;
+    font-size: 0.85rem;
+    padding: 3px 2px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .availrow:last-child {
+    border-bottom: none;
+  }
+  .availrow .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink);
+  }
+  .availrow .vd,
+  .availrow .ld,
+  .availrow .proj {
+    font-family: var(--mono);
+    font-style: normal;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8rem;
+  }
+  .availrow .vd {
+    color: var(--accent);
+  }
+  .availrow .ld {
+    color: #2dd4da;
+  }
+  .availrow .proj {
+    color: var(--ink-soft);
+  }
+  .cliffline {
+    margin: 3px 0;
+    padding: 3px 0 2px;
+    text-align: center;
+    border-top: 1px dashed var(--down);
+    color: var(--down);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  /* draft-state "market so far / still on board" grouped table */
+  #state-table .grouptop th {
+    border-bottom: none;
+    padding-bottom: 2px;
     color: var(--ink-faint);
+    font-size: 10px;
+  }
+  #state-table td.gb,
+  #state-table th.gb {
+    border-left: 1px solid var(--line);
+  }
+  #state-table tfoot td {
+    border-top: 2px solid var(--line-soft);
+    border-bottom: none;
+    font-weight: 600;
+  }
+
+  /* --------------------------------------------------------- rosters --- */
+  /* Ported from golden's .rbands/.rband/.rail/.rgrid4/.rcard: one row per
+     division, a stacked-letter rail, a 4-card grid. Each card is a fixed
+     head over a scrolling masked body of slotRows -- trimmed to 4 columns
+     (Pos/Player/Proj/Paid; bought players carry no bye and no per-line VORP
+     number, only season points). */
+
+  .rbands {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .rband {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    border-radius: 8px;
+    padding: 4px 4px 4px 0;
+  }
+  .rband.mine {
+    outline: 1px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 4%, transparent);
+  }
+  .rband .rail {
+    flex: none;
+    width: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-right: 1px solid var(--line);
+    padding: 4px 0;
+  }
+  .rband.mine .rail {
+    border-right-color: var(--accent);
+  }
+  .rband .rail .divname {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 0.95rem;
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .rband.mine .rail .divname {
+    color: var(--accent);
+  }
+  .rgrid4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+  @media (max-width: 900px) {
+    .rgrid4 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  .rcard {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .rcard.mine {
+    border-color: var(--accent);
+  }
+  .rhd1 {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 3px;
+    padding-bottom: 3px;
+  }
+  .rhd1 b {
+    font-family: var(--mono);
+    font-size: 1.05rem;
+  }
+  .rhd1 .meta {
+    color: var(--ink-faint);
+    font-size: 0.72rem;
+    margin-left: auto;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .rhd1 .meta .left {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .budget {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--surface-sunk);
+    margin-bottom: 5px;
+    overflow: hidden;
+  }
+  .budget i {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+  .rcard table {
+    table-layout: fixed;
+    width: 100%;
+  }
+  .rcard .rtbl-head {
+    flex: none;
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface-sunk);
+  }
+  .rcard .rtblwrap {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 14px), transparent);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 14px), transparent);
+  }
+  .rcard table td,
+  .rcard table th {
+    padding: 2px 6px;
+    font-size: 0.78rem;
+  }
+  .rcard table th {
+    font-size: 0.6rem;
   }
 </style>
 
 <div class="wrap">
   <section class="slide" id="s-live">
-    <div class="card header" id="header"></div>
+    <div class="uhead" id="head-live"></div>
     <div class="card">
       <div class="eyebrow">Buying power</div>
-      <div class="power-row" id="power"></div>
+      <div class="barrow" id="power"></div>
+      <div class="tagsrow" id="power-tags"></div>
     </div>
     <div class="card">
       <div class="eyebrow">Draft state by position</div>
       <div id="state-table"></div>
     </div>
+    <div class="live-bottom">
+      <div class="card rosterbox">
+        <div class="eyebrow" id="mini-my-label">My roster</div>
+        <div class="miniwrap"><table><tbody id="mini-my"></tbody></table></div>
+      </div>
+      <div class="card rosterbox bidderbox">
+        <div class="eyebrow" id="mini-bidder-label">High bidder's roster</div>
+        <div class="miniwrap"><table><tbody id="mini-bidder"></tbody></table></div>
+      </div>
+      <div class="card pressbox">
+        <div class="eyebrow">Run pressure -- what's left before the next tier</div>
+        <div class="presscards" id="presscards"></div>
+      </div>
+    </div>
   </section>
 
   <section class="slide" id="s-market" hidden>
+    <div class="uhead" id="head-market"></div>
     <div class="card">
       <div class="eyebrow">Pool matrix</div>
       <div id="matrix"></div>
@@ -462,6 +1184,30 @@
     btn.addEventListener("click", () => showSlide(btn.dataset.slide));
   });
 
+  // Floating nav + scrub bar auto-hide when idle, return on mouse move/key/hover.
+  const navEl = document.querySelector(".nav");
+  const scrubBarEl = document.querySelector(".scrub-bar");
+  let navTimer;
+  function pokeNav() {
+    navEl.classList.remove("faded");
+    scrubBarEl.classList.remove("faded");
+    clearTimeout(navTimer);
+    navTimer = setTimeout(() => {
+      navEl.classList.add("faded");
+      scrubBarEl.classList.add("faded");
+    }, 2000);
+  }
+  [navEl, scrubBarEl].forEach((el) =>
+    el.addEventListener("mouseenter", () => {
+      clearTimeout(navTimer);
+      navEl.classList.remove("faded");
+      scrubBarEl.classList.remove("faded");
+    })
+  );
+  document.addEventListener("mousemove", pokeNav);
+  document.addEventListener("keydown", pokeNav);
+  pokeNav();
+
   document.addEventListener("keydown", (e) => {
     if (e.shiftKey && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
       // Scrub one pick -- guarded by shiftKey so it doesn't also fire the
@@ -493,50 +1239,130 @@
     return payload.seat_order || (payload.seats || []).map((s) => s.seat_id);
   }
 
-  function renderHeader(payload) {
-    const el = document.getElementById("header");
-    const block = payload.block;
+  // Compact seat label for narrow slots (seat bars, matrix columns): first
+  // token, capped so a full division row still fits.
+  function seatAbbr(payload, seatId) {
+    const label = seatLabel(payload, seatId);
+    if (/^Seat \d+$/.test(label)) return "S" + (seatId + 1);
+    const first = label.trim().split(/\s+/)[0];
+    return first.length > 7 ? first.slice(0, 6) + "…" : first;
+  }
 
+  // Seat ids that lead a division band, for a divider border in seat-ordered
+  // rows -- empty (no dividers) until identity/divisions are resolved.
+  function divisionStarts(payload) {
+    const set = new Set();
+    for (const dv of payload.divisions || []) if (dv.seats.length) set.add(dv.seats[0]);
+    return set;
+  }
+
+  function seatById(payload, seatId) {
+    return (payload.seats || []).find((s) => s.seat_id === seatId);
+  }
+
+  // The block player's own matrix row -- winner/price_setter_bid/expected_price
+  // are already computed server-side (seat_matrix's ascending-auction
+  // resolution); the client never re-derives them.
+  function matrixRowFor(payload, playerId) {
+    return (payload.matrix || []).find((r) => r.player_id === playerId);
+  }
+
+  // Shared VORP<->VOLR blend weight (1 = pure VORP), moved by the Market
+  // slide's blend slider and re-read by the header's blend-track dot.
+  let W = 1.0;
+
+  function blendTrack(vorpD, volrD) {
+    const flat = vorpD === volrD;
+    const left = flat ? 50 : Math.max(0, Math.min(100, (1 - W) * 100));
+    return `<div class="blend-track${flat ? " flat" : ""}"><span class="blend-dot" style="left:${left}%"></span></div>`;
+  }
+
+  function headerTiles(payload) {
+    const block = payload.block;
     if (!block) {
-      el.innerHTML = `
-        <div class="block-hero">
-          <span class="empty">Nobody on the block / waiting on a nomination</span>
+      return `<div class="kpi hero"><span class="klabel">On the block</span>
+        <span class="empty">Nobody on the block / waiting on a nomination</span></div>`;
+    }
+    const posBadge = block.position ? `<span class="pos ${block.position}">${block.position}</span>` : "";
+    if (block.sold) {
+      // A scrubbed frame's block is the pick that just sold at that prefix --
+      // a different, smaller shape (no price/vorp/volr/bids) than a live
+      // nomination, so it only gets the hero tile.
+      return `<div class="kpi hero"><span class="klabel">Just sold</span>
+        <b><span class="pnm">${block.player_id}</span>${posBadge}</b>
+        <span class="sub">sold for ${fmtMoney(block.amount)}${
+        block.buyer ? ` to ${block.buyer}` : ""
+      }</span></div>`;
+    }
+
+    const mySeat = payload.my_seat != null ? seatById(payload, payload.my_seat) : null;
+    const bidCell = (l, v, sub) =>
+      `<div class="statcell"><span class="l">${l}</span>
+       <span class="v money">${fmtMoney(v)}${sub ? ` <small>${sub}</small>` : ""}</span></div>`;
+    const worthCell = (l, cls, dollar) =>
+      `<div class="statcell worth ${cls}"><span class="l">${l}</span>
+       <span class="v">${fmtMoney(dollar)}</span></div>`;
+
+    return `<div class="kpi hero"><span class="klabel">On the block</span>
+        <b><span class="pnm">${block.player_id}</span>${posBadge}</b>
+        <span class="sub">${block.points != null ? `${block.points} pts proj` : ""}</span></div>
+      <div class="kpi splittile">
+        <div class="splitrow bidrow">
+          <span class="rowlabel">Bidding</span>
+          ${bidCell("Current bid", block.highest_offer)}
+          ${bidCell("My max bid", mySeat ? mySeat.max_bid : null)}
+          ${bidCell("Budget left", mySeat ? mySeat.budget_left : null)}
         </div>
-      `;
+        <div class="splitrow worthrow">
+          <span class="rowlabel">Worth</span>
+          ${worthCell("VORP $", "vorp", block.vorp_dollar)}
+          <div class="statcell blendcell"><span class="l">Blend</span>${blendTrack(
+            block.vorp_dollar,
+            block.volr_dollar
+          )}</div>
+          ${worthCell("VOLR $", "volr", block.volr_dollar)}
+        </div>
+      </div>`;
+  }
+
+  function renderHeader(payload, mount) {
+    if (!mount) return;
+    const block = payload.block;
+    if (!block || block.sold || !block.bids) {
+      mount.innerHTML = headerTiles(payload);
       return;
     }
-
-    const posClass = block.position ? `pos-${block.position}` : "";
-    const soldTag = block.sold ? " (just sold)" : "";
-    const currentBid = block.sold
-      ? fmtMoney(block.amount)
-      : fmtMoney(block.highest_offer);
-
-    let worthRow = "";
-    if (block.bids) {
-      const order = seatOrder(payload);
-      worthRow = `<div class="worth-row">${order
-        .map((sid) => {
-          const bid = block.bids[sid];
-          const mine = sid === payload.my_seat ? " mine" : "";
-          return `<span class="worth-tile${mine}"><span class="seat">${seatLabel(
-            payload,
-            sid
-          )}</span><span class="money">${fmtMoney(bid)}</span></span>`;
-        })
-        .join("")}</div>`;
-    }
-
-    el.innerHTML = `
-      <div class="block-hero">
-        <span class="name ${posClass}">${block.player_id}${soldTag}</span>
-        <span class="price">${fmtMoney(block.price)}</span>
-        <span class="sub">board price &middot; current bid ${currentBid} &middot; VORP ${fmtMoney(
-      block.vorp_dollar
-    )} &middot; VOLR ${fmtMoney(block.volr_dollar)}</span>
-      </div>
-      ${worthRow}
-    `;
+    const matrixRow = matrixRowFor(payload, block.player_id);
+    const winner = matrixRow ? matrixRow.winner : null;
+    const setter = matrixRow ? matrixRow.price_setter_bid : null;
+    const exp = matrixRow ? matrixRow.expected_price : null;
+    const order = seatOrder(payload);
+    const bidVals = order.map((sid) => block.bids[sid] || 0);
+    const maxV = Math.max(...bidVals, exp || 0, 1);
+    const barH = (v) => (v > 0 ? Math.max(6, Math.round((v / maxV) * 100)) : 0);
+    const starts = divisionStarts(payload);
+    const bars = order
+      .map((sid) => {
+        const b = block.bids[sid] || 0;
+        const cls = ["sb"];
+        if (sid === winner) cls.push("win");
+        else if (setter != null && b === setter) cls.push("setter");
+        else if (sid === payload.my_seat) cls.push("me");
+        if (starts.has(sid)) cls.push("divedge");
+        return `<div class="${cls.join(" ")}"><span class="sv">${
+          b > 0 ? fmtMoney(b) : "—"
+        }</span><i style="height:${barH(b)}%"></i><span class="sl">${seatAbbr(
+          payload,
+          sid
+        )}</span></div>`;
+      })
+      .join("");
+    const expBar = `<div class="sb exp"><span class="sv">${
+      exp != null ? fmtMoney(exp) : ""
+    }</span><i style="height:${barH(exp)}%"></i><span class="sl">Exp</span></div>`;
+    mount.innerHTML =
+      headerTiles(payload) +
+      `<div class="kpi seatile"><span class="klabel">Worth to each seat</span><div class="seatbars">${bars}${expBar}</div></div>`;
   }
 
   function renderPower(payload) {
@@ -548,14 +1374,35 @@
     el.innerHTML = order
       .map((sid) => {
         const seat = seatsById[sid] || {};
-        const pct = Math.max(2, ((seat.max_bid || 0) / maxOfAll) * 100);
+        const pct = Math.max(4, Math.round(((seat.max_bid || 0) / maxOfAll) * 100));
         const mine = sid === payload.my_seat ? " mine" : "";
-        return `
-        <div class="power-bar${mine}">
-          <div class="fill" style="height:${pct}%" title="max bid ${fmtMoney(seat.max_bid)}"></div>
-          <div class="label">${seatLabel(payload, sid)}</div>
-        </div>
-      `;
+        return `<div class="bar${mine}"><span class="amt">${fmtMoney(
+          seat.max_bid
+        )}</span><i style="height:${pct}%"></i></div>`;
+      })
+      .join("");
+
+    const tagsEl = document.getElementById("power-tags");
+    const blockPos = payload.block && payload.block.position;
+    const target = blockPos ? (payload.config.starting_slots || {})[blockPos] || 0 : 0;
+    if (!blockPos || target <= 0) {
+      tagsEl.innerHTML = "";
+      return;
+    }
+    tagsEl.innerHTML = order
+      .map((sid) => {
+        const seat = seatsById[sid] || { bought: [] };
+        const have = seat.bought.filter((b) => b.position === blockPos).length;
+        const need = Math.max(0, target - have);
+        const d = target > 0 ? need / target : 0;
+        const cls = need === 0 ? "done" : have === 0 ? "empty" : "part";
+        const mine = sid === payload.my_seat ? " me" : "";
+        return `<div class="tagcell${mine}"><span class="tagname">${seatLabel(
+          payload,
+          sid
+        )}</span><span class="pip ${cls}" style="--pc:var(--${blockPos.toLowerCase()});--d:${d.toFixed(
+          2
+        )}">${have}/${target}</span></div>`;
       })
       .join("");
   }
@@ -566,28 +1413,52 @@
     const el = document.getElementById("state-table");
     const drafted = {};
     const spent = {};
+    const vorpGot = {};
     for (const pos of POSITIONS) {
       drafted[pos] = 0;
       spent[pos] = 0;
+      vorpGot[pos] = 0;
     }
+    const levels = payload.levels || {};
     for (const seat of payload.seats || []) {
       for (const b of seat.bought) {
         drafted[b.position] = (drafted[b.position] || 0) + 1;
         spent[b.position] = (spent[b.position] || 0) + b.amount;
+        const replacement = (levels[b.position] || {}).replacement || 0;
+        vorpGot[b.position] = (vorpGot[b.position] || 0) + Math.max(0, (b.points || 0) - replacement);
       }
     }
+    const vorpLeft = {};
+    for (const pos of POSITIONS) vorpLeft[pos] = 0;
+    for (const p of payload.players || []) {
+      const replacement = (levels[p.position] || {}).replacement || 0;
+      vorpLeft[p.position] = (vorpLeft[p.position] || 0) + Math.max(0, (p.points || 0) - replacement);
+    }
+    const pct = (gv, lv) => (gv + lv > 0 ? Math.round((100 * lv) / (gv + lv)) : 0);
 
-    const positions = Object.keys(payload.levels || {});
+    const positions = Object.keys(levels);
+    let totalDrafted = 0,
+      totalSpent = 0,
+      totalGot = 0,
+      totalLeft = 0;
     const rows = positions
       .map((pos) => {
-        const level = payload.levels[pos];
+        const level = levels[pos];
+        const got = vorpGot[pos] || 0,
+          left = vorpLeft[pos] || 0;
+        totalDrafted += drafted[pos] || 0;
+        totalSpent += spent[pos] || 0;
+        totalGot += got;
+        totalLeft += left;
         return `
         <tr>
-          <td class="pos-${pos}">${pos}</td>
+          <td><span class="pos ${pos}">${pos}</span></td>
           <td class="num">${drafted[pos] || 0}</td>
           <td class="num money">${fmtMoney(spent[pos] || 0)}</td>
-          <td class="num">${level.replacement.toFixed(1)}</td>
-          <td class="num">${level.last_rostered.toFixed(1)}</td>
+          <td class="num">${Math.round(got)}</td>
+          <td class="num gb">${level.replacement.toFixed(1)}</td>
+          <td class="num gb">${Math.round(left)}</td>
+          <td class="num">${pct(got, left)}%</td>
         </tr>
       `;
       })
@@ -596,9 +1467,17 @@
     el.innerHTML = `
       <table>
         <thead>
-          <tr><th>Pos</th><th class="num">Drafted</th><th class="num">Spent</th><th class="num">Replacement</th><th class="num">Last rostered</th></tr>
+          <tr class="grouptop"><th></th><th class="num" colspan="3">Market so far</th><th class="num gb">Replacement</th><th class="num gb" colspan="2">Still on the board</th></tr>
+          <tr><th>Pos</th><th class="num">Drafted</th><th class="num">$ spent</th><th class="num">VORP got</th><th class="num gb">Bar (pts)</th><th class="num gb">VORP left</th><th class="num">% left</th></tr>
         </thead>
         <tbody>${rows}</tbody>
+        <tfoot>
+          <tr><td>Total</td><td class="num">${totalDrafted}</td><td class="num money">${fmtMoney(
+      totalSpent
+    )}</td><td class="num">${Math.round(totalGot)}</td><td class="num gb"></td><td class="num gb">${Math.round(
+      totalLeft
+    )}</td><td class="num">${pct(totalGot, totalLeft)}%</td></tr>
+        </tfoot>
       </table>
     `;
   }
@@ -607,16 +1486,26 @@
   // refresh doesn't reset the user's chosen column.
   let matrixSortKey = "price";
   let matrixSortDir = -1;
+  let matrixPosFilter = "ALL";
 
   function renderMatrix(payload) {
     const el = document.getElementById("matrix");
     const byId = Object.fromEntries((payload.players || []).map((p) => [p.player_id, p]));
 
-    const rows = [...(payload.matrix || [])];
+    let rows = [...(payload.matrix || [])];
+    if (matrixPosFilter !== "ALL") {
+      rows = rows.filter((r) => (byId[r.player_id] || {}).position === matrixPosFilter);
+    }
     rows.sort((a, b) => {
       const key = matrixSortKey;
-      const av = key === "position" ? (byId[a.player_id] || {}).position || "" : a[key] ?? 0;
-      const bv = key === "position" ? (byId[b.player_id] || {}).position || "" : b[key] ?? 0;
+      const av =
+        key === "position"
+          ? (byId[a.player_id] || {}).position || ""
+          : a[key] ?? (byId[a.player_id] || {})[key] ?? 0;
+      const bv =
+        key === "position"
+          ? (byId[b.player_id] || {}).position || ""
+          : b[key] ?? (byId[b.player_id] || {})[key] ?? 0;
       if (av < bv) return -1 * matrixSortDir;
       if (av > bv) return 1 * matrixSortDir;
       return 0;
@@ -625,34 +1514,81 @@
     const cols = [
       ["player_id", "Player"],
       ["position", "Pos"],
-      ["price", "Price"],
-      ["expected_price", "Expected"],
-      ["price_setter_bid", "2nd bid"],
-      ["winner", "Winner"],
+      ["price", "Sleeper $"],
+      ["vorp_dollar", "VORP $"],
+      ["volr_dollar", "VOLR $"],
+      ["expected_price", "Exp win"],
     ];
-    const head = cols
-      .map(([key, label]) => `<th data-key="${key}">${label}${matrixSortKey === key ? (matrixSortDir === -1 ? " ↓" : " ↑") : ""}</th>`)
-      .join("");
+    const starts = divisionStarts(payload);
+    const order = seatOrder(payload);
+    const sortArrow = (key) => (matrixSortKey === key ? (matrixSortDir === -1 ? " ↓" : " ↑") : "");
+    const head =
+      cols
+        .slice(0, 3)
+        .map(([key, label]) => `<th data-key="${key}">${label}${sortArrow(key)}</th>`)
+        .join("") +
+      `<th style="text-align:center">Blend</th>` +
+      `<th class="col-volr" data-key="volr_dollar">VOLR $${sortArrow("volr_dollar")}</th>` +
+      order
+        .map((sid) => {
+          const me = sid === payload.my_seat ? " mecol me" : "";
+          const edge = starts.has(sid) ? " divedge" : "";
+          return `<th class="num seat${me}${edge}">${seatAbbr(payload, sid)}${sid === payload.my_seat ? "*" : ""}</th>`;
+        })
+        .join("") +
+      `<th class="num expwin" data-key="expected_price">Exp win${sortArrow("expected_price")}</th>`;
 
     const body = rows
       .map((row) => {
         const p = byId[row.player_id] || {};
-        const winnerLabel =
-          row.winner !== null && row.winner !== undefined ? seatLabel(payload, row.winner) : "--";
+        const seatCells = order
+          .map((sid) => {
+            const b = row.bids ? row.bids[sid] : undefined;
+            const cls = ["seat"];
+            if (sid === payload.my_seat) cls.push("mecol");
+            if (!b || b <= 0) cls.push("out");
+            if (sid === row.winner) cls.push("win");
+            else if (row.price_setter_bid && b === row.price_setter_bid) cls.push("setter");
+            if (starts.has(sid)) cls.push("divedge");
+            return `<td class="${cls.join(" ")}">${b > 0 ? fmtMoney(b) : "—"}</td>`;
+          })
+          .join("");
         return `
         <tr>
-          <td>${row.player_id}</td>
-          <td class="pos-${p.position || ""}">${p.position || ""}</td>
+          <td><span class="pos ${p.position || ""}">${p.position || ""}</span></td>
+          <td class="name">${row.player_id}</td>
           <td class="num money">${fmtMoney(row.price)}</td>
-          <td class="num money">${fmtMoney(row.expected_price)}</td>
-          <td class="num money">${fmtMoney(row.price_setter_bid)}</td>
-          <td>${winnerLabel}</td>
+          <td class="num vorp">${fmtMoney(p.vorp_dollar)}</td>
+          <td class="blend">${blendTrack(p.vorp_dollar, p.volr_dollar)}</td>
+          <td class="num volr">${fmtMoney(p.volr_dollar)}</td>
+          ${seatCells}
+          <td class="expwin">${fmtMoney(row.expected_price)}</td>
         </tr>
       `;
       })
       .join("");
 
     el.innerHTML = `
+      <div class="poolhd">
+        <div class="filters" id="matrix-posfilter">
+          ${["ALL", "QB", "RB", "WR", "TE"]
+            .map(
+              (pos) =>
+                `<button type="button" data-pos="${pos}" class="${
+                  matrixPosFilter === pos ? "active" : ""
+                }">${pos === "ALL" ? "All" : pos}</button>`
+            )
+            .join("")}
+        </div>
+        <div class="knob">
+          <span class="klabel vorp">VORP $</span>
+          <input type="range" id="matrix-blend" min="0" max="100" step="5" value="${Math.round((1 - W) * 100)}" />
+          <span class="klabel volr">VOLR $</span>
+          <span class="knob-readout"><b id="matrix-pctVorp">${Math.round(W * 100)}%</b> VORP / <i id="matrix-pctVolr">${Math.round(
+      (1 - W) * 100
+    )}%</i> VOLR</span>
+        </div>
+      </div>
       <div class="scroller">
         <table>
           <thead><tr>${head}</tr></thead>
@@ -661,7 +1597,21 @@
       </div>
     `;
 
-    el.querySelectorAll("th").forEach((th) => {
+    el.querySelectorAll("#matrix-posfilter button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        matrixPosFilter = btn.dataset.pos;
+        renderMatrix(payload);
+      });
+    });
+    const blendSlider = el.querySelector("#matrix-blend");
+    blendSlider.addEventListener("input", () => {
+      W = 1 - +blendSlider.value / 100;
+      renderMatrix(payload);
+      renderHeader(payload, document.getElementById("head-live"));
+      renderHeader(payload, document.getElementById("head-market"));
+    });
+
+    el.querySelectorAll("th[data-key]").forEach((th) => {
       th.addEventListener("click", () => {
         const key = th.dataset.key;
         if (matrixSortKey === key) {
@@ -699,69 +1649,185 @@
     return slots;
   }
 
+  // Two tables share an identical <colgroup> so the fixed head lines up
+  // with the scrolling, mask-faded body beneath it.
+  const RCARD_COLS = '<colgroup><col style="width:38px"><col><col style="width:44px"><col style="width:46px"></colgroup>';
+
+  function rcard(payload, seat, sid) {
+    const pct = seat.budget_left + seat.bought.reduce((n, b) => n + b.amount, 0);
+    const pctFill = pct > 0 ? Math.round((seat.budget_left / pct) * 100) : 0;
+    const mine = sid === payload.my_seat ? " mine" : "";
+    return `<div class="rcard${mine}">
+      <div class="rhd1"><b>${seatLabel(payload, sid)}</b>
+        <span class="meta"><span class="left">${fmtMoney(seat.budget_left)}</span><span>left</span></span></div>
+      <div class="budget"><i style="width:${pctFill}%"></i></div>
+      <table class="rtbl-head">${RCARD_COLS}
+        <thead><tr><th>Pos</th><th>Player</th><th class="num">Proj</th><th class="num">Paid</th></tr></thead>
+      </table>
+      <div class="rtblwrap"><table>${RCARD_COLS}
+        <tbody>${slotRows(seat, startingSlots(payload.config || {}), false)}</tbody></table></div></div>`;
+  }
+
   function renderRosters(payload) {
     const el = document.getElementById("rosters");
     const seatsById = Object.fromEntries((payload.seats || []).map((s) => [s.seat_id, s]));
     const divisions = payload.divisions || [
       { name: "All seats", index: 0, mine: false, seats: (payload.seats || []).map((s) => s.seat_id) },
     ];
-    const slotsTemplate = startingSlots(payload.config || {});
 
-    el.innerHTML = divisions
+    el.innerHTML = `<div class="rbands">${divisions
       .map((division) => {
-        const cards = division.seats
-          .map((sid) => {
-            const seat = seatsById[sid] || { budget_left: 0, bought: [] };
-            const players = seat.bought.map((b) => ({
-              playerId: b.player_id,
-              position: b.position,
-              points: b.points,
-            }));
-            const seated = fillSlots(players, slotsTemplate);
-            const seatedIds = new Set(seated.values());
-            const bench = seat.bought.filter((b) => !seatedIds.has(b.player_id));
-
-            const lines = slotsTemplate
-              .map((slot) => {
-                const pid = seated.get(slot.id);
-                if (pid) {
-                  const b = seat.bought.find((x) => x.player_id === pid);
-                  return `<div class="roster-line"><span class="pos-${b.position}">${slot.flexLabel}</span><span>${pid}</span></div>`;
-                }
-                return `<div class="roster-line open"><span>${slot.flexLabel}</span><span>-- open --</span></div>`;
-              })
-              .join("");
-            const benchLines = bench
-              .map((b) => `<div class="roster-line bench"><span class="pos-${b.position}">BN</span><span>${b.player_id}</span></div>`)
-              .join("");
-
-            const mine = sid === payload.my_seat ? " mine" : "";
-            return `
-              <div class="roster-card${mine}">
-                <div class="roster-card-head"><span>${seatLabel(payload, sid)}</span><span class="money">$${seat.budget_left}</span></div>
-                ${lines}
-                ${benchLines}
-              </div>
-            `;
-          })
+        const letters = (division.name || "")
+          .split("")
+          .map((c) => `<span>${c}</span>`)
           .join("");
-        const mineClass = division.mine ? " mine" : "";
-        return `
-          <div class="division${mineClass}">
-            <div class="eyebrow">${division.name}</div>
-            <div class="roster-grid">${cards}</div>
-          </div>
-        `;
+        const cards = division.seats
+          .map((sid) => rcard(payload, seatsById[sid] || { budget_left: 0, bought: [] }, sid))
+          .join("");
+        return `<div class="rband${division.mine ? " mine" : ""}">
+          <div class="rail"><span class="divname">${letters}</span></div>
+          <div class="rgrid4">${cards}</div>
+        </div>`;
+      })
+      .join("")}</div>`;
+  }
+
+  const SKILL_POS = ["QB", "RB", "WR", "TE"];
+  const SLOT_LABEL = { FLEX: "FLEX", REC_FLEX: "WR/TE", SUPER_FLEX: "SFLEX", BN: "BN" };
+
+  function posClassFor(pos) {
+    return SKILL_POS.includes(pos) ? pos : pos === "DEF" ? "DEF" : "FLEX";
+  }
+  function posBadgeHtml(pos) {
+    return `<span class="pos ${posClassFor(pos)}">${pos}</span>`;
+  }
+  function slotBadgeHtml(label) {
+    return `<span class="pos ${posClassFor(label)}">${SLOT_LABEL[label] || label}</span>`;
+  }
+
+  // A seat's roster as slot-filled rows via the shared fillSlots (open slots
+  // show the slot label; a flex slot shows the seated player's own position
+  // color under the flex label; bench -- unseated -- players are dimmed).
+  // `mini` drops the Proj column for the narrow Live-slide cards.
+  function slotRows(seat, slotsTemplate, mini) {
+    const bought = seat.bought || [];
+    const players = bought.map((b) => ({ playerId: b.player_id, position: b.position, points: b.points }));
+    const seated = fillSlots(players, slotsTemplate);
+    const seatedIds = new Set(seated.values());
+    const boughtById = Object.fromEntries(bought.map((b) => [b.player_id, b]));
+    const bench = bought.filter((b) => !seatedIds.has(b.player_id));
+
+    const row = (badge, b, cls) =>
+      mini
+        ? `<tr class="${cls}"><td>${badge}</td><td class="name">${
+            b ? b.player_id : "— open —"
+          }</td><td class="num money">${b ? fmtMoney(b.amount) : ""}</td></tr>`
+        : `<tr class="${cls}"><td>${badge}</td><td class="name">${
+            b ? b.player_id : "— open —"
+          }</td><td class="num">${b ? b.points : ""}</td><td class="num money">${
+            b ? fmtMoney(b.amount) : ""
+          }</td></tr>`;
+
+    const starterRows = slotsTemplate
+      .map((slot) => {
+        const pid = seated.get(slot.id);
+        if (!pid) return row(slotBadgeHtml(slot.flexLabel), null, "open");
+        const b = boughtById[pid];
+        const isFlex = slot.eligiblePositions && slot.eligiblePositions.length > 1;
+        const badge = isFlex
+          ? `<span class="pos ${posClassFor(b.position)}">${SLOT_LABEL[slot.flexLabel] || slot.flexLabel}</span>`
+          : posBadgeHtml(b.position);
+        return row(badge, b, "");
       })
       .join("");
+    const benchRows = bench.map((b) => row(posBadgeHtml(b.position), b, "bench")).join("");
+    return starterRows + benchRows;
+  }
+
+  // Serves both "My roster" and "High bidder's roster" -- same slot-fill,
+  // different seat.
+  function renderMiniRoster(payload, seatId, bodyId, labelId, labelText) {
+    const body = document.getElementById(bodyId);
+    const label = document.getElementById(labelId);
+    const seat = seatId != null ? seatById(payload, seatId) : null;
+    if (!seat) {
+      label.textContent = labelText;
+      body.innerHTML = "";
+      return;
+    }
+    const mine = seatId === payload.my_seat ? " (me)" : "";
+    label.textContent = `${labelText} — ${seatLabel(payload, seatId)}${mine} · ${fmtMoney(seat.budget_left)} left`;
+    body.innerHTML = slotRows(seat, startingSlots(payload.config || {}), true);
+  }
+
+  // Run pressure: top-10-by-VORP-$ available players per skill position,
+  // with a cliff marker at the biggest point drop -- pure client-side math
+  // over payload.players, no server dependency (there's no tier-cliff
+  // structure in the payload to consume instead).
+  function renderPressCards(payload) {
+    const el = document.getElementById("presscards");
+    if (!el) return;
+    const numSeats = (payload.seats || []).length;
+    el.innerHTML = SKILL_POS.map((pos) => {
+      const avail = (payload.players || [])
+        .filter((p) => p.position === pos)
+        .slice()
+        .sort((a, b) => (b.vorp_dollar || 0) - (a.vorp_dollar || 0))
+        .slice(0, 10);
+      let cliffAfter = -1,
+        cliffDrop = 0;
+      for (let i = 0; i < avail.length - 1; i++) {
+        const drop = (avail[i].points || 0) - (avail[i + 1].points || 0);
+        if (drop > cliffDrop) {
+          cliffDrop = drop;
+          cliffAfter = i;
+        }
+      }
+      if (avail.length < 3 || cliffDrop <= 0) cliffAfter = -1;
+      const target = ((payload.config || {}).starting_slots || {})[pos] || 0;
+      const slots = target * numSeats;
+      const drafted = (payload.seats || []).reduce(
+        (n, s) => n + s.bought.filter((b) => b.position === pos).length,
+        0
+      );
+      const head = `<div class="availhd"><span>Player</span><span class="vd">VORP $</span><span class="ld">VOLR $</span><span>Proj</span></div>`;
+      const rows = avail
+        .map((p, i) => {
+          const row = `<div class="availrow"><span class="name">${p.player_id}</span><span class="vd">${fmtMoney(
+            p.vorp_dollar
+          )}</span><span class="ld">${fmtMoney(p.volr_dollar)}</span><i class="proj">${Math.round(
+            p.points || 0
+          )}</i></div>`;
+          return i === cliffAfter
+            ? row + `<div class="cliffline">&#9662; -${Math.round(cliffDrop)} pts to next tier</div>`
+            : row;
+        })
+        .join("");
+      return (
+        `<div class="presscard"><div class="cap"><span class="pos ${pos}">${pos}</span>${avail.length} on the board</div>` +
+        `<div class="cliff"><b>${drafted} / ${slots}</b> starters drafted</div>` +
+        `<div class="availlist">${head}${rows}</div></div>`
+      );
+    }).join("");
   }
 
   function renderAll(payload) {
-    renderHeader(payload);
+    renderHeader(payload, document.getElementById("head-live"));
+    renderHeader(payload, document.getElementById("head-market"));
     renderPower(payload);
     renderStateTable(payload);
     renderMatrix(payload);
     renderRosters(payload);
+    renderPressCards(payload);
+    renderMiniRoster(payload, payload.my_seat, "mini-my", "mini-my-label", "My roster");
+    const blockRow = payload.block ? matrixRowFor(payload, payload.block.player_id) : null;
+    renderMiniRoster(
+      payload,
+      blockRow ? blockRow.winner : null,
+      "mini-bidder",
+      "mini-bidder-label",
+      "High bidder's roster"
+    );
   }
 
   window.__renderAll = renderAll; // exposed for a static-payload smoke test
