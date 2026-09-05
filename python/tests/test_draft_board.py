@@ -283,3 +283,30 @@ def test_payload_seats_carries_every_real_seats_roster():
     assert {b["player_id"] for b in seat0["bought"]} == {"19", "147"}
     assert seat0["budget_left"] == LEAGUE_CONFIG.budget - 10 - 15
     assert seat0["max_bid"] == state.max_bid(0)
+
+
+def test_payload_seats_bought_players_carry_real_points():
+    players = _players()
+    state = build_state(_picks(), LEAGUE_CONFIG)
+    payload = build_payload(state, players, LEAGUE_CONFIG, w_floor=1.0, matrix_top=5)
+
+    # "19" is a real, projected player in the CSV; the fixture's own "147"
+    # isn't (no points_ppr row -- filtered out of `players` entirely), which
+    # exercises the 0.0 fallback _seat_summaries shares with
+    # seat_value.py::_roster_of for a player the projections no longer list.
+    by_id = {p.player_id: p.points for p in players}
+    seat0 = next(s for s in payload["seats"] if s["seat_id"] == 0)
+    for bought in seat0["bought"]:
+        expected = round(by_id.get(bought["player_id"], 0.0), 1)
+        assert bought["points"] == expected
+    assert any(b["player_id"] == "19" and b["points"] > 0 for b in seat0["bought"])
+
+
+def test_payload_config_carries_the_slot_template():
+    players = _players()
+    state = build_state(_picks(), LEAGUE_CONFIG)
+    payload = build_payload(state, players, LEAGUE_CONFIG, w_floor=1.0, matrix_top=5)
+
+    assert payload["config"]["starting_slots"] == LEAGUE_CONFIG.starting_slots
+    assert payload["config"]["flex_slots"] == LEAGUE_CONFIG.flex_slots
+    assert payload["config"]["bench_slots"] == LEAGUE_CONFIG.bench_slots

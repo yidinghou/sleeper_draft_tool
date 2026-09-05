@@ -1,15 +1,23 @@
 #!/usr/bin/env python3
 """The live draft board server -- see docs/spec/board/index.md.
 
-Steps 2, 3, and 4 of docs/spec/board/guide.md's build order: the server
+Steps 2, 3, 4, and 6 of docs/spec/board/guide.md's build order: the server
 skeleton, `/state.json`, Sleeper polling, seat identity + divisions, the
-per-seat bid matrix, `my_plan`, and `block`. This is still a partial slice
+per-seat bid matrix, `my_plan`, `block`, and the time-travel scrubber
+(`get_payload_upto`, disk-persisted frames). This is still a partial slice
 of the full rendering contract (docs/spec/board/03-rendering-contract.md):
-everything above is real, but `block`'s `market`/`wk3VorpD` fields aren't
-(no market-price or weeks-1-3 data source is loaded here -- see
-`block_info`'s docstring). Not yet built: the scrubber + frame cache
-(guide.md step 6) and the slide deck (step 5) -- `/board` and `templates/`
-don't exist yet, only the JSON payload does.
+`block`'s `market`/`wk3VorpD` fields aren't wired in (no market-price or
+weeks-1-3 data source is loaded here -- see `block_info`'s docstring), and
+no payload anywhere carries a player's *name* -- `RosterFillPlayer` doesn't
+carry one, so the deck (below) renders raw player ids until that's threaded
+through.
+
+Step 5, the slide deck, is in progress: `templates/board_slides.html` exists
+and serves at `GET /board` (and `GET /` -- there's no separate landing/
+source-picker page yet, both routes serve the same deck). So far it has the
+header (on-block hero, per-seat worth) and the buying-power bars; the
+draft-state table, pool matrix, roster cards, and the live poll loop are
+still placeholder cards in the template.
 
 Two source modes: `--picks-file <path>` (`file` mode, re-read on mtime
 change -- a hand-edited nomination key is the only source of a live block
@@ -228,10 +236,17 @@ def plan_payload(plan: RosterPlan) -> Dict[str, Any]:
     }
 
 
-def _seat_summaries(state: LeagueState) -> List[Dict[str, Any]]:
+def _seat_summaries(
+    state: LeagueState, points_by_id: Dict[str, float]
+) -> List[Dict[str, Any]]:
     """Every real seat's roster summary -- what the deck's Rosters slide
     needs to run `fillSlots` against. `UNKNOWN_SEAT` is excluded; it owns no
-    roster. Doesn't include each pick's opening price (the full contract's
+    roster. Each bought player carries `points` (from `points_by_id`, the
+    full player list -- sold players don't appear in `board["rows"]`
+    anymore) so the client-side fill can actually order by points, same as
+    the Python matching; a player the projections no longer list scores 0
+    rather than being omitted, same convention as `seat_value.py::_roster_of`.
+    Doesn't include each pick's opening price (the full contract's
     `lines[].price`, for over/under-pay tags) -- that needs a second
     `price_board` solve against the opening board, not wired in here.
     """
@@ -241,7 +256,12 @@ def _seat_summaries(state: LeagueState) -> List[Dict[str, Any]]:
             "budget_left": seat.budget_left,
             "max_bid": state.max_bid(seat.seat_id),
             "bought": [
-                {"player_id": b.player_id, "position": b.position, "amount": b.amount}
+                {
+                    "player_id": b.player_id,
+                    "position": b.position,
+                    "amount": b.amount,
+                    "points": round(points_by_id.get(b.player_id, 0.0), 1),
+                }
                 for b in seat.bought
             ],
         }
@@ -274,8 +294,10 @@ def build_payload(
     buys, with fills clearly tagged (`kind="fill"`) so they never masquerade
     as lineup upgrades. `block` is `None` unless `nomination` names a real,
     still-unsold, priced player -- see `block_info`. `seats` is every real
-    seat's roster summary (`_seat_summaries`) -- always included, no
-    identity source needed.
+    seat's roster summary (`_seat_summaries`) and `config` is the slot
+    template (`starting_slots`/`flex_slots`/`bench_slots`) -- both always
+    included, no identity source needed; together they're what the deck's
+    Rosters slide runs `fillSlots` against.
     """
     sold_ids = set(state.sold())
     remaining = [p for p in players if p.player_id not in sold_ids]
@@ -303,7 +325,12 @@ def build_payload(
         ],
         "matrix": matrix,
         "block": block_info(nomination, remaining, board, matrix),
-        "seats": _seat_summaries(state),
+        "seats": _seat_summaries(state, {p.player_id: p.points for p in players}),
+        "config": {
+            "starting_slots": config.starting_slots,
+            "flex_slots": config.flex_slots,
+            "bench_slots": config.bench_slots,
+        },
     }
     if seat_users is not None:
         payload["seat_users"] = seat_users
@@ -883,6 +910,38 @@ class Board:
         return result
 
 
+TEMPLATES = Path(__file__).resolve().parent / "templates"
+BOARD_TEMPLATE_PATH = TEMPLATES / "board_slides.html"
+
+
+#: The tested, shared source of the client-side roster matching -- see
+#: src/roster-fill-client.cjs and src/roster-fill-client.test.js. Inlined
+#: verbatim into the template rather than hand-copied, so there is one
+#: source of truth instead of a driftable duplicate.
+FILL_SLOTS_JS_PATH = REPO_ROOT / "src" / "roster-fill-client.cjs"
+
+
+def load_board_page() -> str:
+    """The deck's HTML, wrapped in the minimal skeleton a `file://`/browser
+    `GET` needs -- the template itself is a fragment (`<title>`, `<style>`,
+    markup, `<script>`, no `<html>`/`<head>`/`<body>`), same convention as
+    `python/scripts/templates/draft_demo.html`. Re-read on every call rather
+    than cached, so a template edit takes effect without restarting the
+    server -- it's a small file and this is a dev-facing tool, not a
+    high-QPS endpoint.
+
+    The template's `<!-- FILL_SLOTS_JS -->` marker is replaced with
+    `roster-fill-client.cjs`'s source. That file's trailing
+    `if (typeof module ...) { module.exports = ... }` guard is inert in a
+    browser (no `module` global there) so it's safe to inline as-is --
+    verified in `roster-fill-client.cjs`'s own commit.
+    """
+    fragment = BOARD_TEMPLATE_PATH.read_text(encoding="utf-8")
+    fill_slots_js = FILL_SLOTS_JS_PATH.read_text(encoding="utf-8")
+    fragment = fragment.replace("<!-- FILL_SLOTS_JS -->", fill_slots_js)
+    return f"<!doctype html>\n<html lang=\"en\">\n<meta charset=\"utf-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n{fragment}\n</html>\n"
+
+
 def make_handler(board: Board):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):  # noqa: A002 -- quiet by default
@@ -896,6 +955,14 @@ def make_handler(board: Board):
             self.end_headers()
             self.wfile.write(payload)
 
+        def _send_html(self, html: str) -> None:
+            body = html.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
         def do_GET(self) -> None:  # noqa: N802 -- stdlib method name
             parsed = urllib.parse.urlparse(self.path)
             if parsed.path == "/state.json":
@@ -905,6 +972,8 @@ def make_handler(board: Board):
                     self._send_json(board.get_payload_upto(int(upto[0])))
                 else:
                     self._send_json(board.payload())
+            elif parsed.path in ("/board", "/"):
+                self._send_html(load_board_page())
             elif self.path == "/health":
                 body = b"ok"
                 self.send_response(200)

@@ -5,6 +5,10 @@ data/*.csv
 !data/boberto-*.csv
 !data/sleeper-board-*.csv
 data/*.json
+# The board server's disk-persisted scrub frames -- see
+# docs/spec/board/04-time-travel-scrubber.md. One dir per draft id/picks-file
+# stem, deep enough that data/*.json above doesn't already cover it.
+data/frames-*/
 .env
 .env.local
 .DS_Store

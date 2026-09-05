@@ -1,0 +1,842 @@
+<title>Live Draft Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+/>
+<style>
+  :root {
+    --ground: #eff2f5;
+    --surface: #ffffff;
+    --surface-sunk: #e7ebf0;
+    --line: #d3dae2;
+    --line-soft: #e3e8ee;
+    --ink: #16202b;
+    --ink-soft: #47576a;
+    --ink-faint: #7b8b9c;
+    --accent: #1f4e79;
+    --accent-soft: #dbe6f1;
+    --up: #0e7c66;
+    --up-soft: #d5ece5;
+    --down: #b4432c;
+    --down-soft: #f6ddd7;
+    --brass: #8a6413;
+    --qb: #6d4b9e;
+    --rb: #0e7c66;
+    --wr: #1f4e79;
+    --te: #a8621c;
+    --def: #5c6b7a;
+    --radius: 6px;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: Archivo, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1720;
+      --surface: #16202b;
+      --surface-sunk: #101821;
+      --line: #2a3846;
+      --line-soft: #212e3a;
+      --ink: #e3eaf1;
+      --ink-soft: #a3b2c1;
+      --ink-faint: #71818f;
+      --accent: #7aaad6;
+      --accent-soft: #1c2f42;
+      --up: #46bfa0;
+      --up-soft: #14312a;
+      --down: #e3806c;
+      --down-soft: #3a1f19;
+      --brass: #d1a94a;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0f1720;
+    --surface: #16202b;
+    --surface-sunk: #101821;
+    --line: #2a3846;
+    --line-soft: #212e3a;
+    --ink: #e3eaf1;
+    --ink-soft: #a3b2c1;
+    --ink-faint: #71818f;
+    --accent: #7aaad6;
+    --accent-soft: #1c2f42;
+    --up: #46bfa0;
+    --up-soft: #14312a;
+    --down: #e3806c;
+    --down-soft: #3a1f19;
+    --brass: #d1a94a;
+  }
+
+  html {
+    color-scheme: light dark;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 72px; /* room for the floating nav */
+  }
+
+  .wrap {
+    max-width: 1360px;
+    margin: 0 auto;
+    padding: 24px 24px 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .slide {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .slide[hidden] {
+    display: none;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .money {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pos-QB {
+    color: var(--qb);
+  }
+  .pos-RB {
+    color: var(--rb);
+  }
+  .pos-WR {
+    color: var(--wr);
+  }
+  .pos-TE {
+    color: var(--te);
+  }
+  .pos-DEF {
+    color: var(--def);
+  }
+
+  /* -------------------------------------------------- header / block --- */
+
+  .header {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .block-hero {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .block-hero .name {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  .block-hero .price {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--accent);
+  }
+  .block-hero .empty {
+    font-size: 18px;
+    color: var(--ink-faint);
+    font-style: italic;
+  }
+  .block-hero .sub {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+
+  .worth-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .worth-tile {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--surface-sunk);
+    border: 1px solid var(--line-soft);
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+  }
+  .worth-tile.mine {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .worth-tile .seat {
+    color: var(--ink-faint);
+  }
+
+  /* --------------------------------------------------- buying power ---- */
+
+  .power-row {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 6px;
+    align-items: end;
+    height: 90px;
+  }
+  .power-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    gap: 4px;
+  }
+  .power-bar .fill {
+    width: 100%;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: 3px 3px 0 0;
+    min-height: 2px;
+  }
+  .power-bar.mine .fill {
+    background: var(--brass);
+    border-color: var(--brass);
+  }
+  .power-bar .label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  /* --------------------------------------------------------- nav --------- */
+
+  .nav {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    z-index: 10;
+  }
+  .nav button {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    padding: 8px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .nav button.active {
+    background: var(--accent);
+    color: white;
+  }
+
+  .scrub-bar {
+    position: fixed;
+    bottom: 68px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    z-index: 10;
+    width: min(90vw, 480px);
+  }
+  .scrub-bar input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+  }
+  .scrub-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  .scrub-bar button {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 4px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+
+  .placeholder {
+    color: var(--ink-faint);
+    font-style: italic;
+    padding: 24px;
+    text-align: center;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th,
+  td {
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  th {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  #matrix th {
+    cursor: pointer;
+    user-select: none;
+  }
+  #matrix th:hover {
+    color: var(--ink);
+  }
+  .scroller {
+    overflow-x: auto;
+  }
+  .num {
+    text-align: right;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .division {
+    margin-bottom: 20px;
+  }
+  .division .eyebrow {
+    margin-bottom: 8px;
+  }
+  .division.mine .eyebrow {
+    color: var(--accent);
+  }
+  .roster-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 900px) {
+    .roster-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  .roster-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px;
+  }
+  .roster-card.mine {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .roster-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-weight: 600;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .roster-line {
+    font-family: var(--mono);
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    color: var(--ink-soft);
+  }
+  .roster-line.open {
+    color: var(--ink-faint);
+    font-style: italic;
+  }
+  .roster-line.bench {
+    color: var(--ink-faint);
+  }
+</style>
+
+<div class="wrap">
+  <section class="slide" id="s-live">
+    <div class="card header" id="header"></div>
+    <div class="card">
+      <div class="eyebrow">Buying power</div>
+      <div class="power-row" id="power"></div>
+    </div>
+    <div class="card">
+      <div class="eyebrow">Draft state by position</div>
+      <div id="state-table"></div>
+    </div>
+  </section>
+
+  <section class="slide" id="s-market" hidden>
+    <div class="card">
+      <div class="eyebrow">Pool matrix</div>
+      <div id="matrix"></div>
+    </div>
+  </section>
+
+  <section class="slide" id="s-rosters" hidden>
+    <div id="rosters"></div>
+  </section>
+</div>
+
+<div class="scrub-bar">
+  <input type="range" id="scrub" min="0" max="0" value="0" disabled />
+  <span class="scrub-label" id="scrub-label">live</span>
+  <button id="scrub-live" hidden>Live</button>
+</div>
+
+<nav class="nav">
+  <button data-slide="s-live" class="active">1 Live</button>
+  <button data-slide="s-market">2 Market</button>
+  <button data-slide="s-rosters">3 Rosters</button>
+</nav>
+
+<script>
+  <!-- FILL_SLOTS_JS -->
+
+  const SLIDES = ["s-live", "s-market", "s-rosters"];
+
+  function showSlide(id) {
+    for (const s of SLIDES) {
+      document.getElementById(s).hidden = s !== id;
+    }
+    for (const btn of document.querySelectorAll(".nav button")) {
+      btn.classList.toggle("active", btn.dataset.slide === id);
+    }
+  }
+
+  document.querySelectorAll(".nav button").forEach((btn) => {
+    btn.addEventListener("click", () => showSlide(btn.dataset.slide));
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.shiftKey && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
+      // Scrub one pick -- guarded by shiftKey so it doesn't also fire the
+      // plain-arrow slide navigation below.
+      scrubStep(e.key === "ArrowRight" ? 1 : -1);
+      e.preventDefault();
+    } else if (e.key === "Escape") {
+      goLive();
+    } else if (e.key === "1" || e.key === "2" || e.key === "3") {
+      showSlide(SLIDES[Number(e.key) - 1]);
+    } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      const current = SLIDES.findIndex((s) => !document.getElementById(s).hidden);
+      const delta = e.key === "ArrowRight" ? 1 : -1;
+      const next = Math.min(SLIDES.length - 1, Math.max(0, current + delta));
+      showSlide(SLIDES[next]);
+    }
+  });
+
+  function fmtMoney(n) {
+    return n === null || n === undefined ? "--" : `$${n}`;
+  }
+
+  function seatLabel(payload, seatId) {
+    const identity = (payload.seat_users || {})[seatId];
+    return (identity && (identity.display_name || identity.username)) || `Seat ${seatId + 1}`;
+  }
+
+  function seatOrder(payload) {
+    return payload.seat_order || (payload.seats || []).map((s) => s.seat_id);
+  }
+
+  function renderHeader(payload) {
+    const el = document.getElementById("header");
+    const block = payload.block;
+
+    if (!block) {
+      el.innerHTML = `
+        <div class="block-hero">
+          <span class="empty">Nobody on the block / waiting on a nomination</span>
+        </div>
+      `;
+      return;
+    }
+
+    const posClass = block.position ? `pos-${block.position}` : "";
+    const soldTag = block.sold ? " (just sold)" : "";
+    const currentBid = block.sold
+      ? fmtMoney(block.amount)
+      : fmtMoney(block.highest_offer);
+
+    let worthRow = "";
+    if (block.bids) {
+      const order = seatOrder(payload);
+      worthRow = `<div class="worth-row">${order
+        .map((sid) => {
+          const bid = block.bids[sid];
+          const mine = sid === payload.my_seat ? " mine" : "";
+          return `<span class="worth-tile${mine}"><span class="seat">${seatLabel(
+            payload,
+            sid
+          )}</span><span class="money">${fmtMoney(bid)}</span></span>`;
+        })
+        .join("")}</div>`;
+    }
+
+    el.innerHTML = `
+      <div class="block-hero">
+        <span class="name ${posClass}">${block.player_id}${soldTag}</span>
+        <span class="price">${fmtMoney(block.price)}</span>
+        <span class="sub">board price &middot; current bid ${currentBid} &middot; VORP ${fmtMoney(
+      block.vorp_dollar
+    )} &middot; VOLR ${fmtMoney(block.volr_dollar)}</span>
+      </div>
+      ${worthRow}
+    `;
+  }
+
+  function renderPower(payload) {
+    const el = document.getElementById("power");
+    const order = seatOrder(payload);
+    const seatsById = Object.fromEntries((payload.seats || []).map((s) => [s.seat_id, s]));
+    const maxOfAll = Math.max(1, ...order.map((sid) => (seatsById[sid] || {}).max_bid || 0));
+
+    el.innerHTML = order
+      .map((sid) => {
+        const seat = seatsById[sid] || {};
+        const pct = Math.max(2, ((seat.max_bid || 0) / maxOfAll) * 100);
+        const mine = sid === payload.my_seat ? " mine" : "";
+        return `
+        <div class="power-bar${mine}">
+          <div class="fill" style="height:${pct}%" title="max bid ${fmtMoney(seat.max_bid)}"></div>
+          <div class="label">${seatLabel(payload, sid)}</div>
+        </div>
+      `;
+      })
+      .join("");
+  }
+
+  const POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"];
+
+  function renderStateTable(payload) {
+    const el = document.getElementById("state-table");
+    const drafted = {};
+    const spent = {};
+    for (const pos of POSITIONS) {
+      drafted[pos] = 0;
+      spent[pos] = 0;
+    }
+    for (const seat of payload.seats || []) {
+      for (const b of seat.bought) {
+        drafted[b.position] = (drafted[b.position] || 0) + 1;
+        spent[b.position] = (spent[b.position] || 0) + b.amount;
+      }
+    }
+
+    const positions = Object.keys(payload.levels || {});
+    const rows = positions
+      .map((pos) => {
+        const level = payload.levels[pos];
+        return `
+        <tr>
+          <td class="pos-${pos}">${pos}</td>
+          <td class="num">${drafted[pos] || 0}</td>
+          <td class="num money">${fmtMoney(spent[pos] || 0)}</td>
+          <td class="num">${level.replacement.toFixed(1)}</td>
+          <td class="num">${level.last_rostered.toFixed(1)}</td>
+        </tr>
+      `;
+      })
+      .join("");
+
+    el.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Pos</th><th class="num">Drafted</th><th class="num">Spent</th><th class="num">Replacement</th><th class="num">Last rostered</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  // Bargain/expected-price sort state persists across renders so a poll
+  // refresh doesn't reset the user's chosen column.
+  let matrixSortKey = "price";
+  let matrixSortDir = -1;
+
+  function renderMatrix(payload) {
+    const el = document.getElementById("matrix");
+    const byId = Object.fromEntries((payload.players || []).map((p) => [p.player_id, p]));
+
+    const rows = [...(payload.matrix || [])];
+    rows.sort((a, b) => {
+      const key = matrixSortKey;
+      const av = key === "position" ? (byId[a.player_id] || {}).position || "" : a[key] ?? 0;
+      const bv = key === "position" ? (byId[b.player_id] || {}).position || "" : b[key] ?? 0;
+      if (av < bv) return -1 * matrixSortDir;
+      if (av > bv) return 1 * matrixSortDir;
+      return 0;
+    });
+
+    const cols = [
+      ["player_id", "Player"],
+      ["position", "Pos"],
+      ["price", "Price"],
+      ["expected_price", "Expected"],
+      ["price_setter_bid", "2nd bid"],
+      ["winner", "Winner"],
+    ];
+    const head = cols
+      .map(([key, label]) => `<th data-key="${key}">${label}${matrixSortKey === key ? (matrixSortDir === -1 ? " ↓" : " ↑") : ""}</th>`)
+      .join("");
+
+    const body = rows
+      .map((row) => {
+        const p = byId[row.player_id] || {};
+        const winnerLabel =
+          row.winner !== null && row.winner !== undefined ? seatLabel(payload, row.winner) : "--";
+        return `
+        <tr>
+          <td>${row.player_id}</td>
+          <td class="pos-${p.position || ""}">${p.position || ""}</td>
+          <td class="num money">${fmtMoney(row.price)}</td>
+          <td class="num money">${fmtMoney(row.expected_price)}</td>
+          <td class="num money">${fmtMoney(row.price_setter_bid)}</td>
+          <td>${winnerLabel}</td>
+        </tr>
+      `;
+      })
+      .join("");
+
+    el.innerHTML = `
+      <div class="scroller">
+        <table>
+          <thead><tr>${head}</tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    `;
+
+    el.querySelectorAll("th").forEach((th) => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.key;
+        if (matrixSortKey === key) {
+          matrixSortDir *= -1;
+        } else {
+          matrixSortKey = key;
+          matrixSortDir = -1;
+        }
+        renderMatrix(payload);
+      });
+    });
+  }
+
+  const FLEX_ELIGIBILITY = {
+    FLEX: ["RB", "WR", "TE"],
+    REC_FLEX: ["WR", "TE"],
+    SUPER_FLEX: ["QB", "RB", "WR", "TE"],
+  };
+
+  // Mirrors LeagueState.seat_slots(bench=False) -- python/vorp/league/teams.py
+  // -- starting slots only, built from the payload's own config so this
+  // never drifts from the real league template.
+  function startingSlots(config) {
+    const slots = [];
+    let nextId = 0;
+    for (const pos of POSITIONS) {
+      const count = (config.starting_slots || {})[pos] || 0;
+      for (let i = 0; i < count; i++) slots.push({ id: nextId++, eligiblePositions: [pos], flexLabel: pos });
+    }
+    for (const [flex, count] of Object.entries(config.flex_slots || {})) {
+      for (let i = 0; i < count; i++) {
+        slots.push({ id: nextId++, eligiblePositions: FLEX_ELIGIBILITY[flex], flexLabel: flex });
+      }
+    }
+    return slots;
+  }
+
+  function renderRosters(payload) {
+    const el = document.getElementById("rosters");
+    const seatsById = Object.fromEntries((payload.seats || []).map((s) => [s.seat_id, s]));
+    const divisions = payload.divisions || [
+      { name: "All seats", index: 0, mine: false, seats: (payload.seats || []).map((s) => s.seat_id) },
+    ];
+    const slotsTemplate = startingSlots(payload.config || {});
+
+    el.innerHTML = divisions
+      .map((division) => {
+        const cards = division.seats
+          .map((sid) => {
+            const seat = seatsById[sid] || { budget_left: 0, bought: [] };
+            const players = seat.bought.map((b) => ({
+              playerId: b.player_id,
+              position: b.position,
+              points: b.points,
+            }));
+            const seated = fillSlots(players, slotsTemplate);
+            const seatedIds = new Set(seated.values());
+            const bench = seat.bought.filter((b) => !seatedIds.has(b.player_id));
+
+            const lines = slotsTemplate
+              .map((slot) => {
+                const pid = seated.get(slot.id);
+                if (pid) {
+                  const b = seat.bought.find((x) => x.player_id === pid);
+                  return `<div class="roster-line"><span class="pos-${b.position}">${slot.flexLabel}</span><span>${pid}</span></div>`;
+                }
+                return `<div class="roster-line open"><span>${slot.flexLabel}</span><span>-- open --</span></div>`;
+              })
+              .join("");
+            const benchLines = bench
+              .map((b) => `<div class="roster-line bench"><span class="pos-${b.position}">BN</span><span>${b.player_id}</span></div>`)
+              .join("");
+
+            const mine = sid === payload.my_seat ? " mine" : "";
+            return `
+              <div class="roster-card${mine}">
+                <div class="roster-card-head"><span>${seatLabel(payload, sid)}</span><span class="money">$${seat.budget_left}</span></div>
+                ${lines}
+                ${benchLines}
+              </div>
+            `;
+          })
+          .join("");
+        const mineClass = division.mine ? " mine" : "";
+        return `
+          <div class="division${mineClass}">
+            <div class="eyebrow">${division.name}</div>
+            <div class="roster-grid">${cards}</div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  function renderAll(payload) {
+    renderHeader(payload);
+    renderPower(payload);
+    renderStateTable(payload);
+    renderMatrix(payload);
+    renderRosters(payload);
+  }
+
+  window.__renderAll = renderAll; // exposed for a static-payload smoke test
+
+  // ---------------------------------------------------------- poll loop --
+  // Adaptive cadence mirroring the server's own poller (--poll/--poll-live,
+  // docs/spec/board/01-live-data-ingestion.md): fast while a player is on
+  // the block, slow otherwise. Re-renders only when the raw JSON text
+  // changes, so an unchanged poll costs a fetch and a string compare, not a
+  // DOM rebuild.
+
+  const IDLE_INTERVAL_MS = 750;
+  const LIVE_INTERVAL_MS = 200;
+
+  let lastJson = null;
+  let lastPayload = null;
+  let scrubPick = null; // null = live; otherwise the frozen pick to view
+
+  const scrubInput = document.getElementById("scrub");
+  const scrubLabel = document.getElementById("scrub-label");
+  const scrubLiveBtn = document.getElementById("scrub-live");
+
+  function updateScrubUI(payload) {
+    const view = payload.view || {};
+    scrubInput.max = view.total || 0;
+    scrubInput.disabled = !view.total;
+    if (scrubPick === null) scrubInput.value = view.total || 0;
+    scrubLabel.textContent = view.live ? "live" : `pick ${view.pick} / ${view.total}`;
+    scrubLiveBtn.hidden = view.live !== false;
+  }
+
+  async function fetchAndRender() {
+    const url = scrubPick === null ? "/state.json" : `/state.json?upto=${scrubPick}`;
+    let text;
+    try {
+      const res = await fetch(url);
+      text = await res.text();
+    } catch (err) {
+      return; // a network hiccup just skips this tick -- the next poll retries
+    }
+    if (text === lastJson) return;
+    lastJson = text;
+    lastPayload = JSON.parse(text);
+    renderAll(lastPayload);
+    updateScrubUI(lastPayload);
+  }
+
+  function goLive() {
+    if (scrubPick === null) return;
+    scrubPick = null;
+    lastJson = null; // force a re-render even if the live text is unchanged
+    fetchAndRender();
+  }
+
+  function scrubTo(n) {
+    const total = (lastPayload && lastPayload.view && lastPayload.view.total) || 0;
+    scrubPick = Math.max(0, Math.min(n, total));
+    lastJson = null;
+    fetchAndRender();
+  }
+
+  function scrubStep(delta) {
+    const total = (lastPayload && lastPayload.view && lastPayload.view.total) || 0;
+    const current = scrubPick === null ? total : scrubPick;
+    scrubTo(current + delta);
+  }
+
+  scrubInput.addEventListener("input", () => scrubTo(Number(scrubInput.value)));
+  scrubLiveBtn.addEventListener("click", goLive);
+
+  async function pollLoop() {
+    await fetchAndRender();
+    const onBlock = Boolean(lastPayload && lastPayload.block && !lastPayload.block.sold);
+    setTimeout(pollLoop, onBlock ? LIVE_INTERVAL_MS : IDLE_INTERVAL_MS);
+  }
+
+  pollLoop();
+</script>
