@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fold the four draft-demo scenario pages into one publishable Artifact.
 
-`scripts/draft_demo.py` writes five local pages: a landing page and one page
+`scripts/auction/draft_demo.py` writes five local pages: a landing page and one page
 per scenario, cross-linked by relative filename. That works from the
 filesystem and not at all as an Artifact, where every page is its own URL and
 `href="draft-demo-2026-panic-run.html"` resolves to nothing. On a phone it is
@@ -13,7 +13,7 @@ keeps a four-minute solve out of a build that should take a second, and
 guarantees the artifact shows exactly the numbers the local pages do.
 
 Nor does it fork the template. The stylesheet, the markup and the ~450 lines
-of render logic are lifted out of `scripts/templates/draft_demo.html` at build
+of render logic are lifted out of `scripts/auction/templates/draft_demo.html` at build
 time and re-hosted inside `templates/scenario_shell.html`, so a change to the
 scenario page shows up here on the next build. Four anchors hold that together
 and every one of them is asserted -- if the template moves, this fails loudly
@@ -126,14 +126,14 @@ def merge_payloads(season: int, keys: List[str]) -> Dict:
     from one solved opening board), so it is asserted identical and stored
     once.
     """
-    data_dir = REPO_ROOT / "data"
+    data_dir = REPO_ROOT / "data" / "auction"
     loaded = []
     for key in keys:
         path = data_dir / f"draft-demo-{season}-{key}.json"
         if not path.exists():
             raise SystemExit(
                 f"missing {path.relative_to(REPO_ROOT)} -- run "
-                f"`python scripts/draft_demo.py {season}` first."
+                f"`python scripts/auction/draft_demo.py {season}` first."
             )
         loaded.append(json.loads(path.read_text()))
 
@@ -171,11 +171,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    index_path = REPO_ROOT / "data" / f"draft-demo-{args.season}.json"
+    index_path = REPO_ROOT / "data" / "auction" / f"draft-demo-{args.season}.json"
     if not index_path.exists():
         raise SystemExit(
             f"missing {index_path.relative_to(REPO_ROOT)} -- run "
-            f"`python scripts/draft_demo.py {args.season}` first."
+            f"`python scripts/auction/draft_demo.py {args.season}` first."
         )
     keys = [s["key"] for s in json.loads(index_path.read_text())["scenarios"]]
 

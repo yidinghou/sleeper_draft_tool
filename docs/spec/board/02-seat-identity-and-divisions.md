@@ -113,7 +113,7 @@ manager changes their handle.
 **Depends on:** `python/vorp/sleeper_client.py`'s `seat_identity`;
 `python/vorp/league/config.py` for `DIVISIONS`, `MY_USERNAME`, `MOCK_SEED`,
 `all_members`, and `division_index_for`. **Implemented in:**
-`python/scripts/draft_board.py` — `random_fill`, `build_divisions`,
+`python/scripts/auction/draft_board.py` — `random_fill`, `build_divisions`,
 `refresh_seat_identity`/`assign_mock_identity`/`_set_identity`,
 `resolve_my_seat`, and `print_seats`. **Done when:** `random_fill` is a
 no-duplicate deterministic permutation that keeps real pins, both `draft_order`

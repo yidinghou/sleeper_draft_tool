@@ -29,13 +29,13 @@ Two inputs feed every step below, so stand them up before step 1:
 | --- | --- | --- |
 | [01 · Replacement level](01-calculating-replacement.md) | `python/vorp/replacement_level.py` | league config + `roster_fill` matching |
 | [02 · Value over last rostered](02-value-over-last-rostered.md) | `python/vorp/last_rostered.py` | `01`'s fill, over the full-roster slot pool |
-| [03 · VORP $ / VOLR $](03-vorp-to-bid.md) | `python/vorp/bid_value.py` (lenses assembled in `python/scripts/bid_value.py`) | `01` + `02` levels and selected sets |
-| [04 · Blended-bar pricing](04-blended-bar-pricing.md) | `python/vorp/models.py` (`progressive_blend`); exported by `python/scripts/blended_price.py` | `01` + `02` bars, `03`'s apportionment |
-| [05 · Principles](05-principles.md) | `python/vorp/principles.py`; report in `python/scripts/principles.py` | `04`'s model registry + all bars |
+| [03 · VORP $ / VOLR $](03-vorp-to-bid.md) | `python/vorp/bid_value.py` (lenses assembled in `python/scripts/auction/bid_value.py`) | `01` + `02` levels and selected sets |
+| [04 · Blended-bar pricing](04-blended-bar-pricing.md) | `python/vorp/models.py` (`progressive_blend`); exported by `python/scripts/auction/blended_price.py` | `01` + `02` bars, `03`'s apportionment |
+| [05 · Principles](05-principles.md) | `python/vorp/principles.py`; report in `python/scripts/auction/principles.py` | `04`'s model registry + all bars |
 | [07 · Live draft board](07-live-draft-board.md) | `python/vorp/board.py` (`price_board`) — pricing core only, no server | `04` re-solved over a residual `LeagueState` |
 | [08 · Seat value](08-seat-value.md) | `python/vorp/seat_value.py` | league matching + `04`'s board price and exchange rate |
-| [09 · Best affordable roster](09-optimal-roster.md) | `python/vorp/optimal_roster.py` (`plan_roster`); printed by `python/scripts/optimal_roster.py` | `08`'s lineup value + `04`/`07` prices |
-| [09b · Roster scenarios](09b-roster-scenarios.md) | **WIP** — would be `python/scripts/roster_scenarios.py` | `09`'s `plan_roster` + `07`'s `price_board`, N seeded times |
+| [09 · Best affordable roster](09-optimal-roster.md) | `python/vorp/optimal_roster.py` (`plan_roster`); printed by `python/scripts/auction/optimal_roster.py` | `08`'s lineup value + `04`/`07` prices |
+| [09b · Roster scenarios](09b-roster-scenarios.md) | **WIP** — would be `python/scripts/auction/roster_scenarios.py` | `09`'s `plan_roster` + `07`'s `price_board`, N seeded times |
 
 (There is no spec `06`; the numbering skips it.)
 
@@ -66,7 +66,7 @@ remainder/Hamilton, sums exactly to the pool), `apportion_with_floor` (reserve
 `_effective_bar` (fall back to the worst player in an exhausted pool rather than
 a bar of zero). The two lenses of `03` — VORP $ against `01`'s bar and
 population, VOLR $ against `02`'s — are assembled from these in
-`python/scripts/bid_value.py`; each independently spends the whole
+`python/scripts/auction/bid_value.py`; each independently spends the whole
 `teams × budget`, and there is deliberately no single combined bid.
 
 ## Step 4 — `python/vorp/models.py`
@@ -84,7 +84,7 @@ apportioned with `apportion_with_floor`. `w_floor` is the one dial (ships at
 
 The pass/fail matrix that turns "which model is better" into a table. See the
 [principles harness](#what-the-principles-harness-guarantees) below for what it
-guarantees. Report rendering is `python/scripts/principles.py`.
+guarantees. Report rendering is `python/scripts/auction/principles.py`.
 
 ## Step 7 — `python/vorp/board.py`
 
@@ -113,10 +113,10 @@ The auction's knapsack: `plan_roster` greedily buys the affordable player
 with the best marginal-points-per-dollar (`08`'s value re-solved as the set
 grows), stopping when no affordable player adds a startable point, with
 `exclude_positions` and `fill_all` as the two knobs on top. Printed by
-`python/scripts/optimal_roster.py`. See
+`python/scripts/auction/optimal_roster.py`. See
 [`09 · The best affordable roster`](09-optimal-roster.md).
 
-## Step 9b — `python/scripts/roster_scenarios.py` (not yet built)
+## Step 9b — `python/scripts/auction/roster_scenarios.py` (not yet built)
 
 Planned as a pure-Python wrapper (no dedicated module, no new model): price the
 board once with `07`, then for each integer seed jitter every price by a

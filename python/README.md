@@ -4,6 +4,14 @@ Pure valuation logic for the draft tool: per-position replacement level and
 value-over-last-rostered, derived from projections. See
 `../docs/spec/vorp/` for the specs this implements.
 
+`scripts/` splits by league: `scripts/auction/` (the live bid-price board and
+demos, league `1372724723108036608`) vs `scripts/snake/` (queue ranking and
+Claude-in-Chrome autodraft, league `1386051970791378944`). `scripts/html_page.py`,
+`replacement_level.py`, and `last_rostered.py` stay flat at `scripts/` root —
+both leagues import them. `data/` mirrors the same split, with shared source
+files (`projections-*.csv`, `boberto-*.csv`, `adp-*.csv`, and the
+replacement-level/last-rostered json) at `data/` root.
+
 **Split with the rest of the repo:** `src/sleeper.ts` and
 `scripts/export-projections.ts` (TypeScript) own everything that talks to
 the Sleeper API and produce `data/projections-{season}.csv`. Everything

@@ -1,7 +1,7 @@
 # 09 · The best affordable roster (FAQ)
 
 > **Implemented.** `python/vorp/optimal_roster.py` (`plan_roster`,
-> `RosterPlan`, `Target`), printed by `python/scripts/optimal_roster.py`.
+> `RosterPlan`, `Target`), printed by `python/scripts/auction/optimal_roster.py`.
 > Pinned by `python/tests/test_optimal_roster.py`: feasibility
 > (`spend + reserve <= budget`, `len(targets) <= open slots`), a monotonic
 > lineup (`points_after >= points_before`), `exclude_positions`/`fill_all`
@@ -139,7 +139,7 @@ sum to anything.
 for `max_bid`, `sell` and open slots; `04`/`07` for the board prices it spends
 against. **Implemented in:** `python/vorp/optimal_roster.py` (`plan_roster`,
 `RosterPlan`, `Target`), reusing `python/vorp/seat_value.py` and
-`python/vorp/league/teams.py`. Printed by `python/scripts/optimal_roster.py`.
+`python/vorp/league/teams.py`. Printed by `python/scripts/auction/optimal_roster.py`.
 **Done when:** for a mid-draft state no plan's `spend` exceeds the seat's
 budget, `spend + reserve <= budget`, `len(targets) <= open slots`, and
 `points_after >= points_before`; on a flat-price board small enough to

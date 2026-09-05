@@ -46,6 +46,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from keeper_vorp import load_keepers, pick_schedule  # noqa: E402
 from vorp.csv_loader import REPO_ROOT, projections_csv_path  # noqa: E402
@@ -86,7 +87,7 @@ def draft_slots(season: int) -> int:
     live picks. That is how deep the queue has to go to cover the whole draft,
     and how many players are worth ranking in the builder.
     """
-    path = REPO_ROOT / "data" / f"snake-draft-{season}-picks.csv"
+    path = REPO_ROOT / "data" / "snake" / f"snake-draft-{season}-picks.csv"
     with path.open(newline="", encoding="utf-8") as f:
         keepers = sum(row["is_keeper"] == "True" for row in csv.DictReader(f))
     return SNAKE_CONFIG.teams * SNAKE_CONFIG.roster_size - keepers
@@ -98,7 +99,7 @@ def load_board(season: int, *, drafted_by_hand: bool = False) -> list[dict]:
 
     `drafted_by_hand` keeps K and DEF in, for callers that want the raw board.
     """
-    path = REPO_ROOT / "data" / f"vorp-snake-{season}.csv"
+    path = REPO_ROOT / "data" / "snake" / f"vorp-snake-{season}.csv"
     with path.open(newline="", encoding="utf-8") as f:
         rows = [
             row
@@ -257,7 +258,7 @@ def prefs_path(season: int) -> Path:
     Lives here rather than in queue_builder because this module is the one the
     queue CSV comes out of, and queue_builder already imports from it.
     """
-    return REPO_ROOT / "data" / f"queue-prefs-{season}.json"
+    return REPO_ROOT / "data" / "snake" / f"queue-prefs-{season}.json"
 
 
 def load_prefs(season: int) -> dict:
@@ -301,7 +302,7 @@ def load_ratings(season: int) -> dict[str, float]:
     on directly. See `queue_builder.queue_order` for why -- ordering by raw
     rating scored worse than using no preferences at all.
     """
-    path = REPO_ROOT / "data" / f"queue-ratings-{season}.json"
+    path = REPO_ROOT / "data" / "snake" / f"queue-ratings-{season}.json"
     if not path.exists():
         return {}
     return json.loads(path.read_text(encoding="utf-8")).get("order", {})
@@ -350,7 +351,7 @@ def place_manual(ordered: list[dict], depth: int) -> list[dict]:
 
 
 def load_my_keepers(season: int) -> list[dict]:
-    path = REPO_ROOT / "data" / f"snake-draft-{season}-picks.csv"
+    path = REPO_ROOT / "data" / "snake" / f"snake-draft-{season}-picks.csv"
     with path.open(newline="", encoding="utf-8") as f:
         return [
             row
@@ -383,7 +384,7 @@ def main() -> None:
     picks = SNAKE_CONFIG.roster_size - len(keepers)
     source = f"pairwise preferences over {len(ratings)} players" if ratings else "pure VORP"
 
-    out_path = REPO_ROOT / "data" / f"queue-snake-{season}.csv"
+    out_path = REPO_ROOT / "data" / "snake" / f"queue-snake-{season}.csv"
     fields = ["queue_pos", "player_id", "player", "position", "team", "bye", "adp", "vorp_avg"]
     with out_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")

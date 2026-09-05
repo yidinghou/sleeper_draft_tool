@@ -39,6 +39,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from draft_pick import TOKEN_FILE, build_payload, post, read_token  # noqa: E402
 from draft_watch import CAPPED, load_queue  # noqa: E402
@@ -264,7 +265,6 @@ def run(
     retry_every: float = 5.0,
     fire_after: float | None = None,
 ) -> None:
-    queue = load_queue(SNAKE_CONFIG.season)
     caps = {p: SNAKE_CONFIG.starting_slots[p] for p in CAPPED}
     sent: set[int] = set()  # pick_no we have already sent for -- never twice
     attempts: dict[int, float] = {}  # pick_no -> monotonic time of last send
@@ -311,6 +311,26 @@ def run(
         roster = roster_of(picks, slot)
 
         if len(picks) != last_seen:
+            if last_seen == -1:
+                # Picks already on the board before we started watching are
+                # keepers, not something autopick beat us to -- seed `sent`
+                # so they never get flagged as a snipe later.
+                sent |= {int(p["pick_no"]) for p in picks
+                         if p.get("draft_slot") == slot and p.get("pick_no") is not None}
+            sniped = [] if last_seen == -1 else [
+                p for p in picks
+                if p.get("draft_slot") == slot
+                and p.get("pick_no") is not None
+                and int(p["pick_no"]) not in sent
+            ]
+            for p in sniped:
+                meta = p.get("metadata") or {}
+                print(
+                    f"  AUTOPICKED (not us): {meta.get('first_name', '')} "
+                    f"{meta.get('last_name', '')} ({meta.get('position')}) at {p['pick_no']}",
+                    flush=True,
+                )
+                sent.add(int(p["pick_no"]))
             last_seen = len(picks)
             # lineup_gaps only knows QB/RB/WR/TE -- mock_draft models the skill
             # lineup and leaves K/DEF out. Reporting its answer alone printed
@@ -335,7 +355,7 @@ def run(
             due = retry_due(time.monotonic(), attempts.get(pick_no), retry_every)
             if should_fire(status, elapsed, pick_timer, fire_after) and due:
                 target = next_pick(
-                    queue,
+                    load_queue(SNAKE_CONFIG.season),
                     taken,
                     roster,
                     caps,

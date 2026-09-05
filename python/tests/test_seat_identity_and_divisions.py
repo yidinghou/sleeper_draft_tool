@@ -10,7 +10,7 @@ pinned in test_draft_board.py.
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "auction"))
 
 from draft_board import build_divisions, random_fill, resolve_my_seat  # noqa: E402
 

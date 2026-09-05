@@ -51,6 +51,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from html_page import write_local  # noqa: E402
 from keeper_vorp import load_keepers, pick_schedule  # noqa: E402
@@ -334,7 +335,7 @@ def comparison_counts(player_ids: list[str], comparisons: list[dict]) -> dict[st
 
 
 def ratings_path(season: int) -> Path:
-    return REPO_ROOT / "data" / f"queue-ratings-{season}.json"
+    return REPO_ROOT / "data" / "snake" / f"queue-ratings-{season}.json"
 
 
 def load_week1(season: int) -> dict[str, float]:
@@ -403,7 +404,7 @@ def season_points(player: dict) -> float | None:
 
 
 def payload_path(season: int) -> Path:
-    return REPO_ROOT / "data" / f"queue-payload-{season}.json"
+    return REPO_ROOT / "data" / "snake" / f"queue-payload-{season}.json"
 
 
 def build_payload(season: int, pool_size: int, prefs: dict | None = None) -> dict:
@@ -520,8 +521,8 @@ def build_rank_page(season: int, pool_size: int) -> None:
         .replace("__DATA__", json.dumps(payload, separators=(",", ":")))
         .replace("__SEASON__", str(season))
     )
-    write_local(fragment, REPO_ROOT / "data", f"live-rank-{season}")
-    out = REPO_ROOT / "data" / f"live-rank-{season}.html"
+    write_local(fragment, REPO_ROOT / "data" / "snake", f"live-rank-{season}")
+    out = REPO_ROOT / "data" / "snake" / f"live-rank-{season}.html"
     print(f"Wrote {out.relative_to(REPO_ROOT)} ({len(payload['players'])} players)")
 
 
@@ -538,8 +539,8 @@ def build_page(season: int, pool_size: int) -> None:
 
     budget = sum(round_target(e["rnd"]) for e in entries) // 2
 
-    write_local(render(payload), REPO_ROOT / "data", f"queue-builder-{season}")
-    out = REPO_ROOT / "data" / f"queue-builder-{season}.html"
+    write_local(render(payload), REPO_ROOT / "data" / "snake", f"queue-builder-{season}")
+    out = REPO_ROOT / "data" / "snake" / f"queue-builder-{season}.html"
     print(f"Wrote {out.relative_to(REPO_ROOT)}  ({len(players)} players to rank)")
     counts = Counter(e["rnd"] for e in entries)
     print(f"\n  {'ROUND':<7}{'PLAYERS':>8}{'PER PLAYER':>12}{'PAIRS':>7}")

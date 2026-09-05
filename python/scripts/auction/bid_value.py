@@ -49,7 +49,7 @@ import sys
 from pathlib import Path
 from typing import Dict
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from vorp.bid_value import (  # noqa: E402
     _effective_bar,
@@ -171,7 +171,7 @@ def main() -> None:
     rows.sort(key=lambda r: r["points"], reverse=True)
 
     suffix = "" if args.window == "season" else f"-{args.window.replace('_', '-')}"
-    out_path = REPO_ROOT / "data" / f"bid-value-{season}{suffix}.json"
+    out_path = REPO_ROOT / "data" / "auction" / f"bid-value-{season}{suffix}.json"
     out_path.write_text(
         json.dumps(
             {

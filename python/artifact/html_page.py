@@ -7,7 +7,8 @@ half back out when the workflow lapsed. This package is that workflow brought
 back without re-entangling it: `scripts/` still writes only local pages, and
 everything an Artifact needs lives here.
 
-Templates in `scripts/templates/` are document *fragments* -- title, style,
+Templates in `scripts/auction/templates/` and `scripts/snake/templates/` are
+document *fragments* -- title, style,
 markup, script, no <html>/<head>/<body> -- because that is exactly what
 publishing expects; the host supplies the skeleton. A local file needs the
 skeleton back, or the browser renders the fragment in quirks mode.

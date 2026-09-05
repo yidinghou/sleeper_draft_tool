@@ -102,7 +102,7 @@ calls (`fetch_draft`, `fetch_draft_picks`, `fetch_league_users`,
 `draft_fingerprint`/`parse_nomination`), which mirror `src/sleeper.ts`;
 `python/vorp/board.py`'s `price_board` for the actual repricing
 (`../vorp/07-live-draft-board.md`); `python/vorp/league/config.py` for
-`LEAGUE_CONFIG`. **Implemented in:** `python/scripts/draft_board.py` — the
+`LEAGUE_CONFIG`. **Implemented in:** `python/scripts/auction/draft_board.py` — the
 `Board` class (`set_source`, `refresh_from_file`, `poll_sleeper_once`,
 `_append_bid_log`, `_save_draft`, `load_saved_draft`, `build_state`) and the
 `make_handler` HTTP routes, with `poller` driving the adaptive cadence.

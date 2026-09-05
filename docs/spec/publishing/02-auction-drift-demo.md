@@ -144,10 +144,10 @@ one is most of the saving.
 repricing; `python/vorp/league/teams.py` (`LeagueState`) for the residual state;
 `data/projections-2026.csv` and its market `sleeper_dollar` column for the sale
 order and amounts; `python/artifact/html_page.py` (`write_pair`) for the two-file
-write. **Implemented in:** `python/scripts/draft_demo.py` (the four `SCENARIOS`,
+write. **Implemented in:** `python/scripts/auction/draft_demo.py` (the four `SCENARIOS`,
 `run_scenario`, `write_scenario_json`) and
 `python/artifact/build_draft_demo.py` (`extract`, `merge_payloads`, `build`),
-over the templates `python/scripts/templates/draft_demo.html` and
+over the templates `python/scripts/auction/templates/draft_demo.html` and
 `python/artifact/templates/scenario_shell.html`. **Done when:** `python
 scripts/draft_demo.py 2026` writes four `data/draft-demo-2026-{key}.json` plus
 the index, folds them into `pages/draft-demo-2026.html` and the gitignored

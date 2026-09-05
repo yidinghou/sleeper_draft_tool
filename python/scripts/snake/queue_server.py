@@ -38,6 +38,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from html_page import LOCAL_HTML_SKELETON  # noqa: E402
 from queue_builder import payload_path, render  # noqa: E402
@@ -50,7 +51,7 @@ MAX_BODY = 2 * 1024 * 1024
 
 
 def prefs_file(season: int) -> Path:
-    return Path(os.environ.get("PREFS_DIR", REPO_ROOT / "data")) / f"queue-prefs-{season}.json"
+    return Path(os.environ.get("PREFS_DIR", REPO_ROOT / "data" / "snake")) / f"queue-prefs-{season}.json"
 
 
 def load_page(season: int) -> str:

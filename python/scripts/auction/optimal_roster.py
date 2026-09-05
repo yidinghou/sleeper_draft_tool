@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 from typing import Dict
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from vorp.board import price_board  # noqa: E402
 from vorp.csv_loader import load_players_from_csv, projections_csv_path  # noqa: E402

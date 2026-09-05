@@ -52,7 +52,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from vorp.board import price_board  # noqa: E402
 from vorp.csv_loader import REPO_ROOT, load_players_from_csv, projections_csv_path  # noqa: E402
@@ -521,11 +521,11 @@ def _nomination_from_sleeper(draft: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def _bid_log_path(draft_id: str) -> Path:
-    return REPO_ROOT / "data" / f"bid-log-{draft_id}.json"
+    return REPO_ROOT / "data" / "auction" / f"bid-log-{draft_id}.json"
 
 
 def _draft_save_path(draft_id: str) -> Path:
-    return REPO_ROOT / "data" / f"draft-{draft_id}.json"
+    return REPO_ROOT / "data" / "auction" / f"draft-{draft_id}.json"
 
 
 def _append_bid_log(path: Path, player_id: str, seat: int, amount: int) -> None:
@@ -663,7 +663,7 @@ def _frame_store_dir(cache_key: Optional[str]) -> Optional[Path]:
     """
     if not cache_key:
         return None
-    return REPO_ROOT / "data" / f"frames-{cache_key}"
+    return REPO_ROOT / "data" / "auction" / f"frames-{cache_key}"
 
 
 def _load_frame(store_dir: Optional[Path], n: int, sig: str) -> Optional[Dict[str, Any]]:
@@ -925,7 +925,7 @@ def load_board_page() -> str:
     """The deck's HTML, wrapped in the minimal skeleton a `file://`/browser
     `GET` needs -- the template itself is a fragment (`<title>`, `<style>`,
     markup, `<script>`, no `<html>`/`<head>`/`<body>`), same convention as
-    `python/scripts/templates/draft_demo.html`. Re-read on every call rather
+    `python/scripts/auction/templates/draft_demo.html`. Re-read on every call rather
     than cached, so a template edit takes effect without restarting the
     server -- it's a small file and this is a dev-facing tool, not a
     high-QPS endpoint.
