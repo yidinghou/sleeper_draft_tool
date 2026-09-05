@@ -1,9 +1,8 @@
 # 09b · Roster scenarios (FAQ) — WIP
 
 > **Work in progress — not yet implemented.** `python/scripts/roster_scenarios.py`
-> doesn't exist yet, and this model wraps [`09`'s `plan_roster`](09-optimal-roster.md),
-> which is itself not yet implemented. Expect this spec to be revised once `09`
-> lands.
+> doesn't exist yet. It wraps [`09`'s `plan_roster`](09-optimal-roster.md),
+> which is implemented, so this is now the only missing piece.
 
 ### What does this compute?
 

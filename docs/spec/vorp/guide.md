@@ -16,8 +16,8 @@ Two inputs feed every step below, so stand them up before step 1:
   `LEAGUE_CONFIG` (the frozen template), `solve_optimal_fill` /
   `summarize_by_position` / `assign_to_slots` (the matching engine), and
   `LeagueState` / `Seat` / `max_bid` (seats holding real slots, so a single sale
-  is expressible). Steps 1, 2, 7, 8 all call into it; steps 9, 9b (below) would
-  too, once built.
+  is expressible). Steps 1, 2, 7, 8, 9 all call into it; step 9b (below)
+  would too, once built.
 - **The projections board** — `data/projections-2026.csv`, loaded by
   `vorp.csv_loader` into `RosterFillPlayer(player_id, position, points)`. It is a
   **living file**: the data pipeline refreshes it, so tests that touch real data
@@ -34,7 +34,7 @@ Two inputs feed every step below, so stand them up before step 1:
 | [05 · Principles](05-principles.md) | `python/vorp/principles.py`; report in `python/scripts/principles.py` | `04`'s model registry + all bars |
 | [07 · Live draft board](07-live-draft-board.md) | `python/vorp/board.py` (`price_board`) — pricing core only, no server | `04` re-solved over a residual `LeagueState` |
 | [08 · Seat value](08-seat-value.md) | `python/vorp/seat_value.py` | league matching + `04`'s board price and exchange rate |
-| [09 · Best affordable roster](09-optimal-roster.md) | **WIP** — would be `python/vorp/optimal_roster.py` (`plan_roster`) | `08`'s lineup value + `04`/`07` prices |
+| [09 · Best affordable roster](09-optimal-roster.md) | `python/vorp/optimal_roster.py` (`plan_roster`); printed by `python/scripts/optimal_roster.py` | `08`'s lineup value + `04`/`07` prices |
 | [09b · Roster scenarios](09b-roster-scenarios.md) | **WIP** — would be `python/scripts/roster_scenarios.py` | `09`'s `plan_roster` + `07`'s `price_board`, N seeded times |
 
 (There is no spec `06`; the numbering skips it.)
@@ -107,14 +107,14 @@ lineup, with a freely-available replacement body imputed into every open slot
 clamps to `max_bid`. An empty seat's values equal league VORP exactly, so this
 is a refinement of `04`, not a rival.
 
-## Step 9 — `python/vorp/optimal_roster.py` (not yet built)
+## Step 9 — `python/vorp/optimal_roster.py`
 
-Planned as the auction's knapsack: `plan_roster` would greedily buy the
-affordable player with the best marginal-points-per-dollar (`08`'s value
-re-solved as the set grows), stopping when no affordable player adds a
-startable point, with `exclude_positions` and `fill_all` as the two knobs on
-top. See [`09 · The best affordable roster`](09-optimal-roster.md). Depends on
-`07`'s `price_board` (now built) for board prices.
+The auction's knapsack: `plan_roster` greedily buys the affordable player
+with the best marginal-points-per-dollar (`08`'s value re-solved as the set
+grows), stopping when no affordable player adds a startable point, with
+`exclude_positions` and `fill_all` as the two knobs on top. Printed by
+`python/scripts/optimal_roster.py`. See
+[`09 · The best affordable roster`](09-optimal-roster.md).
 
 ## Step 9b — `python/scripts/roster_scenarios.py` (not yet built)
 
@@ -122,8 +122,8 @@ Planned as a pure-Python wrapper (no dedicated module, no new model): price the
 board once with `07`, then for each integer seed jitter every price by a
 uniform `±sigma` and re-run `09`, laying the columns out side by side and
 flagging the buys present in every seed. See
-[`09b · Roster scenarios`](09b-roster-scenarios.md). Depends on `09`, which
-doesn't exist yet (`07`'s `price_board` is built).
+[`09b · Roster scenarios`](09b-roster-scenarios.md). Both `09` and `07` are
+now built; only the wrapper script itself is left.
 
 ## Testing
 
@@ -132,13 +132,14 @@ Run, from the repo root:
 ```
 python -m pytest python/tests/test_replacement_level.py python/tests/test_last_rostered.py \
     python/tests/test_bid_value.py python/tests/test_principles.py \
-    python/tests/test_seat_value.py python/tests/test_board.py
+    python/tests/test_seat_value.py python/tests/test_board.py \
+    python/tests/test_optimal_roster.py
 ```
 
 (Equivalently, from `python/`, drop the `python/` prefix — `pyproject.toml` sets
 `pythonpath = ["."]` so the `vorp` package imports without an install. Or just
 `python -m pytest python/tests/` to run everything currently checked in.) These
-six suites are what's implemented today, all passing.
+seven suites are what's implemented today, all passing.
 
 What each suite pins:
 
@@ -168,9 +169,14 @@ What each suite pins:
   removes exactly the sold player from the rows and exactly one slot from the
   residual state, with the priced rows still reconciling to the residual pool.
 
-A future `test_optimal_roster.py` will join this list once `09` is built;
+- **`test_optimal_roster.py`** — no plan outspends its seat's budget,
+  `spend + reserve <= budget`, `len(targets) <= open slots`, a plan never
+  lowers the lineup (`points_after >= points_before`), `exclude_positions`
+  and `fill_all` behave as documented, and greedy matches the brute-forced
+  optimum on a flat-price board small enough to enumerate.
+
 `09b` is expected to stay a thin script pinned by `09`'s determinism test
-rather than getting its own suite, per its spec.
+rather than getting its own suite, per its spec — it doesn't exist yet.
 
 ## What the principles harness guarantees
 
@@ -211,11 +217,12 @@ the point.
   0, not a negative one. This is what lets `03`'s apportionment and `08`'s seat
   value stay non-negative, and it is why a player at exactly the bar still gets
   `min_bid` rather than `$0`.
-- **`09`'s planned knapsack is greedy, not exact.** The exact auction knapsack is
-  NP-hard; `plan_roster` is planned to approximate it by marginal-points-per-dollar,
-  exactly optimal only when prices are flat. See
+- **`09`'s knapsack is greedy, not exact.** The exact auction knapsack is
+  NP-hard; `plan_roster` approximates it by marginal-points-per-dollar,
+  exactly optimal only when prices are flat — pinned by
+  `test_greedy_equals_the_brute_forced_optimum_on_a_flat_price_board`. See
   [`09 · The best affordable roster`](09-optimal-roster.md) for the full
-  argument — not yet built, so this is a design intent, not a pinned property.
+  argument.
 - **Unreachable is not `$0`, and `pool_exhausted` is not a bar of 0.** A position
   with no slot anywhere (K) is absent from every output; a position whose pool
   ran short comes back with `level=None` and callers substitute the worst player
