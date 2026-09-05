@@ -21,9 +21,11 @@ exactly where he was.
 
 ### So how does it actually work?
 
-A `Seat` per team holds the roster template, its remaining budget, and the
-players it has bought. `LeagueState` is the seats plus the league config,
-and it answers three questions the models need:
+A `Seat` per team holds its remaining budget and the players it has bought.
+`LeagueState` pairs those seats with the one shared template (`config`) —
+the template lives there, not on each seat, and is applied per seat to
+generate slots on demand. From that, `LeagueState` answers three questions
+the models need:
 
 ```
 open slots = every seat's unfilled slots, unioned into one flat list
