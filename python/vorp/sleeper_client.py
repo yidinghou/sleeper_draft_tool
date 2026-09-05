@@ -56,6 +56,10 @@ def fetch_league_users(league_id: str) -> List[Dict[str, Any]]:
     return _get(f"/league/{league_id}/users")
 
 
+def fetch_league_rosters(league_id: str) -> List[Dict[str, Any]]:
+    return _get(f"/league/{league_id}/rosters")
+
+
 def draft_fingerprint(draft: Dict[str, Any]) -> str:
     """The cheap-poll signature: change means something worth an expensive
     `/picks` refetch happened. Unchanged means the poller can keep hitting
