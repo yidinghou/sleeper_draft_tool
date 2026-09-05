@@ -31,12 +31,10 @@ board before it merges.
 | | What it covers |
 | --- | --- |
 | [01 · HTML export pipeline](01-html-export-pipeline.md) | `write_pair`/`write_local`, the fragment-vs-standalone split, and `--verify` as a model-parity guard |
-| [02 · Auction-drift demo](02-auction-drift-demo.md) | four scripted mispricing scenarios replayed through `draft_demo.py`'s own repricing, folded into one tabbed page by build-time template extraction |
+| [02 · Auction-drift demo](02-auction-drift-demo.md) | four scripted mispricing scenarios replayed through `price_board`, folded into one tabbed page by build-time template extraction |
 | [Reproduction guide](guide.md) | prerequisites, exact build commands, expected outputs, and gotchas |
 
 Exports the models in [`../vorp/08-seat-value.md`](../vorp/08-seat-value.md)
-(the seat-value page) and [`../vorp/04-blended-bar-pricing.md`](../vorp/04-blended-bar-pricing.md)
-(the blended-price page). The auction-drift demo's repricing conceptually
-mirrors [`../vorp/07-live-draft-board.md`](../vorp/07-live-draft-board.md) (WIP,
-not yet implemented) but is its own logic in `python/scripts/draft_demo.py`,
-not a shared module.
+(the seat-value page), [`../vorp/04-blended-bar-pricing.md`](../vorp/04-blended-bar-pricing.md)
+(the blended-price page), and [`../vorp/07-live-draft-board.md`](../vorp/07-live-draft-board.md)
+(the repricing the auction-drift demo animates).

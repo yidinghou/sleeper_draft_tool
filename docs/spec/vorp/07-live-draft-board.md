@@ -1,9 +1,11 @@
-# 07 · Live draft board (FAQ) — WIP
+# 07 · Live draft board (FAQ)
 
-> **Work in progress — not yet implemented.** Depends on
-> [the league model](../league/index.md), which specifies the seat-and-slot model
-> this board reprices against. Expect the residual-state answers and the
-> Reference section here to be revised as that model settles.
+> **The pricing core is implemented.** `python/vorp/board.py` (`price_board`)
+> exists, lifted out of `scripts/draft_demo.py`'s repricing logic and pinned
+> by `python/tests/test_board.py`. The **live server** described in
+> [`../board/`](../board/index.md) — ingestion, seat identity, the rendering
+> contract, the scrubber, `python/scripts/draft_board.py` — is still not
+> built; `price_board` has no HTTP surface yet.
 
 ### What does this compute?
 

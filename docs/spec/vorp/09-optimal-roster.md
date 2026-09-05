@@ -1,10 +1,10 @@
 # 09 · The best affordable roster (FAQ) — WIP
 
 > **Work in progress — not yet implemented.** `python/vorp/optimal_roster.py`
-> doesn't exist yet, and this model spends against `07`'s board price
-> (`price_board`), which is itself not yet implemented — see
+> doesn't exist yet. It would spend against `07`'s board price, which is
+> implemented (`python/vorp/board.py::price_board`) — see
 > [`07 · Live draft board`](07-live-draft-board.md). Expect this spec to be
-> revised once `07` and this model land.
+> revised once this model lands.
 
 ### What does this compute?
 

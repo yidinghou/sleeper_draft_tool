@@ -5,14 +5,10 @@ How to regenerate every page under this spec from a clean checkout. See
 [`02-auction-drift-demo.md`](02-auction-drift-demo.md) for what the machinery
 does; this is the command sequence and what to expect out of it.
 
-> **Two corrections to the commands/table below, matching current code (see
-> the note atop [`01-html-export-pipeline.md`](01-html-export-pipeline.md)):**
-> there is no tracked `pages/` directory — `write_pair`/`write_local` write
-> everything into gitignored `artifacts/` today; and none of these build
-> scripts actually import `../vorp/07-live-draft-board.md`'s model (it isn't
-> implemented) — `draft_demo.py` reprices with its own `snapshot()`/`seat_rows()`
-> logic directly against `vorp.league.teams.LeagueState`, not a `vorp.board`
-> module.
+> **One correction to the table below, matching current code (see the note
+> atop [`01-html-export-pipeline.md`](01-html-export-pipeline.md)):** there is
+> no tracked `pages/` directory — `write_pair`/`write_local` write everything
+> into gitignored `artifacts/` today.
 
 ## Prerequisites
 
@@ -26,11 +22,10 @@ does; this is the command sequence and what to expect out of it.
   draft-demo builds also read its `sleeper_dollar` (market price) column.
 - **The models in [`../vorp/`](../vorp/index.md)** — replacement level (`01`),
   last-rostered (`02`), and blended-bar pricing (`04`) underpin all builds;
-  seat value (`08`) underpins the seat-value page. The build scripts import
-  these directly; nothing here reimplements a model. (The live board, `07`,
-  is not yet implemented and none of these scripts import it —
-  `draft_demo.py` reprices with its own logic directly against
-  `vorp.league.teams.LeagueState`.)
+  seat value (`08`) underpins the seat-value page; the live board's pricing
+  core (`07`, `python/vorp/board.py::price_board`) underpins the draft-demo
+  build. The build scripts import these directly; nothing here reimplements a
+  model.
 
 There are no console-script entrypoints in `pyproject.toml` — invoke the module
 files directly. All commands below run from the **`python/` directory** (each
