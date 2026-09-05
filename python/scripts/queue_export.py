@@ -44,8 +44,10 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from keeper_vorp import load_keepers, pick_schedule  # noqa: E402
 from vorp.csv_loader import REPO_ROOT, projections_csv_path  # noqa: E402
 from vorp.league.config import MY_USERNAME, SNAKE_CONFIG  # noqa: E402
 
@@ -57,6 +59,24 @@ MANUAL_POSITIONS = ("K", "DEF")
 #: How many K and DEF to carry, per lens. The two lenses are unioned, so this
 #: yields 8 kickers and 9 defenses rather than 10 of each.
 MANUAL_PER_LENS = 5
+
+
+#: The earliest round I will take a given quarterback. VORP rates the position
+#: higher than I do -- it had Maye at row 33 and four more QBs inside row 60 --
+#: and no ordering rule fixes that, because the disagreement is with the number
+#: itself, not with the sort. So the rounds are stated outright.
+#:
+#: Rounds, not ranks, because that is how the decision is made at the table:
+#: "not before the 7th" is a thing I can hold in my head; "not before row 53"
+#: is not. `round_start` does the translation.
+QB_FLOOR = {"Drake Maye": 5, "Jalen Hurts": 7, "Joe Burrow": 7, "Jayden Daniels": 7}
+
+#: Quarterbacks worth their board rank -- no floor at all. One name today.
+QB_FREE = ("Josh Allen",)
+
+#: Everyone unnamed above. Late enough that autopick will never reach a second
+#: quarterback before the roster is otherwise full.
+QB_DEFAULT_ROUND = 12
 
 
 def draft_slots(season: int) -> int:
@@ -173,6 +193,62 @@ def load_pool(season: int, size: int) -> list[dict]:
     `fit_bradley_terry` discards a comparison naming a player it cannot see.
     """
     return load_board(season)[:size] + load_manual(season)
+
+
+def round_start(season: int) -> dict[int, int]:
+    """`{round: first row of that round}` in *live* rows -- keeper picks skipped.
+
+    The queue and the live-ranking page are both one flat list whose Nth row is
+    roughly the Nth live pick, so a round is a row range in it. Keepers make
+    that range narrower than teams-per-round: round 5 starts at row 38, not 41.
+    """
+    keepers = load_keepers(season)
+    starts: dict[int, int] = {}
+    for pick in pick_schedule(keepers, 1, SNAKE_CONFIG):
+        if pick["live_no"] is not None:
+            starts.setdefault(pick["round"], pick["live_no"])
+    return starts
+
+
+def _name_pos(row: dict) -> tuple[str, str]:
+    """Board rows carry `player`/`position`, payload entries `name`/`pos`. Both
+    orderings need the floor, and neither shape is worth converting for it."""
+    return row.get("player") or row["name"], row.get("position") or row["pos"]
+
+
+def apply_qb_floor(rows: list[dict], season: int) -> list[dict]:
+    """`rows`, with every quarterback moved down to the first row of the
+    earliest round I'd take him in -- see QB_FLOOR.
+
+    Placement, not a sort key. Sinking several QBs out of the same stretch of
+    the board frees the rows above them, and a key-based sort lets the last one
+    drift back up into those rows: three round-7 QBs came out at rows 51, 52
+    and 53. Reinserting them into the list they left is exact.
+
+    Only ever sinks. A QB already past his floor, and everyone who is not a
+    quarterback, keeps the position the board gave him.
+    """
+    starts = round_start(season)
+    rest, sinking = [], {}
+    for i, row in enumerate(rows):
+        name, pos = _name_pos(row)
+        floor = starts.get(QB_FLOOR.get(name, QB_DEFAULT_ROUND), 1)
+        if pos == "QB" and name not in QB_FREE and i + 1 < floor:
+            sinking.setdefault(floor, []).append(row)
+        else:
+            rest.append(row)
+
+    # Ascending, so a group inserted earlier is already in place when the next
+    # floor is counted off -- which is what keeps every group at or below its
+    # own row rather than sitting on top of the group beneath it.
+    for floor in sorted(sinking):
+        rest[floor - 1 : floor - 1] = sinking[floor]
+
+    names = {_name_pos(row)[0] for row in rows}
+    missing = [n for n in (*QB_FLOOR, *QB_FREE) if n not in names]
+    if missing:
+        print(f"WARNING: QB floor names not on the board: {missing}")
+    return rest
 
 
 def prefs_path(season: int) -> Path:
@@ -300,7 +376,10 @@ def main() -> None:
     # DEF the builder ranks. Without ratings those trail every skill player and
     # fall past `depth` -- which is the old hand-draft behaviour, and the right
     # default: nothing has been said about them yet to justify queueing one.
-    queue = place_manual(order_board(queue_rows(season, prefs), ratings), depth)
+    # Floor last: `place_manual` pulls every skill player up by the K and DEF
+    # it moves to the back, which would land a floored QB eight rows above his
+    # round. The rows the floor counts have to be the rows that ship.
+    queue = apply_qb_floor(place_manual(order_board(queue_rows(season, prefs), ratings), depth), season)
     picks = SNAKE_CONFIG.roster_size - len(keepers)
     source = f"pairwise preferences over {len(ratings)} players" if ratings else "pure VORP"
 
@@ -409,6 +488,28 @@ def demo() -> None:
     assert len(rows) == len(board) + len(manual) - 1, "exclusion dropped more than one"
     assert len(place_manual(order_board(rows, {}), depth)) == depth, "queue lost depth"
     assert queue_rows(SNAKE_CONFIG.season, {}) == board + manual, "no prefs must be a no-op"
+
+    # QB floor: sinks the named quarterbacks to their round, holds Josh Allen
+    # where the board has him, and never promotes anyone.
+    season = SNAKE_CONFIG.season
+    starts = round_start(season)
+    before = [r["player"] for r in board]
+    after = [r["player"] for r in apply_qb_floor(board, season)]
+    assert after.index("Josh Allen") == before.index("Josh Allen"), "QB_FREE was moved"
+    assert after.index("Drake Maye") >= starts[QB_FLOOR["Drake Maye"]] - 1, "Maye above his round"
+    assert all(after.index(q) >= starts[7] - 1 for q in ("Jalen Hurts", "Joe Burrow", "Jayden Daniels"))
+    floored = starts[QB_DEFAULT_ROUND] - 1
+    assert all(
+        after.index(r["player"]) >= floored
+        for r in board
+        if r["position"] == "QB" and r["player"] not in QB_FLOOR and r["player"] not in QB_FREE
+    ), "an unnamed QB sits above the default floor"
+    # Only ever sinks: a QB already past his floor keeps his place, and no
+    # non-QB is reordered relative to another non-QB.
+    deep = next(r["player"] for r in reversed(board) if r["position"] == "QB")
+    assert after.index(deep) == before.index(deep), "a deep QB was promoted"
+    skill = [n for n in after if n not in {r["player"] for r in board if r["position"] == "QB"}]
+    assert skill == [n for n in before if n in set(skill)], "the floor reordered non-QBs"
 
     pool = load_pool(SNAKE_CONFIG.season, 100)
     assert len(pool) == 100 + len(manual), f"pool is {len(pool)}, expected 100 + {len(manual)}"
