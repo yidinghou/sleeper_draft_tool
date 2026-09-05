@@ -142,7 +142,7 @@
 
   <div class="cols">
     <div>
-      <h2>Live ranking (top 100)</h2>
+      <h2>Live ranking (<span id="rankcount"></span>)</h2>
       <div class="scroll">
         <table><thead><tr><th class="n">#</th><th>Player</th><th>Pos</th>
           <th class="n">Seen</th><th class="n">Board</th></tr></thead>
@@ -359,7 +359,10 @@ function render() {
       : settled && r > 3 ? '  Top 20 has settled; the rest only sharpens the tail.' : '');
 
   const ord = order();
-  document.getElementById('rank').innerHTML = ord.slice(0, 100).map((id, i) => {
+  // The whole pool, not a top-N slice: the pool is sized to the draft (every
+  // live pick), so a cut-off would hide players the queue still has to order.
+  document.getElementById('rankcount').textContent = `all ${ord.length}`;
+  document.getElementById('rank').innerHTML = ord.map((id, i) => {
     const p = byId[id], move = boardRank[id] - (i + 1);
     const cls = move > 0 ? 'move-up' : move < 0 ? 'move-dn' : '';
     return `<tr><td class="n">${i + 1}</td><td>${p.name}</td>` +

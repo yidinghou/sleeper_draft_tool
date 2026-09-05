@@ -25,9 +25,10 @@ scripts/mock_draft.py measures the damage over 400 mocks -- with kickers in a
 90-deep queue I average eight of them and finish with a fieldable starting
 lineup 4% of the time; without, 92%.
 
-Depth is set where the same mocks stop improving: 90 leaves no unfillable QB
-or TE slot, and 120 is no better. A 60-deep queue empties around round 11 and
-hands the rest to Sleeper's board.
+Depth is the whole draft: `draft_slots` -- 10 teams x 16 rounds less the 18
+keepers, 142 live picks. Mocks stop improving around 90, but a queue that ends
+before the draft does hands the tail back to Sleeper's board, which still has
+every keeper on it, so there is nothing to be gained by stopping short.
 
 Reads the finished board rather than re-solving it -- keeper_vorp.py owns the
 VORP math and data/vorp-snake-{season}.csv is the contract between them.
@@ -48,15 +49,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from vorp.csv_loader import REPO_ROOT, projections_csv_path  # noqa: E402
 from vorp.league.config import MY_USERNAME, SNAKE_CONFIG  # noqa: E402
 
-#: Where the mocks stop improving -- see the module docstring. Also has to
-#: outrun sniping: the queue must not empty, because the fallback is Sleeper's
-#: default board, which still has every keeper on it.
-#:
-#: Deep enough to hold the whole rated pool. K and DEF sit in their ADP rounds,
-#: which is the back of it, so a queue that stopped at 90 would rank them in
-#: the builder and then never queue them.
-DEFAULT_DEPTH = 120
-
 #: Not on the VORP board, so they only reach the queue through
 #: `load_manual`. DEF is absent from the board entirely (keeper_vorp.py's
 #: EXCLUDE_POSITIONS) and K is excluded here -- see the module docstring.
@@ -65,6 +57,19 @@ MANUAL_POSITIONS = ("K", "DEF")
 #: How many K and DEF to carry, per lens. The two lenses are unioned, so this
 #: yields 8 kickers and 9 defenses rather than 10 of each.
 MANUAL_PER_LENS = 5
+
+
+def draft_slots(season: int) -> int:
+    """Picks actually up for grabs: every seat in the draft, less the keepers.
+
+    10 teams x 16 rounds = 160, minus the 18 keepers already on rosters = 142
+    live picks. That is how deep the queue has to go to cover the whole draft,
+    and how many players are worth ranking in the builder.
+    """
+    path = REPO_ROOT / "data" / f"snake-draft-{season}-picks.csv"
+    with path.open(newline="", encoding="utf-8") as f:
+        keepers = sum(row["is_keeper"] == "True" for row in csv.DictReader(f))
+    return SNAKE_CONFIG.teams * SNAKE_CONFIG.roster_size - keepers
 
 
 def load_board(season: int, *, drafted_by_hand: bool = False) -> list[dict]:
@@ -170,6 +175,47 @@ def load_pool(season: int, size: int) -> list[dict]:
     return load_board(season)[:size] + load_manual(season)
 
 
+def prefs_path(season: int) -> Path:
+    """The builder's answers file.
+
+    Lives here rather than in queue_builder because this module is the one the
+    queue CSV comes out of, and queue_builder already imports from it.
+    """
+    return REPO_ROOT / "data" / f"queue-prefs-{season}.json"
+
+
+def load_prefs(season: int) -> dict:
+    """The builder's answers, or {} when it has never run.
+
+    Carries more than answers now. `extras` are board-tail players pulled into
+    the ranked pool by hand, `rounds` are per-player round overrides, and
+    `excluded` is the do-not-draft list. They ride in this file rather than one
+    of their own because it is the only thing that syncs both ways: the phone
+    POSTs it to queue_server, which writes the whole body through, so a player
+    removed on a phone reaches this export with no extra plumbing.
+    """
+    path = prefs_path(season)
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+
+def queue_rows(season: int, prefs: dict) -> list[dict]:
+    """Everything eligible for the queue: the whole board plus the K and DEF,
+    less the do-not-draft list.
+
+    Filtered here, before ordering and before `place_manual`, so the queue
+    stays `depth` deep -- dropping a player pulls the next one up behind him
+    rather than leaving a hole in the middle of the draft. Every consumer
+    (draft_watch, draft_auto, mock_draft) reads only the exported CSV, so this
+    one filter is what makes "do not draft" mean it.
+    """
+    excluded = set(prefs.get("excluded", ()))
+    return [
+        r
+        for r in load_board(season) + load_manual(season)
+        if r["player_id"] not in excluded
+    ]
+
+
 def load_ratings(season: int) -> dict[str, float]:
     """The queue ordering key from scripts/queue_builder.py, if it has run.
     Empty dict when the file is absent, which is the plain-VORP case.
@@ -245,15 +291,16 @@ def surname(player: str) -> str:
 def main() -> None:
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     season = int(args[0]) if args else SNAKE_CONFIG.season
-    depth = int(sys.argv[sys.argv.index("--depth") + 1] if "--depth" in sys.argv else DEFAULT_DEPTH)
+    depth = int(sys.argv[sys.argv.index("--depth") + 1] if "--depth" in sys.argv else draft_slots(season))
 
     keepers = load_my_keepers(season)
     ratings = load_ratings(season)
+    prefs = load_prefs(season)
     # The whole board, so unrated players still fill the tail, plus the K and
     # DEF the builder ranks. Without ratings those trail every skill player and
     # fall past `depth` -- which is the old hand-draft behaviour, and the right
     # default: nothing has been said about them yet to justify queueing one.
-    queue = place_manual(order_board(load_board(season) + load_manual(season), ratings), depth)
+    queue = place_manual(order_board(queue_rows(season, prefs), ratings), depth)
     picks = SNAKE_CONFIG.roster_size - len(keepers)
     source = f"pairwise preferences over {len(ratings)} players" if ratings else "pure VORP"
 
@@ -267,6 +314,12 @@ def main() -> None:
 
     kept = ", ".join(f"{k['player_name']} ({k['position']})" for k in keepers)
     print(f"Keeping {kept} -- {picks} live picks, queue {len(queue)} deep ({source})\n")
+    if prefs.get("excluded"):
+        # Said out loud, because a player missing from the queue is otherwise
+        # indistinguishable from one the depth cut off.
+        names = {r["player_id"]: r["player"] for r in load_board(season) + load_manual(season)}
+        dnd = ", ".join(names.get(i, i) for i in prefs["excluded"])
+        print(f"Do not draft ({len(prefs['excluded'])}): {dnd}\n")
     print("Enter top-down; Sleeper's queue appends to the bottom, so no dragging.\n")
     for i, row in enumerate(queue, 1):
         adp = f"{float(row['adp']):>6.1f}" if row["adp"] else "    --"
@@ -291,12 +344,13 @@ def demo() -> None:
     board position among themselves.
     """
     board = load_board(SNAKE_CONFIG.season)
-    queue = order_board(board, {})[:DEFAULT_DEPTH]
+    depth = draft_slots(SNAKE_CONFIG.season)
+    queue = order_board(board, {})[:depth]
     vorps = [float(r["vorp_avg"]) for r in queue]
 
-    assert len(queue) == DEFAULT_DEPTH, f"queue only {len(queue)} deep"
+    assert len(queue) == depth, f"queue only {len(queue)} deep"
     assert vorps == sorted(vorps, reverse=True), "queue is not in VORP order"
-    assert [r["player"] for r in queue] == [r["player"] for r in board[:DEFAULT_DEPTH]]
+    assert [r["player"] for r in queue] == [r["player"] for r in board[:depth]]
 
     # Keys sort ascending. Give the board's 50th player the earliest key and
     # its first a later one; both must land ahead of everyone unkeyed, since
@@ -334,8 +388,8 @@ def demo() -> None:
 
     # K and DEF are queued, but only behind every skill player that fits. See
     # `place_manual` for the 85%-vs-96% measurement behind that.
-    placed = place_manual(order_board(load_board(SNAKE_CONFIG.season) + manual, {}), DEFAULT_DEPTH)
-    assert len(placed) == DEFAULT_DEPTH, f"placed queue is {len(placed)} deep"
+    placed = place_manual(order_board(load_board(SNAKE_CONFIG.season) + manual, {}), depth)
+    assert len(placed) == depth, f"placed queue is {len(placed)} deep"
     assert all(r["position"] in MANUAL_POSITIONS for r in placed[-len(manual):]), (
         "K/DEF are not at the back of the queue"
     )
@@ -345,6 +399,16 @@ def demo() -> None:
     assert {r["player_id"] for r in manual} == {r["player_id"] for r in placed[-len(manual):]}, (
         "placing dropped or duplicated a manual player"
     )
+
+    # Do not draft: filtered before ordering, so the queue is still full depth
+    # -- the next player up fills the hole rather than the queue ending a pick
+    # short of the draft.
+    banned = board[0]["player_id"]
+    rows = queue_rows(SNAKE_CONFIG.season, {"excluded": [banned]})
+    assert banned not in {r["player_id"] for r in rows}, "excluded player survived"
+    assert len(rows) == len(board) + len(manual) - 1, "exclusion dropped more than one"
+    assert len(place_manual(order_board(rows, {}), depth)) == depth, "queue lost depth"
+    assert queue_rows(SNAKE_CONFIG.season, {}) == board + manual, "no prefs must be a no-op"
 
     pool = load_pool(SNAKE_CONFIG.season, 100)
     assert len(pool) == 100 + len(manual), f"pool is {len(pool)}, expected 100 + {len(manual)}"

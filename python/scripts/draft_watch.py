@@ -34,8 +34,10 @@ from vorp.league.config import SNAKE_CONFIG  # noqa: E402
 from vorp.sleeper_client import fetch_draft_picks  # noqa: E402
 
 #: Positions autodraft should only ever take once, and how many of each the
-#: lineup actually starts. Everything else is flex-eligible and self-limiting.
-CAPPED = ("K", "DEF")
+#: lineup actually starts (all four are 1 in SNAKE_CONFIG). Only RB and WR are
+#: left uncapped: TE is flex-eligible here, but the two FLEX slots are being
+#: spent on RB/WR by choice, so a second TE is as dead as a second kicker.
+CAPPED = ("QB", "TE", "K", "DEF")
 
 #: Still-available queue entries to list each time the board moves.
 UPCOMING = 5
@@ -85,6 +87,10 @@ def selftest() -> None:
     assert "CUT" not in "\n".join(report(queue, picks[:1], 4, {"K": 1}))
     # Someone else's kicker doesn't fill my slot.
     assert "CUT" not in "\n".join(report(queue, [{**picks[1], "draft_slot": 7}], 4, {"K": 1}))
+    # QB and TE are capped too, so a rostered TE flags the queued ones as dead.
+    te_queue = queue + [{"player_id": "4", "player": "Bowers", "position": "TE"}]
+    te_picks = picks + [{"player_id": "5", "draft_slot": 4, "metadata": {"position": "TE"}}]
+    assert "CUT TE (1/1 rostered): Bowers" in "\n".join(report(te_queue, te_picks, 4, {"TE": 1}))
     print("ok")
 
 
