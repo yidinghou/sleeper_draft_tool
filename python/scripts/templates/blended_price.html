@@ -1,0 +1,723 @@
+<title>Blended Bar Pricing</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #05091a;
+    --surface: #0f1730;
+    --surface-raised: #182144;
+    --border: #2a3258;
+    --border-soft: #1c2547;
+    --text-primary: #f5f7ff;
+    --text-secondary: #93a3c9;
+    --text-faint: #5c6790;
+    --accent-vorp: #f6ad37;
+    --accent-vorp-soft: rgba(246, 173, 55, 0.16);
+    --accent-volr: #2dd4da;
+    --accent-volr-soft: rgba(45, 212, 218, 0.16);
+    --pos-qb: #fb7185;
+    --pos-rb: #34d399;
+    --pos-wr: #60a5fa;
+    --pos-te: #c084fc;
+    --pos-def: #94a3b8;
+    --accent-sleeper: #8b95b8;
+    --up: #34d399;
+    --warn: #fb7185;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 24px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .masthead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 24px;
+    border-bottom: 1px solid var(--border-soft);
+    padding-bottom: 14px;
+  }
+
+  h1 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin: 0;
+  }
+
+  h1 span { color: var(--text-faint); font-weight: 500; }
+
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .chip {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    padding: 3px 8px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .label {
+    font-family: 'Barlow Condensed', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 13px;
+    color: var(--text-faint);
+  }
+
+  .knob-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+
+  .knob-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 44px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .knob-value b { color: var(--accent-vorp); }
+  .knob-value i { color: var(--accent-volr); font-style: normal; }
+
+  .knob-value small {
+    display: block;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    margin-top: 6px;
+    letter-spacing: 0;
+  }
+
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .preset {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 11px;
+    cursor: pointer;
+  }
+
+  .preset:hover { border-color: var(--text-faint); color: var(--text-primary); }
+  .preset.active { border-color: var(--accent-vorp); color: var(--text-primary); }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent-volr), var(--accent-vorp));
+    outline: none;
+    margin: 0;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--text-primary);
+    border: 3px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--border);
+    cursor: pointer;
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--text-primary);
+    border: 3px solid var(--bg);
+    cursor: pointer;
+  }
+
+  /* ---------- Where the bar sits ---------- */
+
+  .bars { display: flex; flex-direction: column; gap: 9px; }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 42px 1fr 66px;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .bar-track {
+    position: relative;
+    height: 22px;
+    border-radius: 4px;
+    background: var(--surface-raised);
+    overflow: hidden;
+  }
+
+  .bar-span {
+    position: absolute;
+    top: 0; bottom: 0;
+    background: linear-gradient(90deg, var(--accent-volr-soft), var(--accent-vorp-soft));
+    border-left: 2px solid var(--accent-volr);
+    border-right: 2px solid var(--accent-vorp);
+  }
+
+  .bar-sweep {
+    position: absolute;
+    top: 0; bottom: 0;
+    background: rgba(245, 247, 255, 0.13);
+  }
+
+  .bar-tick {
+    position: absolute;
+    top: 3px; bottom: 3px;
+    width: 1px;
+    background: var(--text-faint);
+  }
+
+  .bar-marker {
+    position: absolute;
+    top: -2px; bottom: -2px;
+    width: 3px;
+    background: var(--text-primary);
+    border-radius: 2px;
+    transition: left 0.1s ease-out;
+  }
+
+  .bar-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text-primary);
+    text-align: right;
+  }
+
+  .bar-hint { font-size: 12px; color: var(--text-faint); }
+
+  /* ---------- Stat tiles ---------- */
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+    gap: 10px;
+  }
+
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 13px 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .tile .k {
+    font-family: 'Barlow Condensed', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+
+  .tile .v {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 21px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tile .sub { font-size: 11px; color: var(--text-secondary); }
+  .tile.good .v { color: var(--up); }
+  .tile.warn .v { color: var(--warn); }
+
+  /* ---------- Controls + table ---------- */
+
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  input[type="text"] {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font: inherit; font-size: 13px;
+    padding: 7px 11px; width: 240px; outline: none;
+  }
+
+  input[type="text"]:focus { border-color: var(--accent-vorp); }
+
+  .pos-filters { display: flex; gap: 6px; }
+
+  .pos-btn {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px; font-weight: 600;
+    padding: 6px 10px; cursor: pointer;
+  }
+
+  .pos-btn.active { background: var(--surface-raised); color: var(--text-primary); border-color: var(--border); }
+  .count { margin-left: auto; font-size: 12px; color: var(--text-faint); }
+
+  .table-shell {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .table-scroll { overflow-x: auto; max-height: 620px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; }
+
+  thead th {
+    position: sticky; top: 0;
+    background: var(--surface-raised);
+    font-family: 'Barlow Condensed', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 12px; font-weight: 600;
+    color: var(--text-secondary);
+    text-align: right; padding: 9px 12px;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none;
+  }
+
+  thead th:first-child, thead th:nth-child(2) { text-align: left; }
+  thead th.sorted { color: var(--text-primary); }
+
+  tbody td {
+    padding: 7px 12px; text-align: right;
+    border-bottom: 1px solid var(--border-soft);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  tbody td:first-child, tbody td:nth-child(2) { text-align: left; }
+  tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
+
+  .name { font-family: 'Inter', sans-serif; font-weight: 500; }
+  .team { color: var(--text-faint); font-size: 11px; margin-left: 6px; }
+
+  .pos {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; font-weight: 600;
+    padding: 1px 6px; border-radius: 3px;
+    background: var(--surface-raised);
+  }
+
+  .pos.QB { color: var(--pos-qb); }
+  .pos.RB { color: var(--pos-rb); }
+  .pos.WR { color: var(--pos-wr); }
+  .pos.TE { color: var(--pos-te); }
+  .pos.DEF { color: var(--pos-def); }
+
+  .role { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
+
+  /* ---------- Inline VORP -> VOLR track ---------- */
+
+  td.blend { padding-left: 4px; padding-right: 4px; width: 108px; }
+
+  .blend-track {
+    position: relative;
+    height: 5px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent-vorp), var(--accent-volr));
+    opacity: 0.85;
+  }
+
+  .blend-track.flat { background: var(--border); }
+
+  .blend-dot {
+    position: absolute;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin-top: -4.5px;
+    margin-left: -4.5px;
+    border-radius: 50%;
+    background: var(--text-primary);
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+
+  tbody tr:hover .blend-dot { box-shadow: 0 0 0 2px var(--surface-raised); }
+  .col-vorp { color: var(--accent-vorp); }
+  .col-volr { color: var(--accent-volr); }
+  .col-sleeper { color: var(--accent-sleeper); }
+  .muted { color: var(--text-faint); }
+  .price { font-weight: 600; font-size: 14px; }
+
+  /* The margin in points under the dollars it was apportioned from: the
+     raw input on top of the derived number, so a price can be checked
+     against the thing that produced it without leaving the row. Inherits
+     its column's accent, dimmed, so the dollars still lead. */
+  .pts {
+    display: block;
+    margin-top: 3px;
+    font-size: 11px;
+    font-weight: 400;
+    color: inherit;
+    opacity: 0.62;
+  }
+
+  .pts.zero { opacity: 0.38; }
+
+  thead th small {
+    display: block;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    opacity: 0.6;
+    margin-top: 2px;
+  }
+  .delta.up { color: var(--up); }
+  .delta.down { color: var(--warn); }
+
+  footer {
+    font-size: 12px; color: var(--text-faint); line-height: 1.6;
+    border-top: 1px solid var(--border-soft); padding-top: 14px;
+  }
+
+  footer code { font-family: 'IBM Plex Mono', monospace; color: var(--text-secondary); }
+
+  :focus-visible { outline: 2px solid var(--accent-vorp); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="app">
+  <div class="masthead">
+    <h1>Blended Bar Pricing <span>&mdash; one bar, one price</span></h1>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="panel">
+    <div class="knob-head">
+      <div>
+        <div class="label">Blend at the bottom of the band</div>
+        <div class="knob-value">
+          <b id="pct-vorp"></b> <span style="color:var(--text-faint)">/</span> <i id="pct-volr"></i>
+          <small id="knob-caption"></small>
+        </div>
+      </div>
+      <div class="presets" id="presets"></div>
+    </div>
+    <input type="range" id="slider" />
+  </div>
+
+  <div class="panel">
+    <div class="label">Where the bar sits, by position</div>
+    <div class="bars" id="bars"></div>
+    <div class="bar-hint">
+      Each track runs from the <span style="color:var(--accent-volr)">last-rostered level</span>
+      to <span style="color:var(--accent-vorp)">replacement level</span>, on a shared points axis.
+      The two markers bracket the range the bar sweeps as a player's points fall through the
+      ramp; the faint tick is the full-weight point, above which nobody is blended at all.
+      QB's track is the long one &mdash; which is why this weight moves quarterback prices
+      more than everything else combined.
+    </div>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="controls">
+    <input id="search" type="text" placeholder="Search player or team&hellip;" autocomplete="off" />
+    <div class="pos-filters" id="pos-filters"></div>
+    <span class="count" id="row-count"></span>
+  </div>
+
+  <div class="table-shell">
+    <div class="table-scroll">
+      <table>
+        <thead><tr id="thead-row"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer id="footer"></footer>
+</div>
+
+<script id="price-data" type="application/json">__DATA__</script>
+<script>
+(function () {
+  var D = JSON.parse(document.getElementById('price-data').textContent);
+  var L = D.league;
+  var summaryByW = {};
+  D.summary.forEach(function (s) { summaryByW[s.w_floor.toFixed(2)] = s; });
+
+  var state = { w: D.w_floor, pos: 'ALL', query: '', sort: 'price', dir: -1 };
+  var money = function (v) { return v === null || v === undefined ? '&mdash;' : '$' + v; };
+
+  // The margin in points, under the dollars it bought. A drafted player can
+  // sit BELOW a bar -- every bench pick is below replacement level, that
+  // being what makes him a bench pick -- so the sign is shown, not floored.
+  // Floor the margin and the two columns would read identically for most of
+  // the bench, which is the one place the reader needs them to differ.
+  var pts = function (v) {
+    if (v === null || v === undefined) return '';
+    var sign = v > 0 ? '+' : (v < 0 ? '−' : '');
+    return '<span class="pts' + (v === 0 ? ' zero' : '') + '">' +
+      sign + Math.abs(v).toFixed(1) + ' pts</span>';
+  };
+  var key = function (w) { return w.toFixed(2); };
+
+  var starting = L.roster_size - L.bench_slots;
+  document.getElementById('chips').innerHTML = [
+    L.teams + ' teams', '$' + L.budget + ' budget',
+    starting + ' starters + ' + L.bench_slots + ' bench',
+    D.counts.drafted + ' drafted',
+    D.window === 'season' ? 'full season' : 'weeks 1&ndash;3'
+  ].map(function (t) { return '<span class="chip">' + t + '</span>'; }).join('');
+
+  var presets = [
+    { w: 1.00, label: 'No blend' },
+    { w: 0.50, label: 'Shipped' },
+    { w: 0.25, label: 'Deeper' },
+    { w: 0.00, label: 'Full blend' }
+  ];
+  var presetEl = document.getElementById('presets');
+  presetEl.innerHTML = presets.map(function (p) {
+    return '<button class="preset" data-w="' + p.w + '">' + p.label +
+      ' <b style="font-family:\'IBM Plex Mono\',monospace">' + p.w.toFixed(2) + '</b></button>';
+  }).join('');
+  presetEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('.preset');
+    if (btn) { state.w = +btn.dataset.w; slider.value = state.w * 100; render(); }
+  });
+
+  var slider = document.getElementById('slider');
+  slider.min = 0; slider.max = 100; slider.step = 5;
+  slider.value = state.w * 100;
+  slider.addEventListener('input', function () { state.w = +slider.value / 100; render(); });
+
+  var positions = ['ALL'].concat(Array.from(new Set(D.players.map(function (p) { return p.position; }))));
+  var posEl = document.getElementById('pos-filters');
+  posEl.innerHTML = positions.map(function (p) {
+    return '<button class="pos-btn" data-pos="' + p + '">' + p + '</button>';
+  }).join('');
+  posEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('.pos-btn');
+    if (btn) { state.pos = btn.dataset.pos; render(); }
+  });
+
+  document.getElementById('search').addEventListener('input', function (e) {
+    state.query = e.target.value.trim().toLowerCase();
+    render();
+  });
+
+  var columns = [
+    { key: 'name', label: 'Player' },
+    { key: 'position', label: 'Pos' },
+    { key: 'points', label: 'Pts' },
+    { key: 'vorp_dollar', label: 'VORP $', sub: 'over replacement' },
+    { key: 'lean', label: 'blend' },
+    { key: 'volr_dollar', label: 'VOLR $', sub: 'over last rostered' },
+    { key: 'price', label: 'Price' },
+    { key: 'sleeper_dollar', label: 'Sleeper $' },
+    { key: 'delta', label: 'vs Sleeper' }
+  ];
+
+  var headEl = document.getElementById('thead-row');
+  headEl.addEventListener('click', function (e) {
+    var th = e.target.closest('th');
+    if (!th) return;
+    var k = th.dataset.key;
+    if (state.sort === k) { state.dir = -state.dir; }
+    else { state.sort = k; state.dir = (k === 'name' || k === 'position') ? 1 : -1; }
+    render();
+  });
+
+  // Shared axis so the position tracks are comparable to each other. It has
+  // to reach the full-weight points too, which sit above replacement level.
+  var axisMax = 0;
+  Object.keys(D.levels).forEach(function (pos) {
+    axisMax = Math.max(axisMax, D.levels[pos].replacement, D.levels[pos].full_weight);
+  });
+  axisMax = axisMax * 1.03;
+
+  function render() {
+    var w = state.w;
+    var prices = D.prices[key(w)];
+    var s = summaryByW[key(w)];
+
+    document.getElementById('pct-vorp').textContent = Math.round(w * 100) + '%';
+    document.getElementById('pct-volr').textContent = Math.round((1 - w) * 100) + '%';
+    document.getElementById('knob-caption').innerHTML =
+      '<span class="col-vorp">replacement level</span> vs ' +
+      '<span class="col-volr">last-rostered level</span>, at the bottom of the ramp &mdash; ' +
+      'the top ' + Math.round(D.full_weight_share * 100) + '% of starters are never blended' +
+      (w === 1 ? '; nothing else is either' : '');
+
+    // Position tracks.
+    document.getElementById('bars').innerHTML = Object.keys(D.levels).map(function (pos) {
+      var lv = D.levels[pos];
+      var lo = lv.last_rostered, hi = lv.replacement;
+      var bars = s.bars[pos];
+      var pct = function (v) { return (100 * v / axisMax) + '%'; };
+      var span = hi > lo
+        ? '<div class="bar-span" style="left:' + pct(lo) + ';width:' + pct(hi - lo) + '"></div>'
+        : '<div class="bar-span" style="left:' + pct(lo) + ';width:3px"></div>';
+      // The bar sweeps between these two as a player's points fall through
+      // the ramp: highest for anyone at or above the full-weight point,
+      // lowest at the last-rostered end.
+      var sweep = Math.abs(bars.at_full_weight - bars.at_bottom) < 0.05 ? '' :
+        '<div class="bar-sweep" style="left:' + pct(Math.min(bars.at_bottom, bars.at_full_weight)) +
+        ';width:' + pct(Math.abs(bars.at_full_weight - bars.at_bottom)) + '"></div>';
+      return '<div class="bar-row">' +
+        '<span class="pos ' + pos + '">' + pos + '</span>' +
+        '<div class="bar-track">' + span + sweep +
+          '<div class="bar-marker" style="left:' + pct(bars.at_bottom) + '"></div>' +
+          '<div class="bar-marker" style="left:' + pct(bars.at_full_weight) + '"></div>' +
+          '<div class="bar-tick" style="left:' + pct(lv.full_weight) + '" title="full-weight point"></div>' +
+        '</div>' +
+        '<span class="bar-value">' + bars.at_bottom.toFixed(0) + '&ndash;' +
+          bars.at_full_weight.toFixed(0) + '</span></div>';
+    }).join('');
+
+    // Tiles.
+    var benchDelta = s.bench_spend_per_team - D.market.bench_per_team;
+    var tiles = [
+      { k: 'Starters', v: '$' + s.starter_spend_per_team, sub: 'per team &middot; market $' + D.market.starters_per_team },
+      { k: 'Bench', v: '$' + s.bench_spend_per_team, sub: 'per team &middot; market $' + D.market.bench_per_team,
+        cls: Math.abs(benchDelta) <= 3 ? 'good' : (Math.abs(benchDelta) > 10 ? 'warn' : '') },
+      { k: 'Market MAE', v: '$' + s.market_mae.toFixed(2), sub: 'mean absolute error vs Sleeper $' },
+      { k: 'Top price', v: '$' + s.top_price, sub: 'market tops out at $' + D.market.top },
+      { k: 'Above the floor', v: s.above_floor + ' of ' + D.counts.drafted,
+        sub: 'the rest are priced at $' + L.min_bid },
+      { k: 'Seam crossings', v: s.crossings, sub: 'checked at every weight', cls: s.crossings ? 'warn' : 'good' }
+    ];
+    document.getElementById('tiles').innerHTML = tiles.map(function (t) {
+      return '<div class="tile ' + (t.cls || '') + '"><span class="k">' + t.k + '</span>' +
+        '<span class="v">' + t.v + '</span><span class="sub">' + t.sub + '</span></div>';
+    }).join('');
+
+    // Rows.
+    var rows = D.players.map(function (p, i) {
+      var price = prices[i];
+      // How far the blended price sits from the VORP end toward the VOLR end.
+      // Which end is the expensive one depends on the player: dropping the
+      // weight lifts the marginal band and, the pool being fixed, pays for it
+      // out of the top of the board.
+      var range = p.volr_dollar - p.vorp_dollar;
+      var lean = range === 0 ? 0.5 : (price - p.vorp_dollar) / range;
+      return {
+        p: p, price: price,
+        lean: Math.max(0, Math.min(1, lean)),
+        flat: range === 0,
+        delta: (p.sleeper_dollar === null || p.sleeper_dollar === undefined) ? null : price - p.sleeper_dollar
+      };
+    });
+
+    if (state.pos !== 'ALL') rows = rows.filter(function (r) { return r.p.position === state.pos; });
+    if (state.query) {
+      rows = rows.filter(function (r) {
+        return r.p.name.toLowerCase().indexOf(state.query) !== -1 ||
+          (r.p.team || '').toLowerCase().indexOf(state.query) !== -1;
+      });
+    }
+
+    var k = state.sort, dir = state.dir;
+    rows.sort(function (a, b) {
+      var onRow = (k === 'price' || k === 'delta' || k === 'lean');
+      var av = onRow ? a[k] : a.p[k];
+      var bv = onRow ? b[k] : b.p[k];
+      if (av === null || av === undefined) return 1;
+      if (bv === null || bv === undefined) return -1;
+      if (av < bv) return -dir;
+      if (av > bv) return dir;
+      return b.p.points - a.p.points;
+    });
+
+    headEl.innerHTML = columns.map(function (c) {
+      return '<th data-key="' + c.key + '"' + (state.sort === c.key ? ' class="sorted"' : '') + '>' +
+        c.label + (state.sort === c.key ? (state.dir === 1 ? ' &uarr;' : ' &darr;') : '') +
+        (c.sub ? '<small>pts ' + c.sub + '</small>' : '') + '</th>';
+    }).join('');
+
+    document.getElementById('tbody').innerHTML = rows.map(function (r) {
+      var p = r.p;
+      var dc = r.delta === null ? '' : (r.delta > 0 ? 'up' : (r.delta < 0 ? 'down' : ''));
+      return '<tr>' +
+        '<td><span class="name">' + p.name + '</span>' +
+          (p.team ? '<span class="team">' + p.team + '</span>' : '') +
+          ' <span class="role">' + (p.is_starter ? 'starter' : 'bench') + '</span></td>' +
+        '<td><span class="pos ' + p.position + '">' + p.position + '</span></td>' +
+        '<td>' + p.points.toFixed(1) + '</td>' +
+        '<td class="col-vorp">$' + p.vorp_dollar + pts(p.vorp) + '</td>' +
+        '<td class="blend"><div class="blend-track' + (r.flat ? ' flat' : '') + '">' +
+          '<div class="blend-dot" style="left:' + (100 * r.lean) + '%"></div></div></td>' +
+        '<td class="col-volr">$' + p.volr_dollar + pts(p.volr) + '</td>' +
+        '<td class="price">$' + r.price + '</td>' +
+        '<td class="col-sleeper">' + money(p.sleeper_dollar) + '</td>' +
+        '<td class="delta ' + dc + '">' +
+          (r.delta === null ? '&mdash;'
+            : (r.delta > 0 ? '+$' : (r.delta < 0 ? '−$' : '$')) + Math.abs(r.delta)) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    document.getElementById('row-count').textContent = rows.length + ' of ' + D.players.length + ' drafted';
+
+    Array.prototype.forEach.call(posEl.children, function (b) {
+      b.classList.toggle('active', b.dataset.pos === state.pos);
+    });
+    Array.prototype.forEach.call(presetEl.children, function (b) {
+      b.classList.toggle('active', Math.abs(+b.dataset.w - w) < 0.001);
+    });
+
+    document.getElementById('footer').innerHTML =
+      '<span class="col-vorp">VORP $</span> and <span class="col-volr">VOLR $</span> are this ' +
+      'model\'s own two ends &mdash; the price each player gets at <b>1.00</b> and at <b>0.00</b> &mdash; ' +
+      'so the dot is exactly where the slider has moved him between them. ' +
+      'Under each is the margin in <b>points</b> it was apportioned from &mdash; points over ' +
+      'replacement level and over the last-rostered level &mdash; so the dollars can be checked ' +
+      'against the thing that produced them. A negative margin is a player below that bar: ' +
+      'every bench pick is below replacement level, which is what makes him a bench pick. ' +
+      'Every drafted player at a position is measured against a bar that slides slower than ' +
+      'his points do, so his margin &mdash; and his price &mdash; rises with his points. That is ' +
+      'why seam crossings stay at zero at every weight: a property of the shape, not a tuning result. ' +
+      'The whole $' + (L.teams * L.budget) + ' is apportioned by margin with a $' + L.min_bid +
+      ' floor reserved per player, so the Price column sums to exactly ' + L.teams +
+      ' &times; $' + L.budget + '.' +
+      '<br />Generated from <code>' + D.generated_from + '</code> &middot; season ' + D.season +
+      ' &middot; model <code>progressive_blend</code> in <code>vorp/models.py</code>.';
+  }
+
+  render();
+})();
+</script>

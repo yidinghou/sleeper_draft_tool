@@ -1,7 +1,15 @@
 node_modules
 dist
 data/*.csv
+!data/projections-*.csv
+!data/boberto-*.csv
 !data/sleeper-board-*.csv
+data/*.json
 .env
 .env.local
 .DS_Store
+
+# Built Artifact pages -- regenerate with python/artifact/build_*.py.
+# Derived from data/*.json, which is itself ignored above; the draft-demo
+# build alone is 8MB of near-duplicate HTML (fragment + local skeleton).
+artifacts/
