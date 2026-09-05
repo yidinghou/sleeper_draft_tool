@@ -56,6 +56,24 @@ def _open_count(state: LeagueState, seat_id: int) -> int:
     return sum(1 for s in state.full_roster_slots() if s.seat_id == seat_id)
 
 
+def _seatable_positions(state: LeagueState, seat_id: int) -> Set[str]:
+    """Positions this seat still has an open slot for.
+
+    A player outside this set costs money and fills nothing: the auction
+    league starts one defense and no flex accepts one, so a second DEF has
+    nowhere to sit. `max_bid` holds back a dollar for every *other* open slot,
+    which keeps the budget above the slot count only while each purchase
+    actually consumes a slot -- buy one that doesn't and the seat ends the
+    draft a dollar short of filling its roster.
+    """
+    return {
+        position
+        for slot in state.full_roster_slots()
+        if slot.seat_id == seat_id
+        for position in slot.eligible_positions
+    }
+
+
 def _lineup_ids(
     roster: List[RosterFillPlayer], slots, replacement: Dict[str, float]
 ) -> Tuple[str, ...]:
@@ -180,10 +198,18 @@ def _fill_remaining(
         if cap is None or cap < working.config.min_bid:
             break
         owned = {b.player_id for b in seat.bought}
+        # Only players an open slot can actually seat. Without this the cheapest
+        # body wins on price alone, and a redundant one (a second defense in a
+        # one-DEF league) spends a dollar while consuming no slot -- which is
+        # exactly the dollar `max_bid` had reserved for a slot still to fill.
+        seatable = _seatable_positions(working, seat_id)
         candidates = [
             p
             for pid, p in shoppable.items()
-            if pid not in owned and pid in prices and prices[pid] <= cap
+            if pid not in owned
+            and pid in prices
+            and prices[pid] <= cap
+            and p.position in seatable
         ]
         if not candidates:
             break

@@ -15,26 +15,33 @@ from scratch. Concepts and the "why" live in [01](01-projections-export.md) and
   The scripts run under `tsx` (see `package.json`); no build step, no global
   install.
 
-- **A hand-scraped Sleeper board CSV.** The auction dollar value
-  (`sleeper_proj_dollar` / `$PROJ`) and the board's own PTS are computed
-  client-side in the browser and are *not* on any API (see
-  [`../../sleeper-api.md`](../../sleeper-api.md), "Auction value"). You must scrape
-  them yourself, logged in, from `https://sleeper.com/draft/nfl/{draft_id}`, into
-  `data/sleeper-board-{season}.csv` with columns:
+- **The Sleeper board CSV**, `data/sleeper-board-{season}.csv`:
 
   ```
   player_id,sleeper_rank,bye_week,sleeper_proj_dollar,sleeper_board_pts_half_ppr
   ```
 
+  This used to be hand-scraped from a logged-in browser, on the belief that the
+  draft board's numbers were computed client-side and off the API. Reading the
+  board's React state showed otherwise — the rows it renders come straight from
+  the public projections feed, and the only number it really computes is `rank`,
+  which is that feed ordered by `adp_half_ppr`. `npm run export:board` derives
+  the whole file, and its output was checked against the live board.
+
+  `sleeper_proj_dollar` is the exception and is still browser-only: it is an
+  auction number the board derives client-side, and a snake draft has none at
+  all. The exporter carries existing values forward from the previous CSV rather
+  than blanking them, so re-running never destroys an auction snapshot.
+
   The projections export runs without this file, but then `sleeper_rank`,
   `bye_week` and `sleeper_proj_dollar` come out blank and every point falls back
-  to the API. Commit the CSV — it's a point-in-time snapshot, re-scraped by hand
+  to the API. Commit the CSV — it is a point-in-time snapshot, worth re-running
   closer to draft day if values drift.
 
 ## Build order
 
-1. **Scrape the board** → `data/sleeper-board-{season}.csv` (see above). Do this
-   first; the projections export joins against it.
+1. **Export the board** → `data/sleeper-board-{season}.csv`. Do this first; the
+   projections export joins against it.
 2. **Export projections** → `data/projections-{season}.csv`. This is the file the
    Python VORP engine reads.
 3. **Export the Boberto twin** → `data/boberto-{season}.csv`. Independent of step
@@ -44,7 +51,10 @@ from scratch. Concepts and the "why" live in [01](01-projections-export.md) and
 ## Commands
 
 ```bash
-# 2 — Sleeper players + season/weekly projections, joined to the scraped board
+# 1 — rank/bye/PTS for every projected player, derived from the public feed
+npm run export:board 2026
+
+# 2 — Sleeper players + season/weekly projections, joined to the board
 npm run export:projections 2026
 
 # 3 — FantasyPros projections + market AAV, matched to Sleeper ids
@@ -64,7 +74,7 @@ data/projections-2026.csv (<M> matched board data).` and writes a CSV whose
 header is exactly:
 
 ```
-player_id,player,position,team,sleeper_rank,bye_week,sleeper_proj_dollar,season_pts_half_ppr,pts_source,wk1_3_pts_half_ppr
+player_id,player,position,team,sleeper_rank,bye_week,sleeper_proj_dollar,season_pts_half_ppr,pts_source,wk1_3_pts_league,wk1_pts_league
 ```
 
 Every player present on the scraped board carries `pts_source = board`; everyone

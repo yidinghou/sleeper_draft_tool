@@ -1,0 +1,877 @@
+<title>Queue Builder</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #05091a;
+    --surface: #0f1730;
+    --surface-raised: #182144;
+    --border: #2a3258;
+    --border-soft: #1c2547;
+    --text-primary: #f5f7ff;
+    --text-secondary: #93a3c9;
+    --text-faint: #5c6790;
+    --accent-vorp: #f6ad37;
+    --accent-volr: #2dd4da;
+    --pos-qb: #fb7185;
+    --pos-rb: #34d399;
+    --pos-wr: #60a5fa;
+    --pos-te: #c084fc;
+    --pos-k: #94a3b8;
+    --up: #34d399;
+    --warn: #fb7185;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { max-width: 1180px; margin: 0 auto; padding: 28px 24px 60px;
+         display: flex; flex-direction: column; gap: 18px; }
+
+  .masthead { display: flex; align-items: baseline; justify-content: space-between;
+              flex-wrap: wrap; gap: 10px 24px; border-bottom: 1px solid var(--border-soft);
+              padding-bottom: 14px; }
+  h1 { font-family: 'Barlow Condensed', sans-serif; font-size: 30px; font-weight: 700;
+       letter-spacing: 0.04em; margin: 0; text-transform: uppercase; }
+  .sub { color: var(--text-secondary); font-size: 13px; }
+
+  .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button { font-family: inherit; font-size: 13px; color: var(--text-primary);
+           background: var(--surface-raised); border: 1px solid var(--border);
+           border-radius: 7px; padding: 7px 13px; cursor: pointer; }
+  button:hover { border-color: var(--accent-volr); }
+  button[disabled] { opacity: .4; cursor: default; border-color: var(--border); }
+  .spacer { flex: 1; }
+
+  .duel { display: grid; grid-template-columns: 1fr 64px 1fr; gap: 14px; align-items: stretch; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+          padding: 22px; cursor: pointer; text-align: center; transition: border-color .12s,
+          transform .08s; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+  .card:hover { border-color: var(--accent-vorp); transform: translateY(-2px); }
+  .card .nm { font-family: 'Barlow Condensed', sans-serif; font-size: 30px; font-weight: 600;
+              letter-spacing: .02em; line-height: 1.1; }
+  .card .meta { color: var(--text-secondary); font-size: 13px; }
+  .card .stat { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-faint); }
+  .card .key { font-size: 11px; color: var(--text-faint); letter-spacing: .12em; }
+  .pos { font-weight: 600; }
+  .pos-QB { color: var(--pos-qb); } .pos-RB { color: var(--pos-rb); }
+  .pos-WR { color: var(--pos-wr); } .pos-TE { color: var(--pos-te); }
+  .pos-K  { color: var(--pos-k);  } .pos-DEF { color: var(--pos-k); }
+
+  .vs { display: flex; align-items: center; justify-content: center;
+        font-family: 'Barlow Condensed', sans-serif; color: var(--text-faint);
+        font-size: 18px; letter-spacing: .1em; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .tile { background: var(--surface); border: 1px solid var(--border-soft); border-radius: 10px;
+          padding: 12px 14px; }
+  .tile .lab { color: var(--text-faint); font-size: 11px; text-transform: uppercase;
+               letter-spacing: .1em; }
+  .tile .val { font-family: 'IBM Plex Mono', monospace; font-size: 20px; margin-top: 3px; }
+
+  /* min-width: 0 overrides a grid item's default min-width: auto, which
+     otherwise sizes the column to its widest content (the ranking table) and
+     pushes the whole page wider than the screen instead of letting the table
+     scroll sideways inside its own box. */
+  .cols { display: grid; grid-template-columns: 1fr; gap: 18px; }
+  .cols > div { min-width: 0; }
+  /* Cards stay side by side on a phone -- swiping left or right has to map to
+     a card on the left or right. Only the chrome shrinks. */
+  @media (max-width: 620px) {
+    .app { padding: 14px 10px 40px; gap: 12px; }
+    .duel { grid-template-columns: 1fr 26px 1fr; gap: 8px; }
+    .card { padding: 14px 8px; gap: 6px; }
+    .card .nm { font-size: 20px; }
+    .card .meta, .card .stat { font-size: 11px; }
+    .card .key { display: none; }          /* no arrow keys on a phone */
+    .vs { font-size: 12px; }
+    .tile .val { font-size: 16px; }
+  }
+
+  h2 { font-family: 'Barlow Condensed', sans-serif; font-size: 17px; letter-spacing: .08em;
+       text-transform: uppercase; color: var(--text-secondary); margin: 0 0 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border-soft); }
+  th { color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+  td.n, th.n { text-align: right; font-family: 'IBM Plex Mono', monospace; }
+  .move-up { color: var(--up); } .move-dn { color: var(--warn); }
+  .rook { display: inline-block; margin-left: 4px; font-size: 10px; font-weight: 700;
+          color: var(--bg); background: var(--accent-volr); border-radius: 3px;
+          padding: 0 3px; line-height: 1.5; vertical-align: 1px; }
+  /* A row that lines up with one of my draft turns -- see MY_PICK_AT. The left
+     border reads at a glance while scrolling; the badge says which turn. */
+  tr.pickrow { background: color-mix(in srgb, var(--accent-vorp) 12%, transparent);
+               box-shadow: inset 3px 0 0 var(--accent-vorp); }
+  .pick { display: inline-block; margin-left: 5px; font-size: 10px; font-weight: 700;
+          color: var(--bg); background: var(--accent-vorp); border-radius: 3px;
+          padding: 0 4px; line-height: 1.5; vertical-align: 1px; }
+  .scroll { max-height: 460px; overflow: auto; overscroll-behavior: contain; }
+
+  /* Drag-and-drop reorder: grab the handle, drop anywhere. `manual[]` records
+     the result the same way ▲/▼ does -- see moveTo(). */
+  .drag { cursor: grab; color: var(--text-faint); text-align: center; }
+  tr.dragging { opacity: .35; }
+  tr.drag-over { box-shadow: inset 0 2px 0 var(--accent-volr); }
+
+  /* Row controls. Sized for a thumb during a live draft, and
+     `touch-action: manipulation` drops the 300ms double-tap-zoom wait that
+     otherwise makes every tap feel like it missed. */
+  td.act, th.act { width: 1%; white-space: nowrap; padding: 1px 2px; }
+  .rb { min-width: 34px; height: 32px; padding: 0; font-size: 15px; line-height: 1;
+        background: transparent; border-color: var(--border-soft); color: var(--text-secondary);
+        touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .rb:hover { color: var(--text-primary); }
+  .rb.x:hover { border-color: var(--warn); color: var(--warn); }
+  #search { font-family: inherit; font-size: 13px; color: var(--text-primary);
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 7px; padding: 7px 11px; min-width: 190px; }
+  .chk { color: var(--text-secondary); font-size: 12px; display: flex; align-items: center; gap: 5px; }
+  details#dnd { margin-top: 10px; }
+  details#dnd summary { color: var(--text-secondary); font-size: 12px; cursor: pointer;
+                        text-transform: uppercase; letter-spacing: .08em; }
+  #dndlist { margin-top: 6px; }
+  #dndlist .row { display: flex; align-items: center; gap: 8px; padding: 3px 0;
+                  border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+  @media (max-width: 620px) {
+    .scroll { max-height: 52vh; }
+    .rb { min-width: 38px; height: 36px; }
+    /* Two button columns cost the table ~33px it does not have on a phone.
+       Taking it out of the cell padding keeps every column visible; the
+       overflow-x above is only the backstop for a narrower screen still. */
+    #rank td, .scroll th { padding: 2px 3px; }
+  }
+  .note { color: var(--text-faint); font-size: 12px; }
+  textarea { width: 100%; height: 90px; background: var(--surface); color: var(--text-secondary);
+             border: 1px solid var(--border); border-radius: 8px; font-family: 'IBM Plex Mono', monospace;
+             font-size: 11px; padding: 8px; }
+</style>
+
+<div class="app">
+  <div class="masthead">
+    <div>
+      <h1>Queue Builder</h1>
+      <div class="sub">Which would you rather have on your roster? Ratings start equal &mdash; only your answers move them.</div>
+    </div>
+    <div class="sub" id="season"></div>
+  </div>
+
+  <div class="bar">
+    <button id="undo">&larr; Undo</button>
+    <button id="skip">Skip pair</button>
+    <button id="reveal">Hide ADP / VORP</button>
+    <input id="search" type="search" list="addable" autocomplete="off"
+           placeholder="Add player&hellip;">
+    <datalist id="addable"></datalist>
+    <label class="chk"><input type="checkbox" id="rookies"> rookies only</label>
+    <span class="spacer"></span>
+    <button id="export">Export answers</button>
+    <button id="exportCsv">Export ranking (CSV)</button>
+    <button id="clear">Reset all</button>
+  </div>
+
+  <div class="duel">
+    <div class="card" id="cardA"></div>
+    <div class="vs">VS</div>
+    <div class="card" id="cardB"></div>
+  </div>
+
+  <div class="stats">
+    <div class="tile"><div class="lab">Answered</div><div class="val" id="mAns">0</div></div>
+    <div class="tile"><div class="lab">On round</div><div class="val" id="mRound">1</div></div>
+    <div class="tile"><div class="lab">This round</div><div class="val" id="mRoundProg">0/0</div></div>
+    <div class="tile"><div class="lab">Rounds left</div><div class="val" id="mLeft">0</div></div>
+    <div class="tile"><div class="lab">Top-20 churn</div><div class="val" id="mChurn">&mdash;</div></div>
+  </div>
+  <div class="note" id="advice"></div>
+
+  <div class="cols">
+    <div>
+      <h2>Live ranking (<span id="rankcount"></span>)</h2>
+      <div class="bar" style="margin-bottom:8px">
+        <input id="rankSearch" type="search" placeholder="Find a player&hellip;" autocomplete="off">
+        <button id="rankSearchBtn" title="jump to first match">&#128269; Search</button>
+      </div>
+      <div class="scroll">
+        <table><thead><tr><th class="act"></th><th class="act"></th><th class="n">#</th><th>Player</th><th>Pos</th>
+          <th class="n">Proj</th><th class="n">VORP</th>
+          <th class="n">Seen</th><th class="n">Board</th><th class="act"></th></tr></thead>
+          <tbody id="rank"></tbody></table>
+      </div>
+      <div class="note" style="margin-top:6px">
+        &#9650;&#9660; moves a player exactly one spot, however far you tap it.
+        &#10005; removes him from the draft entirely.
+        <span class="pick" style="margin-left:0">P#</span> marks a row around one of my draft turns.
+      </div>
+      <details id="dnd">
+        <summary>Do not draft (<span id="dndn">0</span>)</summary>
+        <div id="dndlist"></div>
+      </details>
+    </div>
+    <div>
+      <h2>Export</h2>
+      <div class="note" style="margin-bottom:8px">
+        Saves automatically in this browser. <b>Export answers</b> downloads
+        <code>queue-prefs-__SEASON__.json</code> &mdash; put it in <code>data/</code>, then run
+        <code>python scripts/queue_builder.py --fit</code>. The Python fit is the authoritative
+        one; the ranking on the left is a fast live approximation.
+      </div>
+      <textarea id="dump" readonly></textarea>
+      <div class="note" style="margin-top:8px">Paste answers back in and press Import to resume elsewhere.</div>
+      <div class="bar" style="margin-top:8px">
+        <textarea id="paste" placeholder="paste exported JSON here"></textarea>
+      </div>
+      <div class="bar"><button id="import">Import</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = __DATA__;
+const P = DATA.players;
+const KEY = 'queue-prefs-' + DATA.season;
+
+//: Where to push answers so the laptop can pull them back down. Null when the
+//: page is opened off disk, which is still a supported way to run it -- then
+//: localStorage and the Export button are the whole round-trip. The query
+//: string carries the access token straight through.
+const SYNC_URL = location.protocol.startsWith('http') ? '/prefs' + location.search : null;
+const byId = Object.fromEntries(P.map(p => [p.id, p]));
+const boardRank = Object.fromEntries(P.map((p, i) => [p.id, i + 1]));
+
+// Which live-ranking row is my Nth draft turn -- see queue_builder.my_pick_ranks.
+// A row number, not a player id: it moves with whoever the ranking currently
+// has there, which is the point -- a fixed player would go stale the moment
+// anyone answers a comparison. row (1-indexed) -> which turn, e.g. {9: 1, 12: 2}.
+const MY_PICK_AT = Object.fromEntries((DATA.myPicks || []).map((row, i) => [row, i + 1]));
+
+let comparisons = [];
+let reveal = true;   // ADP/VORP visible unless hidden
+let pair = null;
+let churnHistory = [];
+let lastTop = [];
+
+// Everything the ranking page's own controls produce. All three ride in the
+// same prefs object the answers do, because that object is the only thing that
+// syncs both ways: the page POSTs it whole to queue_server, which writes it
+// through untouched, so a player removed on a phone reaches the laptop's queue
+// export with no plumbing of its own.
+let extras = [];             // board-tail ids pulled into the ranked pool
+// id -> a key that sorts strictly between the two players it was inserted
+// between. Set by the ranking page's up/down buttons -- see `move()` -- and
+// once set, overrides whatever comparisons or ADP round would otherwise place
+// that player. Nothing else writes to it.
+let manual = {};
+let excluded = new Set();    // do not draft
+
+// The rest of the board, in the same shape as `players`. Not in the pool, but
+// searchable into it -- this is where the rookies and the late fliers live.
+const ADDABLE = Object.fromEntries((DATA.addable || []).map(p => [p.id, p]));
+
+// --- live ratings: Elo, purely so the page can react instantly. The Python
+// --- Bradley-Terry fit is what actually produces the queue.
+let elo = {}, seen = {};
+function resetRatings() {
+  elo = Object.fromEntries(P.map(p => [p.id, 0]));
+  seen = Object.fromEntries(P.map(p => [p.id, 0]));
+}
+function applyElo(winner, loser) {
+  const pw = 1 / (1 + Math.exp(-(elo[winner] - elo[loser])));
+  // K shrinks as a player accumulates a record, so early answers move fast
+  // and later ones refine rather than overwrite.
+  const k = w => 0.7 / (1 + seen[w] / 6);
+  elo[winner] += k(winner) * (1 - pw);
+  elo[loser]  -= k(loser)  * (1 - pw);
+  seen[winner]++; seen[loser]++;
+}
+function rebuild() {
+  resetRatings();
+  for (const c of comparisons) applyElo(c.winner, c.loser);
+}
+
+// --- pair choice -----------------------------------------------------------
+// Questions come from one ADP round at a time, because two players in the same
+// round are two players I could actually be choosing between at one turn.
+// Comparing a round-1 back against a round-9 tight end asks about a decision
+// that will never arise, and spends a question to learn nothing.
+//
+// About 30% of pairs deliberately cross into the round above. That overlap is
+// the only thing joining the rounds into one comparison graph -- without it
+// Bradley-Terry would fit each round on its own scale and the rounds could not
+// be ordered against each other. It also leaves room to promote a round-3
+// player above a round-2 one, through a chain of realistic comparisons.
+const asked = new Set();
+function pairKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
+
+const ROUNDS = DATA.rounds;
+const TARGET = DATA.targets;
+const byRound = {};
+// Rebuilt rather than built once: adding a player changes it (his ADP round
+// might be one the ranked pool never had a member of), and an excluded player
+// leaves it so the scheduler stops asking about him and his round stops
+// budgeting questions for him.
+function indexRounds() {
+  const live = [...new Set(P.filter(p => !excluded.has(p.id)).map(p => p.rnd))].sort((a, b) => a - b);
+  ROUNDS.splice(0, ROUNDS.length, ...live);
+  for (const r of ROUNDS) { byRound[r] = []; TARGET[r] = TARGET[r] || Math.max(2, Math.min(8, 9 - r)); }
+  for (const p of P) if (!excluded.has(p.id)) byRound[p.rnd].push(p.id);
+}
+indexRounds();
+
+function roundProgress(r) {
+  const ids = byRound[r];
+  const target = TARGET[r] * ids.length;
+  const got = ids.reduce((s, i) => s + seen[i], 0);
+  return { got, target, done: got >= target };
+}
+
+function focusRound() {
+  for (const r of ROUNDS) if (!roundProgress(r).done) return r;
+  return ROUNDS[ROUNDS.length - 1];
+}
+
+const CROSS_ROUND = 0.3;
+
+function choosePair() {
+  const r = focusRound();
+  const here = byRound[r];
+  const prevRound = ROUNDS[ROUNDS.indexOf(r) - 1];
+  const above = prevRound === undefined ? [] : byRound[prevRound];
+  // Cross-round pairs need somewhere to cross to; round 1 has nothing above it.
+  const crossing = above.length && Math.random() < CROSS_ROUND;
+  const left = here, right = crossing ? above : here;
+
+  let best = null, bestScore = Infinity;
+  for (let t = 0; t < 300; t++) {
+    const a = left[(Math.random() * left.length) | 0];
+    const b = right[(Math.random() * right.length) | 0];
+    if (a === b || asked.has(pairKey(a, b))) continue;
+    // Within the candidate set, the most informative question is the one
+    // closest to a coin flip, tilted toward players with the thinnest record.
+    const gap = Math.abs(elo[a] - elo[b]);
+    const thin = (seen[a] + seen[b]) / 12;
+    const score = gap + thin + Math.random() * 0.15;
+    if (score < bestScore) { bestScore = score; best = [a, b]; }
+  }
+  if (best) return best;
+
+  // This round is exhausted -- every pair in it has been asked. Widen to the
+  // neighbouring rounds rather than to the whole board.
+  const near = [].concat(above, here, byRound[ROUNDS[ROUNDS.indexOf(r) + 1]] || []);
+  for (let t = 0; t < 2000; t++) {
+    const a = near[(Math.random() * near.length) | 0];
+    const b = near[(Math.random() * near.length) | 0];
+    if (a !== b && !asked.has(pairKey(a, b))) return [a, b];
+  }
+  // The pool grows when a player is added and shrinks when one is removed, so
+  // this is read fresh rather than from a length captured at load.
+  const ids = P.filter(p => !excluded.has(p.id)).map(p => p.id);
+  for (let t = 0; t < 4000; t++) {
+    const a = ids[(Math.random() * ids.length) | 0], b = ids[(Math.random() * ids.length) | 0];
+    if (a !== b && !asked.has(pairKey(a, b))) return [a, b];
+  }
+  return [ids[0], ids[1]];
+}
+
+// --- rendering -------------------------------------------------------------
+// Every stat can legitimately be absent, so none of them may be formatted
+// blind: defenses have no VORP and no season projection (they are off the VORP
+// board entirely), kickers have no ADP once past the market's tail, and a
+// player Sleeper does not project this week has no wk1. Absent is "--", never
+// 0 -- a zero here reads as a real projection of nothing.
+const num = (v, digits = 1) => (v === null || v === undefined ? '--' : v.toFixed(digits));
+
+function card(el, p, keyHint) {
+  el.className = 'card';
+  el.innerHTML =
+    `<div class="nm">${p.name}${p.exp === 0 ? ' <span class="rook" title="rookie">R</span>' : ''}</div>` +
+    `<div class="meta"><span class="pos pos-${p.pos}">${p.pos}</span> &middot; ${p.team} &middot; bye ${p.bye || '--'} &middot; rd ${p.rnd}</div>` +
+    `<div class="stat">${num(p.pts)} proj pts &middot; ${num(p.wk1)} wk1` +
+      (reveal ? ` &middot; adp ${num(p.adp)} &middot; vorp ${num(p.vorp)}` : '') +
+    `</div>` +
+    `<div class="key">${keyHint}</div>`;
+}
+
+// The same round-blocked key as queue_builder.queue_order -- ADP round is the
+// backbone, ratings order players inside a round, and a well-evidenced player
+// drifts at most ROUND_SLACK across the boundary.
+//
+// Sorting the raw ratings instead is what this used to do, and it made the
+// live table disagree with the queue it is previewing: rounds are only joined
+// by the ~30% crossing questions, so a round-3 player who swept his own round
+// outranks a round-1 player who went even in a much harder one, and the table
+// shows a preference you never expressed. See queue_order's docstring -- raw
+// ratings scored rho 0.404 against known preferences, worse than asking
+// nothing. Elo here, Bradley-Terry there, but the z-score per round is on the
+// same footing either way, so this previews the real order.
+// SLACK_GROWTH widens the drift in the late rounds, where ADP is a guess:
+// round 1 keeps ±1.0, round 16 gets ±3.3.
+const ROUND_SLACK = 1.0, CONFIDENCE_AT = 6, SLACK_GROWTH = 0.15;
+const roundSlack = r => ROUND_SLACK * (1 + SLACK_GROWTH * (r - 1));
+
+// Every player's sort key: the round-blocked comparison key, except a player
+// in `manual` uses that pinned number instead and ignores this entirely.
+function allKeys() {
+  const byRnd = {};
+  P.forEach(p => (byRnd[p.rnd] = byRnd[p.rnd] || []).push(elo[p.id]));
+  const centre = {}, spread = {};
+  for (const r in byRnd) {
+    const v = byRnd[r].slice().sort((x, y) => x - y), n = v.length;
+    centre[r] = n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2;
+    const mean = v.reduce((s, x) => s + x, 0) / n;  // pstdev is about the mean
+    const sd = Math.sqrt(v.reduce((s, x) => s + (x - mean) ** 2, 0) / n);
+    spread[r] = sd || 1;
+  }
+  const key = {};
+  for (const p of P) {
+    if (manual[p.id] !== undefined) { key[p.id] = manual[p.id]; continue; }
+    const z = (elo[p.id] - centre[p.rnd]) / spread[p.rnd];
+    const room = roundSlack(p.rnd);
+    const drift = Math.max(-room, Math.min(room, -z * room / 2));
+    key[p.id] = p.rnd + drift * Math.min(1, seen[p.id] / CONFIDENCE_AT);
+  }
+  return key;
+}
+
+function order() {
+  const key = allKeys();
+  return P.filter(p => !excluded.has(p.id)).map(p => p.id)
+    .sort((a, b) => (key[a] - key[b]) || (boardRank[a] - boardRank[b]));
+}
+
+// `anchor` is a player id to hold still: the table is rewritten wholesale on
+// every answer, which otherwise throws the list back to the top and puts a
+// different player under the thumb that just tapped ▲.
+function render(anchor) {
+  const [a, b] = pair;
+  card(document.getElementById('cardA'), byId[a], '← LEFT ARROW');
+  card(document.getElementById('cardB'), byId[b], 'RIGHT ARROW →');
+
+  const r = focusRound();
+  const prog = roundProgress(r);
+  const left = ROUNDS.filter(x => !roundProgress(x).done).length;
+  document.getElementById('mAns').textContent = comparisons.length;
+  document.getElementById('mRound').textContent = r;
+  document.getElementById('mRoundProg').textContent =
+    Math.min(prog.got, prog.target) + '/' + prog.target;
+  document.getElementById('mLeft').textContent = left;
+  document.getElementById('mChurn').textContent =
+    churnHistory.length ? churnHistory[churnHistory.length - 1] : '—';
+
+  const ra = byId[a].rnd, rb = byId[b].rnd;
+  const where = ra === rb
+    ? `Both round ${ra} — players you'd choose between at the same pick.`
+    : `Round ${Math.min(ra, rb)} vs round ${Math.max(ra, rb)} — a crossing question, which is what lets the rounds be ranked against each other.`;
+  const settled = churnHistory.length && churnHistory[churnHistory.length - 1] <= 2;
+  document.getElementById('advice').textContent =
+    where + (left === 0
+      ? '  All rounds have met their budget — export whenever you like.'
+      : settled && r > 3 ? '  Top 20 has settled; the rest only sharpens the tail.' : '');
+
+  const ord = order();
+  // The whole pool, not a top-N slice: the pool is sized to the draft (every
+  // live pick), so a cut-off would hide players the queue still has to order.
+  document.getElementById('rankcount').textContent = `all ${ord.length}`;
+  const box = document.querySelector('.scroll');
+  const held = anchor && document.getElementById('r_' + anchor);
+  const wasAt = held ? held.offsetTop : 0, wasScrolled = box.scrollTop;
+  document.getElementById('rank').innerHTML = ord.map((id, i) => {
+    const p = byId[id], move = boardRank[id] - (i + 1);
+    const cls = move > 0 ? 'move-up' : move < 0 ? 'move-dn' : '';
+    const rookie = p.exp === 0 ? '<span class="rook" title="rookie">R</span>' : '';
+    // MY_PICK_AT is keyed by row number (1-indexed), not player id -- the
+    // anchor is "who's here for my Nth turn", which follows the row as
+    // answers reorder it, not whoever happened to be there when the page
+    // loaded.
+    const turn = MY_PICK_AT[i + 1];
+    const pickRow = turn ? ' pickrow' : '';
+    const pickTag = turn ? `<span class="pick" title="around my pick ${turn}">P${turn}</span>` : '';
+    return `<tr id="r_${id}" class="${pickRow}" draggable="true" data-id="${id}">` +
+      `<td class="act drag" title="drag to reorder">&#8942;&#8942;</td>` +
+      `<td class="act">` +
+      `<button class="rb" data-mv="-1" data-id="${id}" title="move up">&#9650;</button>` +
+      `<button class="rb" data-mv="1" data-id="${id}" title="move down">&#9660;</button></td>` +
+      `<td class="n">${i + 1}${pickTag}</td><td>${p.name}${rookie}</td>` +
+      `<td class="pos pos-${p.pos}">${p.pos}</td>` +
+      `<td class="n">${num(p.pts)}</td><td class="n">${num(p.vorp)}</td>` +
+      `<td class="n">${seen[id]}</td>` +
+      `<td class="n ${cls}">${boardRank[id]}${move ? ` (${move > 0 ? '+' : ''}${move})` : ''}</td>` +
+      `<td class="act"><button class="rb x" data-x="${id}" title="do not draft">&#10005;</button></td></tr>`;
+  }).join('');
+  if (held) {
+    const now = document.getElementById('r_' + anchor);
+    if (now) box.scrollTop = wasScrolled + (now.offsetTop - wasAt);
+  }
+  applyRankFilter();   // table is rebuilt wholesale above -- reapply the live filter
+
+  const dnd = [...excluded];
+  document.getElementById('dndn').textContent = dnd.length;
+  document.getElementById('dndlist').innerHTML = dnd.map(id => {
+    const p = byId[id] || ADDABLE[id];
+    return `<div class="row"><button class="rb" data-undo="${id}" title="put back">&#8634;</button>` +
+      `<span>${p ? p.name : id}</span>` +
+      `<span class="pos pos-${p ? p.pos : ''}">${p ? p.pos : ''}</span></div>`;
+  }).join('');
+
+  document.getElementById('dump').value = JSON.stringify(payload());
+  document.getElementById('undo').disabled = !comparisons.length;
+}
+
+function payload() {
+  return { season: DATA.season, pool: DATA.pool, comparisons, extras, manual,
+           excluded: [...excluded] };
+}
+
+// --- actions ---------------------------------------------------------------
+function pick(side) {
+  const [a, b] = pair;
+  const winner = side === 'A' ? a : b, loser = side === 'A' ? b : a;
+  comparisons.push({ winner, loser });
+  applyElo(winner, loser);
+  asked.add(pairKey(a, b));
+
+  if (comparisons.length % 10 === 0) {
+    const top = order().slice(0, 20);
+    if (lastTop.length) {
+      let moved = 0;
+      top.forEach((id, i) => { if (lastTop[i] !== id) moved++; });
+      churnHistory.push(moved);
+    }
+    lastTop = top;
+    sync();                     // batched with the churn tick, every 10 answers
+  }
+  save(); next();
+}
+function next() { pair = choosePair(); render(); }
+
+// --- ranking-table controls ------------------------------------------------
+// ▲/▼ moves a player exactly one spot, no more and no less. It pins a key
+// that sorts strictly between the row's new neighbours -- not a comparison
+// replayed until something budges, not a round jumped whole, just "put him
+// here, between these two" -- so the move is exact and instant regardless of
+// round or how much evidence anyone involved has.
+//
+// This is deliberately a second, independent ranking: a manually placed
+// player no longer moves on the strength of comparisons or ADP round, only on
+// further taps. That trade is the point -- predictable beats "mostly right".
+function move(id, dir) {
+  const key = allKeys();
+  const ord = P.filter(p => !excluded.has(p.id)).map(p => p.id)
+    .sort((a, b) => (key[a] - key[b]) || (boardRank[a] - boardRank[b]));
+  const i = ord.indexOf(id), j = i + dir;
+  if (i < 0 || j < 0 || j >= ord.length) return;   // already at the top or bottom
+  moveTo(id, j, ord, key);
+}
+
+// Drag-and-drop drop target: pin `id` at position `targetIndex` (0-indexed, in
+// the current ranking order), same "strictly between its new neighbours" key
+// math as move() above, just for an arbitrary distance instead of one spot.
+// `ord`/`key` are optional precomputed values (move() already has them).
+function moveTo(id, targetIndex, ord, key) {
+  key = key || allKeys();
+  ord = (ord || P.filter(p => !excluded.has(p.id)).map(p => p.id)
+    .sort((a, b) => (key[a] - key[b]) || (boardRank[a] - boardRank[b])))
+    .filter(x => x !== id);
+  if (!ord.length) return;   // nothing else in the pool to sort against
+  targetIndex = Math.max(0, Math.min(targetIndex, ord.length));
+
+  const before = ord[targetIndex - 1], after = ord[targetIndex];
+  const near = before !== undefined ? key[before] : key[after];
+  const beyond = after !== undefined && before !== undefined ? key[after]
+    : before !== undefined ? near + 1 : near - 1;
+  manual[id] = (near + beyond) / 2;
+  save(); sync(); render(id);
+}
+
+function addPlayer(id) {
+  const p = ADDABLE[id];
+  if (!p || byId[id]) return;
+  P.push(p); byId[id] = p;
+  // Last on the board by construction -- he is behind everyone the pool kept,
+  // which is exactly why he was cut. The ranking's ± column reads from here.
+  boardRank[id] = P.length;
+  elo[id] = 0; seen[id] = 0;
+  if (!extras.includes(id)) extras.push(id);
+  excluded.delete(id);
+  indexRounds(); save(); sync(); render(id);
+}
+
+function setExcluded(id, on) {
+  on ? excluded.add(id) : excluded.delete(id);
+  indexRounds(); save(); sync();
+  // A player removed mid-question has to be replaced, or the card still asks
+  // about someone who is off the draft.
+  pair.includes(id) ? next() : render(id);
+}
+
+// localStorage is the system of record. The server copy is a transport, so
+// that the laptop can pull answers down from the phone -- it is pushed on a
+// batch of answers and whenever the page is backgrounded (locking a phone
+// fires visibilitychange, and nothing after it is guaranteed to run). A failed
+// push is dropped on purpose: swiping through a tunnel must not block or lose
+// an answer that is already safe in localStorage.
+function save() { try { localStorage.setItem(KEY, JSON.stringify(payload())); } catch (e) {} }
+
+function sync() {
+  if (!SYNC_URL) return;
+  try {
+    fetch(SYNC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload()),
+      keepalive: true,          // survives the page being backgrounded
+    }).catch(() => {});
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') sync();
+});
+
+// --- swipe -----------------------------------------------------------------
+// A swipe counts only when it is decisively horizontal: past SWIPE_MIN px and
+// longer across than down. Otherwise scrolling the ranking table with a thumb
+// would answer a pair by accident, and an accidental answer is worse than a
+// missed one -- it is a preference recorded that you never held.
+const SWIPE_MIN = 50;
+let touch = null;
+const duel = document.querySelector('.duel');
+duel.addEventListener('touchstart', e => {
+  const t = e.changedTouches[0];
+  touch = { x: t.clientX, y: t.clientY };
+}, { passive: true });
+duel.addEventListener('touchend', e => {
+  if (!touch) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - touch.x, dy = t.clientY - touch.y;
+  touch = null;
+  if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) <= Math.abs(dy)) return;
+  // Swipe toward the card you want -- the same mapping the arrow keys use, so
+  // the two inputs cannot teach opposite habits.
+  pick(dx < 0 ? 'A' : 'B');
+}, { passive: true });
+
+document.getElementById('cardA').onclick = () => pick('A');
+document.getElementById('cardB').onclick = () => pick('B');
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft') pick('A');
+  else if (e.key === 'ArrowRight') pick('B');
+  else if (e.key === 's') next();
+  else if (e.key === 'u') document.getElementById('undo').click();
+});
+document.getElementById('skip').onclick = () => { asked.add(pairKey(...pair)); next(); };
+document.getElementById('undo').onclick = () => {
+  // Undoes an A/B answer only -- a ▲/▼ move is undone by tapping the other
+  // direction, since a manual move is not something the fit ever "answered".
+  if (!comparisons.length) return;
+  comparisons.pop();
+  rebuild(); save(); next();
+};
+
+// One delegated listener: the rows are rewritten on every answer, so per-button
+// handlers would be re-bound hundreds of times. `click`, not `touchstart` --
+// the browser swallows the click that ends a scroll fling, which is what keeps
+// a thumb scrolling the table from removing somebody by accident.
+// --- search the live ranking (find a player among 200+ rows) ---------------
+let rankFilter = '';
+function applyRankFilter() {
+  const q = rankFilter.trim().toLowerCase();
+  document.querySelectorAll('#rank tr[draggable]').forEach(tr => {
+    const name = tr.children[3].textContent.toLowerCase();
+    const pos = tr.children[4].textContent.toLowerCase();
+    tr.hidden = !!q && !name.includes(q) && !pos.includes(q);
+  });
+}
+function jumpToFirstMatch() {
+  const first = [...document.querySelectorAll('#rank tr[draggable]')].find(tr => !tr.hidden);
+  if (!first) return;
+  first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  first.style.outline = '2px solid var(--accent-volr)';
+  setTimeout(() => { first.style.outline = ''; }, 1200);
+}
+document.getElementById('rankSearch').oninput = e => { rankFilter = e.target.value; applyRankFilter(); };
+document.getElementById('rankSearch').addEventListener('keydown', e => {
+  if (e.key === 'Enter') jumpToFirstMatch();
+});
+document.getElementById('rankSearchBtn').onclick = jumpToFirstMatch;
+
+document.getElementById('rank').onclick = e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.x) setExcluded(b.dataset.x, true);
+  else move(b.dataset.id, +b.dataset.mv);
+};
+
+// --- drag-and-drop reorder ---------------------------------------------
+const rankBody = document.getElementById('rank');
+let dragId = null;
+rankBody.addEventListener('dragstart', e => {
+  const tr = e.target.closest('tr[draggable]');
+  if (!tr) return;
+  dragId = tr.dataset.id;
+  e.dataTransfer.effectAllowed = 'move';
+  tr.classList.add('dragging');
+});
+rankBody.addEventListener('dragend', e => {
+  const tr = e.target.closest('tr[draggable]');
+  if (tr) tr.classList.remove('dragging');
+  rankBody.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+});
+rankBody.addEventListener('dragover', e => {
+  if (!dragId) return;
+  e.preventDefault();
+  const rows = [...rankBody.querySelectorAll('tr[draggable]')];
+  rankBody.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  const over = rows.find(r => {
+    const box = r.getBoundingClientRect();
+    return e.clientY < box.top + box.height / 2;
+  });
+  (over || rows[rows.length - 1]).classList.add('drag-over');
+});
+rankBody.addEventListener('drop', e => {
+  if (!dragId) return;
+  e.preventDefault();
+  const rows = [...rankBody.querySelectorAll('tr[draggable]')];
+  const over = rankBody.querySelector('.drag-over');
+  const id = dragId;
+  dragId = null;
+  if (!over) return;
+  let targetIndex = rows.indexOf(over);
+  // Dropping past the midpoint of the last row means "after it", not "before it".
+  if (over === rows[rows.length - 1]) {
+    const box = over.getBoundingClientRect();
+    if (e.clientY >= box.top + box.height / 2) targetIndex += 1;
+  }
+  // `rows` still includes the dragged row itself (DOM hasn't re-rendered yet),
+  // but moveTo()'s `ord` does not -- once the drop point is past where the
+  // dragged row currently sits, its removal shifts everything after it down one.
+  const dragIndex = rows.findIndex(r => r.dataset.id === id);
+  if (dragIndex >= 0 && dragIndex < targetIndex) targetIndex -= 1;
+  moveTo(id, targetIndex);
+});
+document.getElementById('dndlist').onclick = e => {
+  const b = e.target.closest('button');
+  if (b) setExcluded(b.dataset.undo, false);
+};
+
+// --- add a player ----------------------------------------------------------
+// Native datalist: the browser does the type-ahead, including on a phone, so
+// there is no search box to write. The label carries position and team because
+// names collide and a bare surname is not enough to pick the right rookie.
+const label = p => `${p.name} · ${p.pos} ${p.team || 'FA'}${p.exp === 0 ? ' · R' : ''}`;
+function fillSearch() {
+  const rookiesOnly = document.getElementById('rookies').checked;
+  const options = Object.values(ADDABLE)
+    .filter(p => !byId[p.id] && (!rookiesOnly || p.exp === 0));
+  document.getElementById('addable').innerHTML =
+    options.map(p => `<option value="${label(p)}">`).join('');
+}
+document.getElementById('rookies').onchange = fillSearch;
+document.getElementById('search').onchange = e => {
+  const hit = Object.values(ADDABLE).find(p => label(p) === e.target.value);
+  if (hit) { addPlayer(hit.id); e.target.value = ''; fillSearch(); }
+};
+document.getElementById('reveal').onclick = e => {
+  reveal = !reveal;
+  e.target.textContent = reveal ? 'Hide ADP / VORP' : 'Show ADP / VORP';
+  render();
+};
+document.getElementById('clear').onclick = () => {
+  if (!confirm('Discard all ' + comparisons.length + ' answers?')) return;
+  comparisons = []; churnHistory = []; lastTop = []; asked.clear();
+  // The do-not-draft list and the manual moves are not answers -- they are
+  // decisions, and "discard all answers" is not a request to un-remove the
+  // players I have taken off the draft or put back where the fit had them.
+  rebuild(); save(); next();
+};
+document.getElementById('export').onclick = () => {
+  const blob = new Blob([JSON.stringify(payload(), null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'queue-prefs-' + DATA.season + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+// Matches queue_export.py's queue-snake-{season}.csv column shape, so this
+// can drop straight into data/ in place of the Python fit if wanted.
+function csvCell(v) {
+  const s = String(v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+document.getElementById('exportCsv').onclick = () => {
+  const header = 'queue_pos,player_id,player,position,team,proj,wk1_pts,adp,vorp_avg,rookie';
+  const rows = order().map((id, i) => {
+    const p = byId[id];
+    return [i + 1, id, p.name, p.pos, p.team || '', p.pts ?? '', p.wk1 ?? '', p.adp ?? '', p.vorp ?? '', p.exp === 0 ? 'R' : ''];
+  });
+  const csv = [header].concat(rows.map(r => r.map(csvCell).join(','))).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'queue-snake-' + DATA.season + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+document.getElementById('import').onclick = () => {
+  try {
+    const parsed = JSON.parse(document.getElementById('paste').value);
+    comparisons = parsed.comparisons || parsed;
+    apply(parsed);
+    for (const c of comparisons) asked.add(pairKey(c.winner, c.loser));
+    rebuild(); save(); next();
+  } catch (e) { alert('Could not read that JSON: ' + e.message); }
+};
+
+// --- boot ------------------------------------------------------------------
+// Pull one saved run's decisions into the page: the players it added, the
+// ones it moved by hand, and the players it took off the draft.
+function apply(saved) {
+  if (!saved) return;
+  for (const id of saved.extras || []) if (!byId[id]) addTo(id);
+  Object.assign(manual, saved.manual || {});
+  for (const id of saved.excluded || []) excluded.add(id);
+}
+function addTo(id) {                       // addPlayer without the save/render
+  const p = ADDABLE[id];
+  if (!p) return;
+  P.push(p); byId[id] = p; boardRank[id] = P.length;
+  if (!extras.includes(id)) extras.push(id);
+}
+
+// Whichever run is further along wins -- for the *answers*. Taking localStorage
+// unconditionally loses an exported file rebuilt into the page (answered
+// elsewhere, saved to data/queue-prefs-{season}.json) behind a stale copy in
+// this browser, with no sign that it happened. Ties go to localStorage: same
+// length usually means the same run, and it is the one that survived a reload
+// here.
+//
+// The other three keys are merged from both sides instead, never chosen
+// between. They are decisions rather than a run: a rookie added on the phone
+// must not vanish because the laptop's file happens to hold more answers.
+let restored = DATA.resume;
+let local = null;
+try { local = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+const answers = r => (r && r.comparisons ? r.comparisons.length : -1);
+if (answers(local) >= answers(restored)) restored = local || restored;
+apply(DATA.resume); apply(local);
+indexRounds();
+
+// After the extras are in P, so their answers survive the filter below and the
+// ratings cover them.
+resetRatings();
+if (restored && restored.comparisons) {
+  comparisons = restored.comparisons.filter(c => byId[c.winner] && byId[c.loser]);
+  for (const c of comparisons) asked.add(pairKey(c.winner, c.loser));
+  rebuild();
+}
+document.getElementById('season').textContent = DATA.season + ' · ' + P.length + ' players';
+fillSearch();
+next();
+</script>

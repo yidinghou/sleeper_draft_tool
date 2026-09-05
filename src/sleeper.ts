@@ -9,6 +9,8 @@ export interface SleeperPlayer {
   team: string | null;
   status: string;
   active?: boolean;
+  /** Seasons played. 0 is a rookie, which is the only thing this is read for. */
+  years_exp?: number | null;
 }
 
 export interface SleeperProjection {
@@ -17,6 +19,19 @@ export interface SleeperProjection {
   pts_half_ppr?: number;
   pts_std?: number;
   adp_2qb?: number;
+  /** The projected stat line (pass_yd, rush_td, rec, ...) behind those points. */
+  [stat: string]: number | string | undefined;
+}
+
+/** A league's scoring rules: stat key -> points per unit of that stat. */
+export type ScoringSettings = Record<string, number>;
+
+export interface SleeperLeague {
+  league_id: string;
+  name: string;
+  season: string;
+  total_rosters: number;
+  scoring_settings: ScoringSettings;
 }
 
 export interface DraftPick {
@@ -93,6 +108,34 @@ export async function fetchWeeklyProjections(
   week: number,
 ): Promise<Record<string, SleeperProjection>> {
   return get<Record<string, SleeperProjection>>(`/projections/nfl/regular/${season}/${week}`);
+}
+
+/** Points for a projected stat line under a league's own scoring rules.
+ *
+ * Sleeper ships `pts_half_ppr` alongside every projection, and it is the wrong
+ * number for these leagues: it scores a passing TD at 6, both leagues here
+ * score it at 4, so it inflates every QB by roughly four points a game. The
+ * stat line is in the same response, so the honest number is one dot product
+ * away.
+ *
+ * Scoring keys and stat keys share a namespace by design (`pass_td` scores
+ * `pass_td`), so this is that dot product and nothing more -- including the
+ * bonus and per-range keys, which Sleeper reports as stats too.
+ */
+export function scoreProjection(
+  projection: SleeperProjection,
+  scoring: ScoringSettings,
+): number {
+  let points = 0;
+  for (const [stat, perUnit] of Object.entries(scoring)) {
+    const value = projection[stat];
+    if (typeof value === "number") points += value * perUnit;
+  }
+  return points;
+}
+
+export async function fetchLeague(leagueId: string): Promise<SleeperLeague> {
+  return get<SleeperLeague>(`/league/${leagueId}`);
 }
 
 export async function fetchDraft(draftId: string): Promise<Draft> {
