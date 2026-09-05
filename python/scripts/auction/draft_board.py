@@ -69,7 +69,7 @@ from vorp.league.roster_fill import RosterFillPlayer as Player  # noqa: E402
 from vorp.league.teams import UNKNOWN_SEAT, LeagueState  # noqa: E402
 from vorp.optimal_roster import RosterPlan, Target, plan_roster  # noqa: E402
 from vorp.seat_value import price_from_value, seat_values  # noqa: E402
-from vorp.sleeper_client import (  # noqa: E402
+from vorp.sources.sleeper import (  # noqa: E402
     draft_fingerprint,
     fetch_draft,
     fetch_draft_picks,

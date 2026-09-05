@@ -43,7 +43,7 @@ mirrored to `data/draft-<id>.json` (`_save_draft`, atomic temp-file replace) so
 history survives a restart and can be replayed offline — the saved envelope is
 the same shape `--picks-file` reads, so it opens directly.
 
-Both `sleeper_client.py` reads go through `_get`, which appends `?_cb=<epoch_ms>`
+Both `sources/sleeper.py` reads go through `_get`, which appends `?_cb=<epoch_ms>`
 to defeat the CDN. That client is a read-only stdlib-`urllib` mirror of
 `src/sleeper.ts`, so the pricing process has no second language runtime.
 
@@ -97,7 +97,7 @@ rates are localhost-only, so the fast cadence is essentially free.
 
 ## Reference
 
-**Depends on:** `python/vorp/sleeper_client.py` for the four read-only Sleeper
+**Depends on:** `python/vorp/sources/sleeper.py` for the four read-only Sleeper
 calls (`fetch_draft`, `fetch_draft_picks`, `fetch_league_users`,
 `draft_fingerprint`/`parse_nomination`), which mirror `src/sleeper.ts`;
 `python/vorp/board.py`'s `price_board` for the actual repricing

@@ -53,7 +53,7 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from vorp.league.config import LEAGUE_CONFIG, MY_USERNAME  # noqa: E402
-from vorp.sleeper_client import fetch_league_rosters, fetch_league_users  # noqa: E402
+from vorp.sources.sleeper import fetch_league_rosters, fetch_league_users  # noqa: E402
 
 GRAPHQL = "https://sleeper.com/graphql"
 

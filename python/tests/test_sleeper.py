@@ -4,7 +4,7 @@ Mirrors src/sleeper.test.ts's coverage for the ported functions, plus
 seat_identity, which has no TypeScript counterpart.
 """
 
-from vorp.sleeper_client import (
+from vorp.sources.sleeper import (
     cache_busted_url,
     draft_fingerprint,
     parse_nomination,

@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from vorp.league.config import SNAKE_CONFIG  # noqa: E402
-from vorp.sleeper_client import fetch_draft_picks  # noqa: E402
+from vorp.sources.sleeper import fetch_draft_picks  # noqa: E402
 
 #: Positions autodraft should only ever take once, and how many of each the
 #: lineup actually starts (all four are 1 in SNAKE_CONFIG). Only RB and WR are
