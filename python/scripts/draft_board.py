@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
 """The live draft board server -- see docs/spec/board/index.md.
 
-Steps 2 and 4 of docs/spec/board/guide.md's build order: the server skeleton,
-`/state.json`, seat identity + divisions, the per-seat bid matrix, `my_plan`,
-and `block`. This is still a partial slice of the full rendering contract
-(docs/spec/board/03-rendering-contract.md): everything above is real, but
-`block`'s `market`/`wk3VorpD` fields aren't (no market-price or weeks-1-3
-data source is loaded here -- see `block_info`'s docstring). Sleeper polling
-(guide.md step 3) is also follow-up work; today this only reads
-`--picks-file`, whose optional top-level `"nomination"` key
-(`{player_id, highest_offer, offering_slot, ...}`, a shape this repo
-invented -- there's no spec-given format for a manual entry pane's
-nomination, only Sleeper's own `metadata`) is the only source of a live
-block. Identity is resolved from `random_fill` plus whatever a pick's
-`picked_by` happens to carry -- there is no real `draft`/`users` feed to
-seed pins from yet, outside of `--print-seats`, which does its own one-shot
-fetch.
+Steps 2, 3, and 4 of docs/spec/board/guide.md's build order: the server
+skeleton, `/state.json`, Sleeper polling, seat identity + divisions, the
+per-seat bid matrix, `my_plan`, and `block`. This is still a partial slice
+of the full rendering contract (docs/spec/board/03-rendering-contract.md):
+everything above is real, but `block`'s `market`/`wk3VorpD` fields aren't
+(no market-price or weeks-1-3 data source is loaded here -- see
+`block_info`'s docstring). Not yet built: the scrubber + frame cache
+(guide.md step 6) and the slide deck (step 5) -- `/board` and `templates/`
+don't exist yet, only the JSON payload does.
+
+Two source modes: `--picks-file <path>` (`file` mode, re-read on mtime
+change -- a hand-edited nomination key is the only source of a live block
+there, since there's no spec-given format for a manual entry pane's
+nomination, only Sleeper's own `metadata`; this repo invented
+`{player_id, highest_offer, offering_slot}`), or `--draft-id <id>` (`draft`
+mode, the default when `--picks-file` is omitted): a background `poller`
+thread drives `Board.poll_sleeper_once` at an adaptive cadence
+(`--poll`/`--poll-live`), durably saving the draft and appending to the bid
+ladder on every real change -- see `01-live-data-ingestion.md`.
 
 The matrix has no cache in front of it (that's guide.md step 6, not built),
 so it runs one lineup solve per `(player, real seat)` pair on every
@@ -24,6 +28,7 @@ so it runs one lineup solve per `(player, real seat)` pair on every
 Usage: python scripts/draft_board.py --picks-file <path> [--me 3] [--port 8770]
                                      [--season 2026] [--w-floor 1.0]
                                      [--matrix-top 300]
+       python scripts/draft_board.py --draft-id <id> [--poll 0.75] [--poll-live 0.2]
        python scripts/draft_board.py --draft-id <id> --print-seats
 """
 
@@ -33,6 +38,8 @@ import argparse
 import json
 import random
 import sys
+import threading
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -40,7 +47,7 @@ from typing import Any, Dict, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from vorp.board import price_board  # noqa: E402
-from vorp.csv_loader import load_players_from_csv, projections_csv_path  # noqa: E402
+from vorp.csv_loader import REPO_ROOT, load_players_from_csv, projections_csv_path  # noqa: E402
 from vorp.league.config import (  # noqa: E402
     DIVISIONS,
     LEAGUE_CONFIG,
@@ -54,7 +61,14 @@ from vorp.league.roster_fill import RosterFillPlayer as Player  # noqa: E402
 from vorp.league.teams import UNKNOWN_SEAT, LeagueState  # noqa: E402
 from vorp.optimal_roster import RosterPlan, Target, plan_roster  # noqa: E402
 from vorp.seat_value import price_from_value, seat_values  # noqa: E402
-from vorp.sleeper_client import fetch_draft, fetch_league_users, seat_identity  # noqa: E402
+from vorp.sleeper_client import (  # noqa: E402
+    draft_fingerprint,
+    fetch_draft,
+    fetch_draft_picks,
+    fetch_league_users,
+    parse_nomination,
+    seat_identity,
+)
 
 DEFAULT_PORT = 8770
 DEFAULT_W_FLOOR = 1.0
@@ -425,13 +439,217 @@ def print_seats(draft: Dict[str, Any], users: List[Dict[str, Any]]) -> None:
         print(f"seat {seat_id + 1}: {entry.get('display_name')} ({entry.get('username')})")
 
 
+def _pick_from_sleeper(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """A Sleeper `DraftPick` (see `src/sleeper.ts`) as the internal pick
+    shape `build_state` reads. `metadata.amount` is the real sold price --
+    the auction dollar Sleeper can only be scraped for elsewhere, but a
+    completed pick's own record carries it directly.
+    """
+    meta = raw.get("metadata") or {}
+    return {
+        "player_id": str(raw.get("player_id") or meta.get("player_id")),
+        "position": meta.get("position"),
+        "amount": int(meta.get("amount") or 0),
+        "draft_slot": raw.get("draft_slot"),
+    }
+
+
+def _nomination_from_sleeper(draft: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """`sleeper_client.parse_nomination`'s `Nomination` as the internal
+    nomination dict `block_info` reads. `None` when nothing is on the block.
+    """
+    nomination = parse_nomination(draft)
+    if not nomination.player_id:
+        return None
+    return {
+        "player_id": nomination.player_id,
+        "highest_offer": nomination.highest_offer,
+        "offering_slot": nomination.offering_slot,
+    }
+
+
+def _bid_log_path(draft_id: str) -> Path:
+    return REPO_ROOT / "data" / f"bid-log-{draft_id}.json"
+
+
+def _draft_save_path(draft_id: str) -> Path:
+    return REPO_ROOT / "data" / f"draft-{draft_id}.json"
+
+
+def _append_bid_log(path: Path, player_id: str, seat: int, amount: int) -> None:
+    """Append one bid rung for `player_id`, only if it differs from the last
+    recorded rung -- see docs/spec/analysis/01-bid-trends.md's format:
+    `{player_id: [{seat, amount}, ...]}`, `seat` 1-indexed (matching
+    `offering_slot`). Sleeper exposes only the current high bid, so this
+    ladder is a sample of the bidding reconstructed from poll history, not a
+    transcript of it -- a rung raised and outbid between two polls is never
+    recorded.
+    """
+    log: Dict[str, List[Dict[str, int]]] = (
+        json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    )
+    rungs = log.setdefault(player_id, [])
+    if rungs and rungs[-1]["seat"] == seat and rungs[-1]["amount"] == amount:
+        return
+    rungs.append({"seat": seat, "amount": amount})
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(log, indent=2) + "\n", encoding="utf-8")
+
+
+def _save_draft(path: Path, board: "Board") -> None:
+    """Durable mirror of the draft -- the shape
+    docs/spec/analysis/01-bid-trends.md's guide already documents for
+    `data/draft-<id>.json`: `{me?, seat_names?, picks: [{player_id, amount,
+    draft_slot, pick_no, position}]}`. Atomic (write to a temp file, then
+    rename) so a crash mid-write never leaves a half-written file
+    `load_saved_draft`/`--picks-file` could choke on. `seat_names` is
+    0-indexed (matching `board.seat_users`); `me` is 1-indexed, matching
+    `--me` and Sleeper's own `draft_slot` convention.
+    """
+    picks = []
+    for raw in board.raw_picks:
+        meta = raw.get("metadata") or {}
+        picks.append(
+            {
+                "player_id": str(raw.get("player_id") or meta.get("player_id")),
+                "amount": int(meta.get("amount") or 0),
+                "draft_slot": raw.get("draft_slot"),
+                "pick_no": raw.get("pick_no"),
+                "position": meta.get("position"),
+            }
+        )
+    envelope: Dict[str, Any] = {
+        "picks": picks,
+        "seat_names": {
+            str(seat_id): identity.get("display_name") or identity.get("username")
+            for seat_id, identity in board.seat_users.items()
+        },
+    }
+    if board.my_seat is not None:
+        envelope["me"] = board.my_seat + 1
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(envelope, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
+def load_saved_draft(
+    path: Path, config: LeagueConfig
+) -> Optional[Tuple[LeagueState, List[Dict[str, Any]]]]:
+    """Load a saved envelope -- the same shape `_save_draft` writes, and the
+    same shape `--picks-file` already reads -- so the board can seed from it
+    on startup and work offline before the first poll lands. Returns
+    `(state, picks)` in the internal pick shape (`player_id`/`position`/
+    `amount`/`draft_slot`); `None` if the file doesn't exist.
+    """
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    picks = [
+        {
+            "player_id": p["player_id"],
+            "position": p.get("position"),
+            "amount": p["amount"],
+            "draft_slot": p.get("draft_slot"),
+        }
+        for p in data.get("picks", [])
+    ]
+    return build_state(picks, config), picks
+
+
+# --------------------------------------------------------------------------
+# The time-travel scrubber -- see docs/spec/board/04-time-travel-scrubber.md.
+# --------------------------------------------------------------------------
+
+#: Folded into every frame's cache signature, so any change to what a frame
+#: bakes in is a cache invalidation, not a manual purge -- bump this and
+#: every persisted/in-memory frame misses and rebuilds against the current
+#: shape. History: 1 -- initial frame cache (in-memory only).
+FRAME_SCHEMA_VERSION = 1
+
+
+def _prefix_sig(picks: List[Dict[str, Any]], n: int, seat_users: Dict[int, Dict[str, Any]]) -> str:
+    """The cache key for a scrubbed frame: `FRAME_SCHEMA_VERSION`, the first
+    `n` picks as `[index, player_id, amount]` triples, and the seat names a
+    frame bakes into each roster. A frame depends only on its picks prefix
+    -- the draft is append-only, so this stays valid as it grows.
+    """
+    triples = [[i, p["player_id"], p["amount"]] for i, p in enumerate(picks[:n])]
+    names = {str(sid): u.get("display_name") or u.get("username") for sid, u in seat_users.items()}
+    blob = {"v": FRAME_SCHEMA_VERSION, "picks": triples, "names": names}
+    return json.dumps(blob, sort_keys=True)
+
+
+def _sold_block(
+    picks: List[Dict[str, Any]], n: int, seat_users: Dict[int, Dict[str, Any]]
+) -> Optional[Dict[str, Any]]:
+    """The pick that just sold at `n` -- what a scrubbed frame surfaces as
+    `block` in place of a live nomination (a frozen frame has none). `None`
+    at `n == 0` (the opening board, nothing sold yet).
+    """
+    if n <= 0 or n > len(picks):
+        return None
+    pick = picks[n - 1]
+    draft_slot = pick.get("draft_slot")
+    seat_id = int(draft_slot) - 1 if draft_slot is not None else None
+    identity = seat_users.get(seat_id, {}) if seat_id is not None else {}
+    return {
+        "player_id": pick["player_id"],
+        "position": pick.get("position"),
+        "amount": pick.get("amount"),
+        "seat": seat_id,
+        "buyer": identity.get("display_name") or identity.get("username"),
+        "sold": True,
+    }
+
+
+def _frame_store_dir(cache_key: Optional[str]) -> Optional[Path]:
+    """`data/frames-<cache_key>/` -- `None` when there's no stable key to
+    persist under (an inline paste has no draft id or file to name it by),
+    in which case frames stay in-memory only for that run.
+    """
+    if not cache_key:
+        return None
+    return REPO_ROOT / "data" / f"frames-{cache_key}"
+
+
+def _load_frame(store_dir: Optional[Path], n: int, sig: str) -> Optional[Dict[str, Any]]:
+    """A persisted frame, or `None` on a miss -- no file, or its `sig`
+    doesn't match the current one (schema bump, picks changed under it), so
+    it rebuilds instead of serving a payload the current renderer can't
+    read.
+    """
+    if store_dir is None:
+        return None
+    path = store_dir / f"{n}.json"
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("sig") != sig:
+        return None
+    return data.get("payload")
+
+
+def _store_frame(store_dir: Optional[Path], n: int, sig: str, payload: Dict[str, Any]) -> None:
+    """Persist a frame, atomically (temp file + rename)."""
+    if store_dir is None:
+        return
+    store_dir.mkdir(parents=True, exist_ok=True)
+    path = store_dir / f"{n}.json"
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps({"sig": sig, "payload": payload}), encoding="utf-8")
+    tmp.replace(path)
+
+
 class Board:
     """Holds the config, the loaded projections, and the live state under a
     single-threaded refresh -- see docs/spec/board/01-live-data-ingestion.md.
-    Only the `file` source mode is implemented so far, so identity is
-    resolved from each pick's `picked_by` (usually absent from a hand-edited
-    mock) plus `random_fill` -- there is no Sleeper `draft`/`users` source
-    yet to seed real pins from.
+    Two source modes: `file` (`--picks-file`, re-read on mtime change) and
+    `draft` (`--draft-id`, polled -- see `poll_sleeper_once`). Identity comes
+    from `seat_identity` over whatever `self._draft`/`self._users` currently
+    hold (empty in `file` mode, real Sleeper data once `set_draft_id` runs)
+    plus a pick's `picked_by`, filled out by `random_fill`.
     """
 
     def __init__(
@@ -447,14 +665,26 @@ class Board:
         self.w_floor = w_floor
         self.me_fallback = me_fallback
         self.matrix_top = matrix_top
+        self.mode = "file"
         self.picks_file: Optional[Path] = None
         self._mtime: Optional[float] = None
+        self.draft_id: Optional[str] = None
+        self._last_fingerprint: Optional[str] = None
+        self._draft: Dict[str, Any] = {}
+        self._users: List[Dict[str, Any]] = []
+        self.raw_picks: List[Dict[str, Any]] = []
+        #: The current picks, in draft order, internal shape -- what the
+        #: scrubber replays prefixes of. See `get_payload_upto`.
+        self.picks: List[Dict[str, Any]] = []
+        #: {n: (prefix_sig, payload)} -- in-memory only so far (no disk
+        #: persistence yet). See `get_payload_upto`.
+        self._frame_cache: Dict[int, Tuple[str, Dict[str, Any]]] = {}
         self.state = LeagueState.opening(config)
         self.nomination: Optional[Dict[str, Any]] = None
         self._refresh_identity([])
 
     def _refresh_identity(self, picks: List[Dict[str, Any]]) -> None:
-        self.seat_users = refresh_seat_identity({}, [], picks, self.config)
+        self.seat_users = refresh_seat_identity(self._draft, self._users, picks, self.config)
         self.my_seat = resolve_my_seat(self.seat_users, self.me_fallback)
         self.divisions, self.seat_order = build_divisions(
             self.seat_users, self.config, self.my_seat
@@ -462,6 +692,7 @@ class Board:
         self.my_division = next((b["index"] for b in self.divisions if b["mine"]), None)
 
     def set_picks_file(self, path: Path) -> None:
+        self.mode = "file"
         self.picks_file = path
         self._mtime = None
         self.refresh_from_file()
@@ -477,14 +708,83 @@ class Board:
         data = json.loads(self.picks_file.read_text(encoding="utf-8"))
         picks = data.get("picks", [])
         self.state = build_state(picks, self.config)
+        self.picks = picks
         self.nomination = data.get("nomination")
         self._refresh_identity(picks)
         return True
 
+    def set_draft_id(self, draft_id: str) -> None:
+        """Switch to `draft` mode and do the first poll. `league_id` comes
+        off the draft itself -- one cheap extra `/draft` fetch to learn it,
+        then `poll_sleeper_once(force=True)` does the real work. If a
+        previously saved envelope exists (`data/draft-<id>.json`), it seeds
+        `state` first, so the board has something to show even if the very
+        first poll is slow or the first request lands before it returns.
+        """
+        self.mode = "draft"
+        self.draft_id = draft_id
+        self._last_fingerprint = None
+        saved = load_saved_draft(_draft_save_path(draft_id), self.config)
+        if saved is not None:
+            self.state, picks = saved
+            self.picks = picks
+            self._refresh_identity(picks)
+        seed = fetch_draft(draft_id)
+        self._users = fetch_league_users(seed["league_id"])
+        self.poll_sleeper_once(force=True)
+
+    def poll_sleeper_once(self, force: bool = False) -> bool:
+        """The cheap/expensive split -- see
+        docs/spec/board/01-live-data-ingestion.md. A cheap `/draft` poll,
+        `draft_fingerprint`-gated: only when it changes (or `force`) does
+        this pay for the expensive `/draft/{id}/picks` refetch and rebuild
+        `state`. On a refetch, also durably saves the draft
+        (`data/draft-<id>.json`) and, if a player is on the block, appends
+        its current high bid to the bid ladder (`data/bid-log-<id>.json`).
+        Returns whether picks were actually refetched.
+
+        A network failure never raises out of here -- it's printed and
+        treated as "nothing changed", leaving `state` as it was (the last
+        good poll, or whatever `load_saved_draft` seeded it with). A
+        background poller that dies on the first hiccup is useless; a
+        request handler that 500s because Sleeper had one slow response is
+        worse than serving slightly stale data.
+        """
+        try:
+            draft = fetch_draft(self.draft_id)
+            fingerprint = draft_fingerprint(draft)
+            if not force and fingerprint == self._last_fingerprint:
+                return False
+            raw_picks = fetch_draft_picks(self.draft_id)
+        except Exception as exc:  # noqa: BLE001 -- deliberately broad, see above
+            print(f"poll_sleeper_once: {exc}", file=sys.stderr)
+            return False
+
+        self._last_fingerprint = fingerprint
+        self._draft = draft
+        self.raw_picks = raw_picks
+        picks = [_pick_from_sleeper(p) for p in self.raw_picks]
+        self.state = build_state(picks, self.config)
+        self.picks = picks
+        self.nomination = _nomination_from_sleeper(draft)
+        self._refresh_identity(picks)
+        _save_draft(_draft_save_path(self.draft_id), self)
+        if self.nomination and self.nomination.get("offering_slot") is not None:
+            _append_bid_log(
+                _bid_log_path(self.draft_id),
+                self.nomination["player_id"],
+                self.nomination["offering_slot"],
+                self.nomination.get("highest_offer") or 0,
+            )
+        return True
+
     def payload(self) -> Dict[str, Any]:
-        if self.picks_file is not None:
+        if self.mode == "file" and self.picks_file is not None:
             self.refresh_from_file()
-        return build_payload(
+        # In "draft" mode the background poller (see `poller`) keeps state
+        # current; a request here just reads whatever it last built.
+        total = len(self.picks)
+        result = build_payload(
             self.state,
             self.players,
             self.config,
@@ -497,6 +797,65 @@ class Board:
             matrix_top=self.matrix_top,
             nomination=self.nomination,
         )
+        result["view"] = {"pick": total, "total": total, "live": True}
+        return result
+
+    @property
+    def cache_key(self) -> Optional[str]:
+        """What `data/frames-<cache_key>/` is named after -- the draft id in
+        `draft` mode, the picks-file's stem in `file` mode, `None` for an
+        inline paste (no stable id, so frames stay in-memory only).
+        """
+        if self.mode == "draft" and self.draft_id:
+            return self.draft_id
+        if self.mode == "file" and self.picks_file:
+            return self.picks_file.stem
+        return None
+
+    def get_payload_upto(self, n: int) -> Dict[str, Any]:
+        """The board as it stood after pick `n` -- see
+        docs/spec/board/04-time-travel-scrubber.md. Checked in memory first,
+        then on disk (`data/frames-<cache_key>/<n>.json`), both keyed by a
+        prefix signature (`_prefix_sig`) so a stale entry -- a
+        `FRAME_SCHEMA_VERSION` bump, or the seat names changing -- misses
+        and rebuilds instead of serving a payload the current renderer can't
+        read. `n` is clamped to `[0, total]`. Never mutates the live
+        payload -- this builds its own residual state from a picks prefix,
+        entirely separate from `self.state`.
+        """
+        total = len(self.picks)
+        n = max(0, min(n, total))
+        sig = _prefix_sig(self.picks, n, self.seat_users)
+
+        cached = self._frame_cache.get(n)
+        if cached is not None and cached[0] == sig:
+            return cached[1]
+
+        store_dir = _frame_store_dir(self.cache_key)
+        disk_payload = _load_frame(store_dir, n, sig)
+        if disk_payload is not None:
+            self._frame_cache[n] = (sig, disk_payload)
+            return disk_payload
+
+        sub_state = build_state(self.picks[:n], self.config)
+        result = build_payload(
+            sub_state,
+            self.players,
+            self.config,
+            self.w_floor,
+            seat_users=self.seat_users,
+            divisions=self.divisions,
+            seat_order=self.seat_order,
+            my_seat=self.my_seat,
+            my_division=self.my_division,
+            matrix_top=self.matrix_top,
+            nomination=None,  # a scrubbed view has no live nomination
+        )
+        result["block"] = _sold_block(self.picks, n, self.seat_users)
+        result["view"] = {"pick": n, "total": total, "live": n == total}
+        self._frame_cache[n] = (sig, result)
+        _store_frame(store_dir, n, sig, result)
+        return result
 
 
 def make_handler(board: Board):
@@ -513,8 +872,14 @@ def make_handler(board: Board):
             self.wfile.write(payload)
 
         def do_GET(self) -> None:  # noqa: N802 -- stdlib method name
-            if self.path == "/state.json":
-                self._send_json(board.payload())
+            parsed = urllib.parse.urlparse(self.path)
+            if parsed.path == "/state.json":
+                query = urllib.parse.parse_qs(parsed.query)
+                upto = query.get("upto")
+                if upto:
+                    self._send_json(board.get_payload_upto(int(upto[0])))
+                else:
+                    self._send_json(board.payload())
             elif self.path == "/health":
                 body = b"ok"
                 self.send_response(200)
@@ -529,6 +894,26 @@ def make_handler(board: Board):
     return Handler
 
 
+def poller(
+    board: "Board",
+    idle_interval: float,
+    live_interval: float,
+    stop_event: threading.Event,
+) -> None:
+    """Background loop driving `Board.poll_sleeper_once` at an adaptive
+    cadence -- see docs/spec/board/01-live-data-ingestion.md. `live_interval`
+    (fast) while a player is on the block, `idle_interval` (slow) otherwise:
+    latency is only felt during active bidding, and a missed raise can't be
+    recovered, so the fast cadence only runs when it actually matters. Both
+    rates are localhost-only Sleeper calls, so the fast one is essentially
+    free.
+    """
+    while not stop_event.is_set():
+        board.poll_sleeper_once()
+        interval = live_interval if board.nomination is not None else idle_interval
+        stop_event.wait(interval)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--picks-file", type=Path)
@@ -538,6 +923,10 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--w-floor", type=float, default=DEFAULT_W_FLOOR)
     parser.add_argument("--matrix-top", type=int, default=DEFAULT_MATRIX_TOP)
+    parser.add_argument("--poll", type=float, default=0.75, help="idle poll interval, seconds")
+    parser.add_argument(
+        "--poll-live", type=float, default=0.2, help="poll interval while a player is on the block"
+    )
     parser.add_argument(
         "--print-seats",
         action="store_true",
@@ -551,16 +940,28 @@ def main() -> None:
         print_seats(draft, users)
         return
 
-    if not args.picks_file:
-        parser.error("--picks-file is required (Sleeper polling isn't built yet)")
-
     config = LEAGUE_CONFIG
     players = load_players_from_csv(projections_csv_path(args.season))
     board = Board(config, players, args.w_floor, me_fallback=args.me, matrix_top=args.matrix_top)
-    board.set_picks_file(args.picks_file)
+
+    if args.picks_file:
+        board.set_picks_file(args.picks_file)
+        print(f"Serving on http://127.0.0.1:{args.port}/state.json (picks: {args.picks_file})")
+    else:
+        board.set_draft_id(args.draft_id)
+        stop_event = threading.Event()
+        thread = threading.Thread(
+            target=poller,
+            args=(board, args.poll, args.poll_live, stop_event),
+            daemon=True,
+        )
+        thread.start()
+        print(
+            f"Serving on http://127.0.0.1:{args.port}/state.json "
+            f"(polling draft {args.draft_id}, idle {args.poll}s / live {args.poll_live}s)"
+        )
 
     server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(board))
-    print(f"Serving on http://127.0.0.1:{args.port}/state.json (picks: {args.picks_file})")
     server.serve_forever()
 
 

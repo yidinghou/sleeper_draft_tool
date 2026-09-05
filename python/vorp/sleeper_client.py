@@ -93,13 +93,17 @@ def seat_identity(
     raw_picks: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[int, Dict[str, Any]]:
     """`{seat_id: {user_id, username, display_name}}`, resolved from whatever
-    the draft actually names a manager for.
+    the draft actually names a manager for. `seat_id` is 0-indexed, matching
+    `LeagueState`'s seats everywhere else in this codebase -- Sleeper itself
+    is 1-indexed (`draft_slot`, and a dict-shaped `draft_order`'s slot
+    values), so every key below is shifted by one on the way in.
 
     `draft_order` seeds most of the map and comes in two shapes: a dict
-    (`{user_id: slot}`, the common case) or an array (`user_id` at index
-    `slot - 1`, with `None` for an unseeded slot). Picks are the fallback --
-    a seat `draft_order` never seeded can still have picked, via its
-    `picked_by` -- and only fill a seat `draft_order` left open, never
+    (`{user_id: slot}`, `slot` 1-indexed, the common case) or an array
+    (`user_id` at index `slot - 1` -- i.e. the array index *is already* the
+    0-indexed seat id -- with `None` for an unseeded slot). Picks are the
+    fallback -- a seat `draft_order` never seeded can still have picked, via
+    its `picked_by` -- and only fill a seat `draft_order` left open, never
     override it.
     """
     by_user_id = {u["user_id"]: u for u in users}
@@ -117,17 +121,17 @@ def seat_identity(
     if isinstance(draft_order, dict):
         for user_id, slot in draft_order.items():
             if user_id is not None and slot is not None:
-                identity[int(slot)] = entry(user_id)
+                identity[int(slot) - 1] = entry(user_id)
     elif isinstance(draft_order, list):
         for i, user_id in enumerate(draft_order):
             if user_id is not None:
-                identity[i + 1] = entry(user_id)
+                identity[i] = entry(user_id)
 
     for pick in raw_picks or []:
         slot = pick.get("draft_slot")
         user_id = pick.get("picked_by")
-        if slot is not None and user_id and int(slot) not in identity:
-            identity[int(slot)] = entry(user_id)
+        if slot is not None and user_id and int(slot) - 1 not in identity:
+            identity[int(slot) - 1] = entry(user_id)
 
     return identity
 
