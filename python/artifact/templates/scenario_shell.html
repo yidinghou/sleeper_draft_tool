@@ -1,0 +1,195 @@
+__ORIGINAL_HEAD__
+<style>
+  /* ---- Added by python/artifact: the scenario switcher and the phone
+     breakpoint. Everything above this comment is draft_demo.html's own
+     stylesheet, lifted verbatim. ---- */
+
+  .tabs-wrap {
+    max-width: 1360px;
+    margin: 0 auto;
+    padding: 28px 24px 0;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab {
+    flex: 0 0 auto;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 100px;
+    padding: 7px 15px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .tab:hover {
+    border-color: var(--accent);
+  }
+  .tab[aria-selected="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--surface);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .tab[aria-selected="true"] {
+      color: var(--surface-sunk);
+    }
+  }
+  :root[data-theme="dark"] .tab[aria-selected="true"] {
+    color: var(--surface-sunk);
+  }
+
+  /* The scenario pages carried a "back to all scenarios" link; in one merged
+     page the tabs are that navigation, so the link is stripped out at build
+     time and this hides any stray copy. */
+  .back-link {
+    display: none !important;
+  }
+
+  /* ---- Phone. The source template stops at 1080px, which collapses the
+     two-column layout but still assumes a mouse and a wide table. ---- */
+  @media (max-width: 640px) {
+    body {
+      font-size: 14px;
+    }
+    .tabs-wrap {
+      padding: 16px 12px 0;
+    }
+    .wrap {
+      padding: 16px 12px 48px !important;
+      gap: 18px !important;
+    }
+    h1 {
+      font-size: 24px !important;
+    }
+    .lede {
+      font-size: 14px;
+    }
+    /* The transport is the one control that has to stay usable one-handed:
+       let the scrubber take its own full-width row under the buttons. */
+    .transport-row {
+      flex-wrap: wrap;
+    }
+    #scrub {
+      order: 10;
+      flex: 1 0 100%;
+      min-width: 0;
+      height: 28px;
+    }
+    #play,
+    #reset {
+      min-height: 40px;
+      padding-inline: 16px;
+    }
+    /* Tap targets: the position filters and sortable headers are otherwise
+       ~22px tall, under the 44px iOS guidance. */
+    .pos-btn {
+      min-height: 34px;
+      padding-inline: 12px;
+    }
+    table th {
+      padding-block: 10px !important;
+    }
+    .stats {
+      grid-template-columns: 1fr 1fr !important;
+    }
+  }
+</style>
+
+<div class="tabs-wrap">
+  <div class="tabs" id="tabs" role="tablist" aria-label="Scenario"></div>
+</div>
+
+<div id="app"></div>
+
+<template id="scenario-markup">__ORIGINAL_MARKUP__</template>
+
+<script id="all-data" type="application/json">__DATA__</script>
+<script>
+  (function () {
+    var ALL = JSON.parse(document.getElementById("all-data").textContent);
+    var tpl = document.getElementById("scenario-markup");
+    var app = document.getElementById("app");
+    var tabsEl = document.getElementById("tabs");
+
+    // draft_demo.html's own IIFE, rebound as a function of its payload. It
+    // closes over the DOM it renders into, so switching scenarios re-creates
+    // that DOM from the <template> first and lets the old nodes -- and every
+    // listener bound to them -- fall away with it.
+    function boot(D) {__ORIGINAL_SCRIPT__}
+
+    function payloadFor(s) {
+      return {
+        season: ALL.season,
+        window: ALL.window,
+        w_floor: ALL.w_floor,
+        league: ALL.league,
+        players: ALL.players,
+        title: s.title,
+        blurb: s.blurb,
+        frames: s.frames,
+        ledger: s.ledger
+      };
+    }
+
+    function show(key) {
+      var s = ALL.scenarios.filter(function (x) {
+        return x.key === key;
+      })[0];
+      if (!s) return;
+      Array.prototype.forEach.call(tabsEl.children, function (b) {
+        b.setAttribute("aria-selected", String(b.dataset.key === key));
+      });
+      app.innerHTML = "";
+      app.appendChild(tpl.content.cloneNode(true));
+      boot(payloadFor(s));
+      try {
+        localStorage.setItem("auction-drift-scenario", key);
+      } catch (e) {
+        /* private mode, blocked site data -- the default tab is fine */
+      }
+    }
+
+    tabsEl.innerHTML = ALL.scenarios
+      .map(function (s) {
+        return (
+          '<button class="tab" role="tab" data-key="' +
+          s.key +
+          '" aria-selected="false">' +
+          s.title +
+          "</button>"
+        );
+      })
+      .join("");
+
+    tabsEl.addEventListener("click", function (e) {
+      var b = e.target.closest(".tab");
+      if (b) show(b.dataset.key);
+    });
+
+    var start = null;
+    try {
+      start = localStorage.getItem("auction-drift-scenario");
+    } catch (e) {
+      /* ignore */
+    }
+    var known = ALL.scenarios.some(function (s) {
+      return s.key === start;
+    });
+    show(known ? start : ALL.scenarios[0].key);
+  })();
+</script>

@@ -1,0 +1,1524 @@
+<title>What He's Worth to You</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+/>
+<style>
+  /* Tokens are the export family's own (blended_price / draft_demo), so this
+     page reads as a sibling rather than a stranger. Only --dead is new: the
+     state a player enters when he reaches no slot on this roster. */
+  :root {
+    --ground: #eff2f5;
+    --surface: #ffffff;
+    --surface-sunk: #e7ebf0;
+    --line: #d3dae2;
+    --line-soft: #e3e8ee;
+    --ink: #16202b;
+    --ink-soft: #47576a;
+    --ink-faint: #7b8b9c;
+    --accent: #1f4e79;
+    --accent-soft: #dbe6f1;
+    --up: #0e7c66;
+    --up-soft: #d5ece5;
+    --down: #b4432c;
+    --down-soft: #f6ddd7;
+    --dead: #96a3b1;
+    --dead-soft: #e9edf1;
+    --brass: #8a6413;
+    --radius: 8px;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: Archivo, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1720;
+      --surface: #16202b;
+      --surface-sunk: #101821;
+      --line: #2a3846;
+      --line-soft: #212e3a;
+      --ink: #e3eaf1;
+      --ink-soft: #a3b2c1;
+      --ink-faint: #71818f;
+      --accent: #7aaad6;
+      --accent-soft: #1c2f42;
+      --up: #46bfa0;
+      --up-soft: #14312a;
+      --down: #e3806c;
+      --down-soft: #3a1f19;
+      --dead: #5d6b79;
+      --dead-soft: #1a242f;
+      --brass: #d1a94a;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0f1720;
+    --surface: #16202b;
+    --surface-sunk: #101821;
+    --line: #2a3846;
+    --line-soft: #212e3a;
+    --ink: #e3eaf1;
+    --ink-soft: #a3b2c1;
+    --ink-faint: #71818f;
+    --accent: #7aaad6;
+    --accent-soft: #1c2f42;
+    --up: #46bfa0;
+    --up-soft: #14312a;
+    --down: #e3806c;
+    --down-soft: #3a1f19;
+    --dead: #5d6b79;
+    --dead-soft: #1a242f;
+    --brass: #d1a94a;
+  }
+
+  html {
+    color-scheme: light dark;
+  }
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 36px 24px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  h1 {
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .lede {
+    margin: 0;
+    max-width: 68ch;
+    color: var(--ink-soft);
+    font-size: 16px;
+  }
+
+  .rule {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    background: var(--surface-sunk);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 13px 16px;
+    max-width: 72ch;
+  }
+  /* The formula is the one thing that must not re-wrap -- broken across
+     lines it stops reading as an equation. It scrolls instead. */
+  .rule .formula {
+    display: block;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: none;
+    padding: 0;
+    white-space: nowrap;
+    overflow-x: auto;
+    color: var(--ink);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .panel-head h2 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .panel-note {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+
+  /* ---- presets ---- */
+  .presets {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .presets::-webkit-scrollbar {
+    display: none;
+  }
+  .preset {
+    flex: 0 0 auto;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 100px;
+    padding: 7px 15px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .preset:hover {
+    border-color: var(--accent);
+  }
+  .preset[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--surface);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .preset[aria-pressed="true"] {
+      color: var(--surface-sunk);
+    }
+  }
+  :root[data-theme="dark"] .preset[aria-pressed="true"] {
+    color: var(--surface-sunk);
+  }
+
+  .blurb {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 14px;
+    max-width: 76ch;
+    min-height: 44px;
+  }
+
+  /* ---- layout ---- */
+  .cols {
+    display: grid;
+    grid-template-columns: minmax(320px, 0.85fr) minmax(0, 1.6fr);
+    gap: 16px;
+    align-items: start;
+  }
+  @media (max-width: 1000px) {
+    .cols {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .side-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* ---- the seat's slots: the model made visible ---- */
+  .slots {
+    display: flex;
+    flex-direction: column;
+  }
+  .slot {
+    display: grid;
+    grid-template-columns: 64px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .slot:last-child {
+    border-bottom: 0;
+  }
+  .slot-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+  }
+  .slot.filled .slot-tag {
+    color: var(--accent);
+  }
+  .slot-who {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+  .slot-who .nm {
+    font-weight: 600;
+    font-size: 13.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .slot.empty .slot-who .nm {
+    font-weight: 400;
+    font-style: italic;
+    color: var(--dead);
+  }
+  .slot-pts {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft);
+  }
+  .slot.empty .slot-pts {
+    color: var(--dead);
+  }
+  .drop {
+    background: none;
+    border: 0;
+    color: var(--ink-faint);
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 4px 2px;
+  }
+  .drop:hover {
+    color: var(--down);
+  }
+
+  .bench-note {
+    padding: 10px 16px;
+    border-top: 1px solid var(--line-soft);
+    font-size: 12.5px;
+    color: var(--ink-faint);
+  }
+
+  /* ---- money ---- */
+  .money-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--line-soft);
+  }
+  .money-cell {
+    background: var(--surface);
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .money-cell b {
+    font-family: var(--mono);
+    font-size: 19px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .money-cell .sub {
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+
+  /* ---- board ---- */
+  .board-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  input[type="text"] {
+    flex: 1 1 180px;
+    min-width: 0;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--surface-sunk);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 7px 11px;
+  }
+  input[type="text"]:focus-visible,
+  .preset:focus-visible,
+  .pos-btn:focus-visible,
+  .drop:focus-visible,
+  tbody tr:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .pos-filters {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .pos-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    background: var(--surface-sunk);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 5px 9px;
+    cursor: pointer;
+  }
+  .pos-btn[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--surface);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .pos-btn[aria-pressed="true"] {
+      color: var(--surface-sunk);
+    }
+  }
+  :root[data-theme="dark"] .pos-btn[aria-pressed="true"] {
+    color: var(--surface-sunk);
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    padding: 9px 16px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 11.5px;
+    color: var(--ink-faint);
+  }
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend i {
+    flex: 0 0 auto;
+  }
+  .k-span {
+    width: 22px;
+    height: 2px;
+    background: var(--ink-faint);
+    opacity: 0.55;
+  }
+  .k-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .k-dot.below {
+    background: var(--down);
+  }
+
+  .scroller {
+    max-height: 620px;
+    overflow: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--surface);
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding: 10px 10px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  thead th:first-child,
+  thead th.l {
+    text-align: left;
+  }
+  tbody td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line-soft);
+    text-align: right;
+    white-space: nowrap;
+  }
+  tbody td.l {
+    text-align: left;
+  }
+  tbody tr {
+    cursor: pointer;
+  }
+  tbody tr:hover {
+    background: var(--accent-soft);
+  }
+  tbody tr.zero td {
+    color: var(--dead);
+  }
+  .num {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .player .nm {
+    font-weight: 600;
+  }
+  .player .tm {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    margin-left: 6px;
+  }
+
+  .pos {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    border-radius: 4px;
+    padding: 2px 6px;
+    background: var(--surface-sunk);
+    color: var(--ink-soft);
+  }
+  .pos-QB {
+    background: #e6dcf3;
+    color: #4b2e78;
+  }
+  .pos-RB {
+    background: #d7ecdf;
+    color: #14603c;
+  }
+  .pos-WR {
+    background: #d9e5f5;
+    color: #1f4e79;
+  }
+  .pos-TE {
+    background: #f7e3cf;
+    color: #7a4a12;
+  }
+  .pos-DEF {
+    background: #e0e4e9;
+    color: #3d4b5a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .pos-QB {
+      background: #33254a;
+      color: #c8b2ea;
+    }
+    :root:not([data-theme="light"]) .pos-RB {
+      background: #14372a;
+      color: #7fd3a6;
+    }
+    :root:not([data-theme="light"]) .pos-WR {
+      background: #1c2f42;
+      color: #8ebbe4;
+    }
+    :root:not([data-theme="light"]) .pos-TE {
+      background: #3d2c15;
+      color: #e0b57c;
+    }
+    :root:not([data-theme="light"]) .pos-DEF {
+      background: #232d38;
+      color: #9aa8b6;
+    }
+  }
+  :root[data-theme="dark"] .pos-QB {
+    background: #33254a;
+    color: #c8b2ea;
+  }
+  :root[data-theme="dark"] .pos-RB {
+    background: #14372a;
+    color: #7fd3a6;
+  }
+  :root[data-theme="dark"] .pos-WR {
+    background: #1c2f42;
+    color: #8ebbe4;
+  }
+  :root[data-theme="dark"] .pos-TE {
+    background: #3d2c15;
+    color: #e0b57c;
+  }
+  :root[data-theme="dark"] .pos-DEF {
+    background: #232d38;
+    color: #9aa8b6;
+  }
+
+  .why {
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    max-width: 24ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .why b {
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+  tr.zero .why b {
+    color: var(--dead);
+  }
+
+  /* ---- the bar ladder: three bars per position, one of them yours ---- */
+  .bars {
+    display: flex;
+    flex-direction: column;
+  }
+  .bar-row {
+    display: grid;
+    grid-template-columns: 44px 1fr 52px;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .bar-row:last-child {
+    border-bottom: 0;
+  }
+  .bar-track {
+    position: relative;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--surface-sunk);
+    border: 1px solid var(--line-soft);
+  }
+  .mark {
+    position: absolute;
+    top: 50%;
+    width: 2px;
+    height: 12px;
+    margin-top: -6px;
+    border-radius: 1px;
+  }
+  .mark.last {
+    background: var(--dead);
+  }
+  .mark.repl {
+    background: var(--ink-faint);
+  }
+  .mark.mine {
+    width: 9px;
+    height: 9px;
+    margin-top: -4.5px;
+    margin-left: -4.5px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--surface);
+  }
+  .bar-num {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--ink-soft);
+  }
+  .bar-num.risen {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .bar {
+    color: var(--ink-soft);
+  }
+  .bar-col {
+    color: var(--ink-faint);
+  }
+  /* Divides the points derivation (Pts − bar = your VORP) from the dollars
+     it converts into, so the three-term arithmetic reads as one unit. */
+  .edge {
+    border-right: 1px solid var(--line);
+  }
+  td.edge {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  td.edge.nil {
+    color: var(--dead);
+    font-weight: 400;
+  }
+
+  /* When the budget cap bites, the bid and the worth are different numbers.
+     Showing only the cap would flatten the top of the board into identical
+     values and hide the roster effect entirely. */
+  .capped {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--brass);
+    line-height: 1.3;
+  }
+
+  /* The room's two lenses as a band, and your price as a dot inside or
+     below it. The band is the spread between VOLR $ and VORP $ -- they
+     cross partway down the board, so which end is which changes by row. */
+  .band {
+    position: relative;
+    height: 8px;
+    min-width: 90px;
+  }
+  .band-span {
+    position: absolute;
+    top: 3px;
+    height: 2px;
+    background: var(--ink-faint);
+    opacity: 0.55;
+    border-radius: 1px;
+    min-width: 2px;
+  }
+  .band-dot {
+    position: absolute;
+    top: 0;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .band-dot.below {
+    background: var(--down);
+  }
+  tr.zero .band-span {
+    opacity: 0.3;
+  }
+  .volr {
+    color: var(--ink-faint);
+  }
+
+  .row-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    margin-left: auto;
+  }
+
+  .empty-state {
+    padding: 28px 18px;
+    text-align: center;
+    color: var(--ink-faint);
+    font-size: 13.5px;
+  }
+
+  footer {
+    color: var(--ink-faint);
+    font-size: 12px;
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+    max-width: 82ch;
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    background: var(--surface-sunk);
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  @media (max-width: 640px) {
+    body {
+      font-size: 14px;
+    }
+    .wrap {
+      padding: 18px 12px 48px;
+      gap: 16px;
+    }
+    h1 {
+      font-size: 24px;
+    }
+    .lede {
+      font-size: 14px;
+    }
+    .money-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    /* Three cells in a two-column grid leaves a dead square; the max bid is
+       the one worth the full width anyway. */
+    .money-cell:last-child {
+      grid-column: 1 / -1;
+    }
+    .scroller {
+      max-height: 460px;
+    }
+    .why,
+    thead th.why-col,
+    .bar-col,
+    .band-col {
+      display: none;
+    }
+    .pos-btn {
+      min-height: 32px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+    }
+  }
+</style>
+
+<div class="wrap">
+  <header style="display: flex; flex-direction: column; gap: 10px">
+    <span class="eyebrow">docs/spec/vorp/08 &middot; seat value</span>
+    <h1>What He&rsquo;s Worth to You</h1>
+    <p class="lede">
+      The board price is one number for all twelve seats. It can&rsquo;t be
+      right for all of them: a manager holding three running backs and a
+      manager holding none are not bidding on the same thing. Build a roster
+      below and watch the room&rsquo;s price and yours come apart.
+    </p>
+    <div class="rule" id="rule"></div>
+  </header>
+
+  <div class="presets" id="presets"></div>
+  <p class="blurb" id="blurb"></p>
+
+  <div class="cols">
+    <div class="side-stack">
+      <div class="card">
+        <div class="panel-head">
+          <h2>Your starting lineup</h2>
+          <span class="panel-note" id="slot-note"></span>
+        </div>
+        <div class="slots" id="slots"></div>
+        <div class="bench-note" id="bench-note"></div>
+      </div>
+
+      <div class="card">
+        <div class="panel-head">
+          <h2>Your money</h2>
+          <span class="panel-note">bought at the room&rsquo;s price</span>
+        </div>
+        <div class="money-grid" id="money"></div>
+      </div>
+
+      <div class="card">
+        <div class="panel-head">
+          <h2>Which bar he has to clear</h2>
+          <span class="panel-note">per position</span>
+        </div>
+        <div class="bars" id="bars"></div>
+        <div class="bench-note" id="bar-note">
+          A player is worth his points <em>over a bar</em>. The room uses
+          <b>replacement level</b> &mdash; the best man nobody has to start.
+          Your bar starts there and <b>rises</b> as you fill slots, because it
+          becomes the man he would have to bench. It is not
+          <b>last-rostered</b>, which sits <em>below</em> replacement and asks
+          a different question: is he worth a bench spot at all?
+          <br /><br />
+          Running out of room does not by itself make a player worthless. Once
+          your slots are full, anyone <em>over</em> the bar is still worth the
+          upgrade &mdash; you start him and bench the man he beat. Anyone
+          <em>under</em> it is worth exactly the $1 floor, because he would sit
+          on your bench and score nothing.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="panel-head">
+        <h2>The board</h2>
+        <span class="panel-note" id="board-note"></span>
+      </div>
+      <div class="board-controls">
+        <input id="search" type="text" placeholder="Search player or team&hellip;" autocomplete="off" />
+        <div class="pos-filters" id="pos-filters"></div>
+        <span class="row-count" id="row-count"></span>
+      </div>
+      <div class="legend band-col">
+        <span><i class="k-span"></i>the spread between the room&rsquo;s two lenses</span>
+        <span><i class="k-dot"></i>your price, inside that spread</span>
+        <span><i class="k-dot below"></i>under both &mdash; neither lens would price him this low</span>
+      </div>
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr>
+              <th class="l">Player</th>
+              <th class="l">Pos</th>
+              <th>Pts</th>
+              <th class="bar-col">&minus; Your bar</th>
+              <th class="bar-col edge">= Your VORP</th>
+              <th>VOLR $</th>
+              <th>VORP $</th>
+              <th>You</th>
+              <th class="band-col">Where you land</th>
+              <th class="l why-col">Because</th>
+            </tr>
+          </thead>
+          <tbody id="board"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer id="footer"></footer>
+</div>
+
+<script id="seat-data" type="application/json">__DATA__</script>
+<script>
+  (function () {
+    var D = JSON.parse(document.getElementById("seat-data").textContent);
+    var L = D.league;
+    var byId = {};
+    D.players.forEach(function (p) {
+      byId[p.id] = p;
+    });
+
+    var state = { roster: [], pos: "ALL", query: "", preset: null };
+
+    // One scale for every row's band, so a long track means an expensive
+    // player rather than a rescaled one -- rows stay comparable down the
+    // column.
+    var maxDollar = D.players.reduce(function (m, p) {
+      return Math.max(m, p.board, p.volr);
+    }, 1);
+
+    // ---------------------------------------------------------------- model
+    // Kuhn's algorithm, the same matching python/vorp/league/roster_fill.py
+    // runs. Ported rather than called because this page has no server; the
+    // build's --verify flag re-solves every preset in Python and fails if
+    // these two ever disagree.
+    function assign(players, slots) {
+      var ordered = players.slice().sort(function (a, b) {
+        return b.points - a.points || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+      });
+      var occupant = {};
+      var pool = {};
+      ordered.forEach(function (p) {
+        pool[p.id] = p;
+      });
+
+      function tryAssign(p, visited) {
+        for (var i = 0; i < slots.length; i++) {
+          var s = slots[i];
+          if (s.eligible.indexOf(p.pos) === -1) continue;
+          if (visited[s.id]) continue;
+          visited[s.id] = 1;
+          var held = occupant[s.id];
+          if (held === undefined || tryAssign(pool[held], visited)) {
+            occupant[s.id] = p.id;
+            return true;
+          }
+        }
+        return false;
+      }
+
+      ordered.forEach(function (p) {
+        tryAssign(p, {});
+      });
+      return occupant;
+    }
+
+    // The freely-available bodies, as players in the pool. A manager who
+    // leaves a slot open still starts somebody there.
+    //
+    // Putting them in the pool rather than scoring empty slots afterwards is
+    // load-bearing: `assign` maximizes the COUNT of players seated, not the
+    // points on the field, and those differ the moment slots are worth
+    // different amounts when empty. Nine players in ten slots has several
+    // maximum matchings, and leaving SUPER_FLEX open (a free QB, 214.8) beats
+    // leaving REC_FLEX open (a free WR, 139.6) by 75 points. With the free
+    // agents in the pool every slot is filled and the objective is simply
+    // total seated points, which greedy points-descending solves exactly.
+    var FREE = (function () {
+      var positions = {};
+      D.slots.forEach(function (s) {
+        s.eligible.forEach(function (pos) {
+          if (D.replacement[pos] !== undefined) positions[pos] = 1;
+        });
+      });
+      var out = [];
+      Object.keys(positions)
+        .sort()
+        .forEach(function (pos) {
+          for (var i = 0; i < D.slots.length; i++) {
+            out.push({
+              id: "__free__" + pos + "__" + i,
+              pos: pos,
+              points: D.replacement[pos],
+              free: true,
+              name: "a freely available " + pos
+            });
+          }
+        });
+      return out;
+    })();
+
+    function isFree(id) {
+      return typeof id === "string" && id.indexOf("__free__") === 0;
+    }
+
+    function fill(roster) {
+      var pool = roster.concat(FREE);
+      var byPid = {};
+      pool.forEach(function (p) {
+        byPid[p.id] = p;
+      });
+      var occupant = assign(pool, D.slots);
+      var total = 0;
+      Object.keys(occupant).forEach(function (sid) {
+        total += byPid[occupant[sid]].points;
+      });
+      return { occupant: occupant, points: total, pool: byPid };
+    }
+
+    function rosterPlayers() {
+      return state.roster.map(function (id) {
+        return byId[id];
+      });
+    }
+
+    function spent() {
+      return rosterPlayers().reduce(function (a, p) {
+        return a + p.board;
+      }, 0);
+    }
+
+    function openSpots() {
+      return L.roster_size - state.roster.length;
+    }
+
+    function maxBid() {
+      var open = openSpots();
+      if (open <= 0) return 0;
+      return L.budget - spent() - (open - 1) * L.min_bid;
+    }
+
+    function seatBid(price) {
+      var cap = maxBid();
+      if (cap < L.min_bid) return 0;
+      return Math.max(L.min_bid, Math.min(price, cap));
+    }
+
+    // ------------------------------------------------------------- rendering
+    function posPill(pos) {
+      return '<span class="pos pos-' + pos + '">' + pos + "</span>";
+    }
+
+    function slotLabel(slot) {
+      return slot.eligible.length === 1 ? slot.eligible[0] : slot.eligible.join("/");
+    }
+
+    function renderSlots(occupant, pool) {
+      var seatedIds = {};
+      Object.keys(occupant).forEach(function (sid) {
+        seatedIds[occupant[sid]] = sid;
+      });
+
+      document.getElementById("slots").innerHTML = D.slots
+        .map(function (s) {
+          var pid = occupant[s.id];
+          var p = pool[pid];
+          if (p && !p.free) {
+            return (
+              '<div class="slot filled"><span class="slot-tag">' +
+              slotLabel(s) +
+              '</span><span class="slot-who">' +
+              posPill(p.pos) +
+              '<span class="nm">' +
+              p.name +
+              '</span></span><span class="slot-pts">' +
+              p.points.toFixed(1) +
+              ' <button class="drop" data-drop="' +
+              p.id +
+              '" aria-label="Drop ' +
+              p.name +
+              '">&times;</button></span></div>'
+            );
+          }
+          // A slot nobody bought isn't empty -- it holds the body a dollar
+          // buys, and which position that is falls out of the fill rather
+          // than being assumed. A superflex quietly holding a free
+          // quarterback at 214.8 is why quarterbacks get expensive to you.
+          return (
+            '<div class="slot empty"><span class="slot-tag">' +
+            slotLabel(s) +
+            '</span><span class="slot-who"><span class="nm">' +
+            (p ? "a freely available " + p.pos : "&mdash;") +
+            '</span></span><span class="slot-pts">' +
+            (p ? p.points.toFixed(1) : "&mdash;") +
+            "</span></div>"
+          );
+        })
+        .join("");
+
+      // Anyone rostered who reached no starting slot is on the bench, where he
+      // scores nothing -- which is exactly why he adds nothing.
+      var benched = state.roster.filter(function (id) {
+        return seatedIds[id] === undefined;
+      });
+      var note = document.getElementById("bench-note");
+      if (!benched.length) {
+        note.innerHTML =
+          "Bench: " +
+          Math.max(0, L.bench_slots - 0) +
+          " slots, empty. Bench players score nothing, so they never change what anyone is worth to you.";
+      } else {
+        note.innerHTML =
+          "<b>On your bench:</b> " +
+          benched
+            .map(function (id) {
+              return byId[id].name;
+            })
+            .join(", ") +
+          " &mdash; reached no starting slot, so they add nothing.";
+      }
+      document.getElementById("slot-note").textContent =
+        state.roster.length + " rostered · " + D.slots.length + " starting slots";
+    }
+
+    // The bar a *very good* player at this position would have to clear.
+    // Probing with an absurd projection rather than reading a slot's floor is
+    // what makes this correct through flex chains: whoever actually falls out
+    // of the lineup is whoever the matching drops, and points − value recovers
+    // him without having to trace the cascade.
+    var PROBE = 1e6;
+    function positionBar(roster, baseline, pos) {
+      var probe = { id: "__probe__", pos: pos, points: PROBE, name: "probe" };
+      var got = fill(roster.concat([probe]));
+      var seated = false;
+      Object.keys(got.occupant).forEach(function (sid) {
+        if (got.occupant[sid] === "__probe__") seated = true;
+      });
+      if (!seated) return null;
+      return PROBE - (got.points - baseline);
+    }
+
+    function renderBars(roster, baseline) {
+      var positions = Object.keys(D.replacement);
+      var lo = Infinity;
+      var hi = -Infinity;
+      var rows = positions.map(function (pos) {
+        var mine = positionBar(roster, baseline, pos);
+        var r = D.replacement[pos];
+        var l = D.last_rostered[pos];
+        [r, l, mine].forEach(function (v) {
+          if (v === null) return;
+          lo = Math.min(lo, v);
+          hi = Math.max(hi, v);
+        });
+        return { pos: pos, mine: mine, replacement: r, last: l };
+      });
+
+      var span = Math.max(1, hi - lo);
+      var pct = function (v) {
+        return ((v - lo) / span) * 100;
+      };
+
+      document.getElementById("bars").innerHTML = rows
+        .map(function (r) {
+          var marks =
+            '<span class="mark last" style="left:' +
+            pct(r.last) +
+            '%" title="last-rostered ' +
+            r.last.toFixed(1) +
+            '"></span><span class="mark repl" style="left:' +
+            pct(r.replacement) +
+            '%" title="replacement ' +
+            r.replacement.toFixed(1) +
+            '"></span>';
+          var mine =
+            r.mine === null
+              ? ""
+              : '<span class="mark mine" style="left:' +
+                pct(r.mine) +
+                '%" title="your bar ' +
+                r.mine.toFixed(1) +
+                '"></span>';
+          var risen = r.mine !== null && r.mine > r.replacement + 0.05;
+          return (
+            '<div class="bar-row">' +
+            posPill(r.pos) +
+            '<div class="bar-track">' +
+            marks +
+            mine +
+            '</div><span class="bar-num' +
+            (risen ? " risen" : "") +
+            '">' +
+            (r.mine === null ? "no slot" : r.mine.toFixed(1)) +
+            "</span></div>"
+          );
+        })
+        .join("");
+    }
+
+    function renderMoney() {
+      var cap = maxBid();
+      document.getElementById("money").innerHTML = [
+        ["$" + (L.budget - spent()), "left of $" + L.budget],
+        [openSpots() + " spots", "still to fill"],
+        [cap < L.min_bid ? "out" : "$" + cap, "most you can bid"]
+      ]
+        .map(function (c) {
+          return (
+            '<div class="money-cell"><b>' +
+            c[0] +
+            '</b><span class="sub">' +
+            c[1] +
+            "</span></div>"
+          );
+        })
+        .join("");
+    }
+
+    function renderBoard(baseOccupant, baseline) {
+      var roster = rosterPlayers();
+      var owned = {};
+      state.roster.forEach(function (id) {
+        owned[id] = 1;
+      });
+      var seatedBefore = {};
+      Object.keys(baseOccupant).forEach(function (sid) {
+        seatedBefore[baseOccupant[sid]] = sid;
+      });
+
+      var rows = [];
+      for (var i = 0; i < D.players.length; i++) {
+        var p = D.players[i];
+        if (owned[p.id]) continue;
+        if (state.pos !== "ALL" && p.pos !== state.pos) continue;
+        if (state.query) {
+          var hay = (p.name + " " + (p.team || "")).toLowerCase();
+          if (hay.indexOf(state.query) === -1) continue;
+        }
+
+        var got = fill(roster.concat([p]));
+        var withHim = got.occupant;
+        var value = Math.max(0, got.points - baseline);
+        // Worth and bid are different numbers and the page shows both. A seat
+        // down to its last $37 is capped on every good player, and if the
+        // column showed only the cap, the roster effect this page exists to
+        // demonstrate would sit behind a flat wall of $37s.
+        var worth = L.min_bid + Math.floor(D.rate * value);
+        var yours = seatBid(worth);
+        var capped = yours !== worth && yours !== 0;
+
+        // Why this number. Not "which slot is he in" -- the matching reroutes
+        // freely, so a man who really took the flex can end up recorded in an
+        // RB slot with an incumbent shuffled into the flex behind him. Both
+        // are optimal and the physical slot is arbitrary. What is invariant is
+        // which slot became newly occupied, and who fell out of the lineup.
+        var why;
+        var seatedAfter = {};
+        Object.keys(withHim).forEach(function (sid) {
+          seatedAfter[withHim[sid]] = sid;
+        });
+
+        if (seatedAfter[p.id] === undefined) {
+          why = "no slot he can reach";
+        } else {
+          var displaced = null;
+          Object.keys(seatedBefore).forEach(function (pid) {
+            if (seatedAfter[pid] === undefined) displaced = pid;
+          });
+          if (displaced === null) {
+            why = "joins the lineup";
+          } else if (isFree(displaced)) {
+            // He beat a body anyone could have for a dollar, so the honest
+            // report is which slot he took, not whose place.
+            var sid = seatedBefore[displaced];
+            var slot = D.slots.filter(function (s) {
+              return String(s.id) === String(sid);
+            })[0];
+            why = "fills <b>" + slotLabel(slot) + "</b>";
+          } else {
+            why = "displaces <b>" + byId[displaced].name + "</b>";
+          }
+        }
+
+        // Every positive value is a margin over *some* bar, and that bar is
+        // what the roster changed. Deriving it back out (points − value)
+        // rather than tracking it forward keeps it honest through flex
+        // chains, where the man who leaves the lineup isn't always the man
+        // the candidate physically replaced.
+        rows.push({
+          p: p,
+          value: value,
+          bar: p.points - value,
+          worth: worth,
+          yours: yours,
+          capped: capped,
+          why: why
+        });
+      }
+
+      // Ordered by what he is worth to this seat, not by what it may bid --
+      // the cap flattens the top of the board into a wall of identical
+      // numbers and would sort the most interesting rows into an arbitrary
+      // order.
+      rows.sort(function (a, b) {
+        return b.worth - a.worth || b.p.board - a.p.board;
+      });
+
+      document.getElementById("row-count").textContent =
+        rows.length + " of " + D.players.length;
+
+      var body = document.getElementById("board");
+      if (!rows.length) {
+        body.innerHTML =
+          '<tr><td colspan="7"><div class="empty-state">Nobody on the board matches that.</div></td></tr>';
+        return;
+      }
+
+      body.innerHTML = rows
+        .slice(0, 240)
+        .map(function (r) {
+          // Where your price lands against the room's two lenses (03). They
+          // cross -- VORP $ is higher at the top of the board, VOLR $ at the
+          // bottom -- so the pair is a spread, not a ladder, and neither is
+          // uniformly the generous one.
+          //
+          // Your price is pinned to VORP $ from above (same rate, a bar that
+          // only rises) and has no fixed relationship to VOLR $ at all. So
+          // sitting ABOVE VOLR $ means nothing; dropping under BOTH marks is
+          // the signal worth colouring.
+          var lo = Math.min(r.p.volr, r.p.board);
+          var hi = Math.max(r.p.volr, r.p.board);
+          var pct = function (v) {
+            return Math.max(0, Math.min(100, (v / maxDollar) * 100));
+          };
+          var band =
+            '<div class="band"><div class="band-span" style="left:' +
+            pct(lo) +
+            "%;width:" +
+            (pct(hi) - pct(lo)) +
+            '%"></div><span class="band-dot' +
+            (r.worth < lo ? " below" : "") +
+            '" style="left:' +
+            pct(r.worth) +
+            '%"></span></div>';
+          return (
+            '<tr class="' +
+            (r.value === 0 ? "zero" : "") +
+            '" data-add="' +
+            r.p.id +
+            '" tabindex="0"><td class="l player"><span class="nm">' +
+            r.p.name +
+            "</span>" +
+            (r.p.team ? '<span class="tm">' + r.p.team + "</span>" : "") +
+            '</td><td class="l">' +
+            posPill(r.p.pos) +
+            '</td><td class="num">' +
+            r.p.points.toFixed(1) +
+            '</td><td class="num bar-col' +
+            (r.value === 0 ? "" : " bar") +
+            '">' +
+            (r.value === 0 ? "&mdash;" : r.bar.toFixed(1)) +
+            '</td><td class="num bar-col edge' +
+            (r.value === 0 ? " nil" : "") +
+            '">' +
+            r.value.toFixed(1) +
+            '</td><td class="num volr">$' +
+            r.p.volr +
+            '</td><td class="num">$' +
+            r.p.board +
+            '</td><td class="num"><b>' +
+            (r.yours === 0 ? "out" : "$" + r.yours) +
+            "</b>" +
+            (r.capped ? '<span class="capped">worth $' + r.worth + "</span>" : "") +
+            '</td><td class="band-col">' +
+            band +
+            '</td><td class="l why why-col">' +
+            r.why +
+            "</td></tr>"
+          );
+        })
+        .join("");
+    }
+
+    function render() {
+      var roster = rosterPlayers();
+      var base = fill(roster);
+      var occupant = base.occupant;
+      var baseline = base.points;
+      renderSlots(occupant, base.pool);
+      renderMoney();
+      renderBars(roster, baseline);
+      renderBoard(occupant, baseline);
+      document.getElementById("board-note").innerHTML =
+        "$" + D.rate.toFixed(3) + "/pt &middot; sorted by what he&rsquo;s worth to you";
+    }
+
+    // ------------------------------------------------------------- controls
+    document.getElementById("presets").innerHTML = D.presets
+      .map(function (s) {
+        return (
+          '<button class="preset" data-preset="' +
+          s.key +
+          '" aria-pressed="false">' +
+          s.title +
+          "</button>"
+        );
+      })
+      .join("");
+
+    function applyPreset(key) {
+      var p = D.presets.filter(function (x) {
+        return x.key === key;
+      })[0];
+      if (!p) return;
+      state.preset = key;
+      state.roster = p.roster.slice();
+      Array.prototype.forEach.call(
+        document.getElementById("presets").children,
+        function (b) {
+          b.setAttribute("aria-pressed", String(b.dataset.preset === key));
+        }
+      );
+      document.getElementById("blurb").innerHTML = p.blurb;
+      render();
+    }
+
+    function clearPreset() {
+      state.preset = null;
+      Array.prototype.forEach.call(
+        document.getElementById("presets").children,
+        function (b) {
+          b.setAttribute("aria-pressed", "false");
+        }
+      );
+      document.getElementById("blurb").innerHTML =
+        "Your own roster. Every price on the right is re-solved against it.";
+    }
+
+    document.getElementById("presets").addEventListener("click", function (e) {
+      var b = e.target.closest(".preset");
+      if (b) applyPreset(b.dataset.preset);
+    });
+
+    document.getElementById("board").addEventListener("click", function (e) {
+      var tr = e.target.closest("tr[data-add]");
+      if (!tr) return;
+      if (state.roster.length >= L.roster_size) return;
+      state.roster.push(tr.dataset.add);
+      clearPreset();
+      render();
+    });
+
+    document.getElementById("board").addEventListener("keydown", function (e) {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      var tr = e.target.closest("tr[data-add]");
+      if (!tr) return;
+      e.preventDefault();
+      if (state.roster.length >= L.roster_size) return;
+      state.roster.push(tr.dataset.add);
+      clearPreset();
+      render();
+    });
+
+    document.getElementById("slots").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-drop]");
+      if (!b) return;
+      var i = state.roster.indexOf(b.dataset.drop);
+      if (i !== -1) state.roster.splice(i, 1);
+      clearPreset();
+      render();
+    });
+
+    var positions = ["ALL"].concat(
+      Object.keys(D.replacement).filter(function (pos) {
+        return D.players.some(function (p) {
+          return p.pos === pos;
+        });
+      })
+    );
+    document.getElementById("pos-filters").innerHTML = positions
+      .map(function (p) {
+        return (
+          '<button class="pos-btn" data-pos="' +
+          p +
+          '" aria-pressed="' +
+          (p === "ALL") +
+          '">' +
+          p +
+          "</button>"
+        );
+      })
+      .join("");
+    document.getElementById("pos-filters").addEventListener("click", function (e) {
+      var b = e.target.closest(".pos-btn");
+      if (!b) return;
+      state.pos = b.dataset.pos;
+      Array.prototype.forEach.call(e.currentTarget.children, function (x) {
+        x.setAttribute("aria-pressed", String(x.dataset.pos === state.pos));
+      });
+      render();
+    });
+
+    document.getElementById("search").addEventListener("input", function (e) {
+      state.query = e.target.value.trim().toLowerCase();
+      render();
+    });
+
+    document.getElementById("rule").innerHTML =
+      '<code class="formula">value(p) = lineup(roster + p) &minus; lineup(roster)</code>' +
+      "<span>Your <b>lineup</b> is the best your roster can field, with every " +
+      "slot nobody bought holding the best body a dollar buys. So a player is " +
+      "worth the points he <em>adds</em> &mdash; and once your slots are full, " +
+      "that means the points he adds over the man he would bench.</span>";
+
+    document.getElementById("footer").innerHTML =
+      L.teams +
+      " seats &times; $" +
+      L.budget +
+      ", " +
+      L.roster_size +
+      " roster spots each (" +
+      L.starting_slots +
+      " starting, " +
+      L.bench_slots +
+      " bench). <b>VORP $</b> and <b>VOLR $</b> are spec 03's two lenses, each " +
+      "spending the whole budget on its own bar &mdash; replacement level for " +
+      "one, the last-rostered level for the other. A lower bar does not mean " +
+      "more money: it means bigger margins for everyone, which inflates the " +
+      "denominator and shrinks the rate. VORP pays $" +
+      D.rate.toFixed(3) +
+      "/pt because " +
+      D.zero_vorp +
+      " of the " +
+      D.players.length +
+      " players clear replacement level by nothing at all and take only the $" +
+      L.min_bid +
+      " floor, concentrating the pool on the rest; VOLR pays just $" +
+      D.volr_rate.toFixed(3) +
+      "/pt because every player clears the last-rostered bar by something and " +
+      "so dilutes it. That is why the two cross partway down the board, and why " +
+      "a star is worth more under VORP despite the smaller margin. <b>You</b> " +
+      "is the VORP rate applied to the points a player adds to <em>your</em> starting " +
+      "lineup, floored to whole dollars and capped at what you could legally " +
+      "bid; on an empty seat it equals VORP $ exactly, and it only falls from " +
+      "there. Rostered players are charged the room&rsquo;s price, which is what " +
+      "makes the budget move. A slot nobody bought is not empty &mdash; it holds " +
+      "the best body a dollar buys, because measured against a genuinely empty " +
+      "slot a player would be worth his whole projection instead of his margin, " +
+      "and that is the one thing every model here refuses to do.";
+
+    applyPreset(D.presets[0].key);
+  })();
+</script>

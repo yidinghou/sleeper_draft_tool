@@ -3,9 +3,13 @@ import path from "node:path";
 import {
   fetchPlayers,
   fetchSeasonProjections,
+  fetchWeeklyProjections,
   sleeperPlayerFullName,
   type SleeperPlayer,
 } from "../src/sleeper.ts";
+
+/** Weeks summed into the early-season points column. */
+const EARLY_WEEKS = [1, 2, 3];
 
 interface BoardEntry {
   rank: number;
@@ -43,11 +47,20 @@ function loadBoard(season: number): Map<string, BoardEntry> {
 async function main() {
   const season = Number(process.argv[2] ?? 2026);
 
-  const [players, projections] = await Promise.all([
+  const [players, projections, weeklyProjections] = await Promise.all([
     fetchPlayers(),
     fetchSeasonProjections(season),
+    Promise.all(EARLY_WEEKS.map((week) => fetchWeeklyProjections(season, week))),
   ]);
   const board = loadBoard(season);
+
+  const earlyWeeksPts = new Map<string, number>();
+  for (const weekProjections of weeklyProjections) {
+    for (const [playerId, proj] of Object.entries(weekProjections)) {
+      if (proj.pts_half_ppr === undefined) continue;
+      earlyWeeksPts.set(playerId, (earlyWeeksPts.get(playerId) ?? 0) + proj.pts_half_ppr);
+    }
+  }
 
   const header = [
     "player_id",
@@ -59,6 +72,7 @@ async function main() {
     "sleeper_proj_dollar",
     "season_pts_half_ppr",
     "pts_source",
+    "wk1_3_pts_half_ppr",
   ];
 
   const rows: string[] = [header.join(",")];
@@ -87,6 +101,7 @@ async function main() {
       boardEntry?.dollar ?? "",
       round(pts),
       ptsSource,
+      round(earlyWeeksPts.get(player.player_id)),
     ];
     rows.push(row.map(csvCell).join(","));
   }

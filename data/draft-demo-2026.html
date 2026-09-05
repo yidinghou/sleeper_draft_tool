@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Auction Drift</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+/>
+<style>
+  :root {
+    --ground: #eff2f5;
+    --surface: #ffffff;
+    --surface-sunk: #e7ebf0;
+    --line: #d3dae2;
+    --line-soft: #e3e8ee;
+    --ink: #16202b;
+    --ink-soft: #47576a;
+    --ink-faint: #7b8b9c;
+    --accent: #1f4e79;
+    --accent-soft: #dbe6f1;
+    --up: #0e7c66;
+    --up-soft: #d5ece5;
+    --down: #b4432c;
+    --down-soft: #f6ddd7;
+    --brass: #8a6413;
+    --radius: 8px;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: Archivo, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1720;
+      --surface: #16202b;
+      --surface-sunk: #101821;
+      --line: #2a3846;
+      --line-soft: #212e3a;
+      --ink: #e3eaf1;
+      --ink-soft: #a3b2c1;
+      --ink-faint: #71818f;
+      --accent: #7aaad6;
+      --accent-soft: #1c2f42;
+      --up: #46bfa0;
+      --up-soft: #14312a;
+      --down: #e3806c;
+      --down-soft: #3a1f19;
+      --brass: #d1a94a;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0f1720;
+    --surface: #16202b;
+    --surface-sunk: #101821;
+    --line: #2a3846;
+    --line-soft: #212e3a;
+    --ink: #e3eaf1;
+    --ink-soft: #a3b2c1;
+    --ink-faint: #71818f;
+    --accent: #7aaad6;
+    --accent-soft: #1c2f42;
+    --up: #46bfa0;
+    --up-soft: #14312a;
+    --down: #e3806c;
+    --down-soft: #3a1f19;
+    --brass: #d1a94a;
+  }
+
+  html {
+    color-scheme: light dark;
+  }
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 40px 24px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  h1 {
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .lede {
+    margin: 0;
+    max-width: 70ch;
+    color: var(--ink-soft);
+    font-size: 16px;
+  }
+
+  .chips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-soft);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 100px;
+    padding: 4px 11px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+
+  .card:hover {
+    border-color: var(--accent);
+  }
+
+  .card-body {
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+  }
+
+  .card h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  .card p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+
+  .card-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--line-soft);
+    border-top: 1px solid var(--line-soft);
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .card-stat {
+    background: var(--surface-sunk);
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .card-stat .k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .card-stat .v {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .card-stat .v small {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-faint);
+  }
+
+  .movers {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 14px 20px 4px;
+  }
+
+  .mover-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12.5px;
+  }
+
+  .mover-row .nm {
+    color: var(--ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mover-row .d {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .up {
+    color: var(--up);
+  }
+  .down {
+    color: var(--down);
+  }
+
+  .card-cta {
+    margin: auto 20px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  a.open {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--surface);
+    background: var(--accent);
+    border-radius: 6px;
+    padding: 8px 14px;
+    text-decoration: none;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) a.open {
+      color: var(--surface-sunk);
+    }
+  }
+  :root[data-theme="dark"] a.open {
+    color: var(--surface-sunk);
+  }
+
+  a.open:hover {
+    opacity: 0.9;
+  }
+
+  footer {
+    color: var(--ink-faint);
+    font-size: 12px;
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+    max-width: 78ch;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    background: var(--surface-sunk);
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+</style>
+
+<div class="wrap">
+  <header style="display: flex; flex-direction: column; gap: 10px">
+    <span class="eyebrow">docs/spec/vorp/06 &middot; league, teams and slots</span>
+    <h1>Auction Drift</h1>
+    <p class="lede">
+      Four scripted rooms, one live-repricing model. Each replays the same
+      market-order sale sequence &mdash; only what each sale actually goes
+      for changes &mdash; so any difference between them is the seat-and-slot
+      model responding to money and slots leaving the room, nothing else.
+    </p>
+    <div class="chips" id="chips"></div>
+  </header>
+
+  <div class="grid" id="grid"></div>
+
+  <footer id="footer"></footer>
+</div>
+
+<script id="index-data" type="application/json">{"season":2026,"league":{"teams":12,"budget":200},"picks":60,"w_floor":1.0,"scenarios":[{"key":"bargain-run","title":"Bargain run","blurb":"The first 15 picks -- the best players on the board -- go for 45% off market. Money stays in the room faster than value leaves it, so every player still on the board gets more expensive, not cheaper.","pool_open":2400,"pool_now":899,"vorp_rate_open":0.391,"vorp_rate_now":0.606,"picks":60,"movers":{"gainers":[{"name":"Jared Goff","delta":13,"price":37},{"name":"David Montgomery","delta":12,"price":33},{"name":"Matthew Stafford","delta":12,"price":34}],"losers":[]}},{"key":"fair-market","title":"Fair market","blurb":"Every player sells at market, no mispricing at all. The control: price should barely move off its opening number, because nothing about the room's spending is out of the ordinary.","pool_open":2400,"pool_now":606,"vorp_rate_open":0.391,"vorp_rate_now":0.375,"picks":60,"movers":{"gainers":[{"name":"Alec Pierce","delta":1,"price":6},{"name":"Davante Adams","delta":1,"price":10}],"losers":[{"name":"Jared Goff","delta":-1,"price":23},{"name":"Matthew Stafford","delta":-1,"price":21},{"name":"Jordan Love","delta":-1,"price":21}]}},{"key":"panic-run","title":"Panic run","blurb":"The first 15 picks go for 40% over market. Money leaves the room faster than value does, so every player still on the board gets cheaper.","pool_open":2400,"pool_now":348,"vorp_rate_open":0.391,"vorp_rate_now":0.171,"picks":60,"movers":{"gainers":[],"losers":[{"name":"Jared Goff","delta":-13,"price":11},{"name":"Matthew Stafford","delta":-12,"price":10},{"name":"Jordan Love","delta":-12,"price":10}]}},{"key":"position-runs","title":"Position runs","blurb":"The room pays 35% over for the first 12 running backs, then goes 25% under for the first 14 receivers. Two positions move in opposite directions at once, and each position's own bar only starts to slide once it sells past its own concrete slots.","pool_open":2400,"pool_now":563,"vorp_rate_open":0.391,"vorp_rate_now":0.341,"picks":60,"movers":{"gainers":[],"losers":[{"name":"Jared Goff","delta":-3,"price":21},{"name":"Jordan Love","delta":-3,"price":19},{"name":"Kyler Murray","delta":-3,"price":18}]}}]}</script>
+<script>
+  (function () {
+    var D = JSON.parse(document.getElementById("index-data").textContent);
+
+    document.getElementById("chips").innerHTML = [
+      D.league.teams + " seats",
+      "$" + D.league.budget + " budget",
+      D.picks + " scripted sales",
+      "w_floor " + D.w_floor.toFixed(2)
+    ]
+      .map(function (t) {
+        return '<span class="chip">' + t + "</span>";
+      })
+      .join("");
+
+    function moverRow(m) {
+      var sign = m.delta > 0 ? "+" : "&minus;";
+      var cls = m.delta > 0 ? "up" : "down";
+      return (
+        '<div class="mover-row"><span class="nm">' +
+        m.name +
+        '</span><span class="d ' +
+        cls +
+        '">' +
+        sign +
+        "$" +
+        Math.abs(m.delta) +
+        " &rarr; $" +
+        m.price +
+        "</span></div>"
+      );
+    }
+
+    document.getElementById("grid").innerHTML = D.scenarios
+      .map(function (s) {
+        var poolDelta = s.pool_now - s.pool_open;
+        var rateDelta = s.vorp_rate_now - s.vorp_rate_open;
+        var movers = s.movers.gainers.concat(s.movers.losers);
+        return (
+          '<div class="card">' +
+          '<div class="card-body"><h2>' +
+          s.title +
+          "</h2><p>" +
+          s.blurb +
+          "</p></div>" +
+          '<div class="card-stats">' +
+          '<div class="card-stat"><span class="k">Pool, after ' +
+          s.picks +
+          ' picks</span><span class="v">$' +
+          s.pool_now +
+          " <small>(" +
+          (poolDelta >= 0 ? "+" : "&minus;") +
+          "$" +
+          Math.abs(poolDelta) +
+          ")</small></span></div>" +
+          '<div class="card-stat"><span class="k">$ / VORP pt</span><span class="v">$' +
+          s.vorp_rate_now.toFixed(2) +
+          " <small>(" +
+          (rateDelta >= 0 ? "+" : "&minus;") +
+          "$" +
+          Math.abs(rateDelta).toFixed(2) +
+          ")</small></span></div>" +
+          "</div>" +
+          (movers.length
+            ? '<div class="movers">' + movers.map(moverRow).join("") + "</div>"
+            : "") +
+          '<div class="card-cta"><span></span><a class="open" href="draft-demo-' +
+          D.season +
+          "-" +
+          s.key +
+          '.html">Open scenario &rarr;</a></div>' +
+          "</div>"
+        );
+      })
+      .join("");
+
+    document.getElementById("footer").innerHTML =
+      "Every scenario starts from the same solved opening board (" +
+      D.league.teams +
+      " seats &times; $" +
+      D.league.budget +
+      ") and the same sale order &mdash; richest player first, by market " +
+      "price. Only the price each sale actually lands at differs between " +
+      "them. <code>$ / VORP pt</code> is the exchange rate pure-VORP " +
+      "pricing runs on: after every priced player is guaranteed the $1 " +
+      "floor, the rest of the pool splits across everyone left in " +
+      "proportion to points over replacement, at this one rate.";
+  })();
+</script>
+
+</html>

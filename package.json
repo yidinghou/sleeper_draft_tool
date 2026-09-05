@@ -5,6 +5,7 @@
   "description": "Sleeper draft tool — projections export and draft polling",
   "scripts": {
     "export:projections": "tsx scripts/export-projections.ts",
+    "export:boberto": "tsx scripts/export-boberto.ts",
     "test": "node --import tsx --test src/**/*.test.ts"
   },
   "keywords": [],
