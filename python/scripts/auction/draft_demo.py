@@ -362,7 +362,7 @@ def main() -> None:
         template = INDEX_TEMPLATE_PATH.read_text(encoding="utf-8")
         fragment = template.replace("__DATA__", json.dumps(index_payload, separators=(",", ":")))
         write_local(fragment, REPO_ROOT / "data" / "auction", stem)
-        print(f"Wrote data/{stem}.html -- the landing page, linking to all {len(keys)} scenarios")
+        print(f"Wrote data/auction/{stem}.html -- the landing page, linking to all {len(keys)} scenarios")
 
 
 if __name__ == "__main__":

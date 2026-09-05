@@ -315,7 +315,7 @@ def main() -> None:
     template = HTML_TEMPLATE_PATH.read_text(encoding="utf-8")
     fragment = template.replace("__DATA__", json.dumps(payload, separators=(",", ":")))
     write_local(fragment, REPO_ROOT / "data" / "snake", f"vorp-snake-{season}")
-    print(f"\nWrote data/vorp-snake-{season}.html")
+    print(f"\nWrote data/snake/vorp-snake-{season}.html")
 
 
 def print_board_windows(rows: list[dict], picks: list[dict], through_round: int) -> None:

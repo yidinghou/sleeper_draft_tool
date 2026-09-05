@@ -266,7 +266,7 @@ def main() -> None:
     template = HTML_TEMPLATE_PATH.read_text(encoding="utf-8")
     fragment = template.replace("__DATA__", json.dumps(payload, separators=(",", ":")))
     write_local(fragment, REPO_ROOT / "data" / "auction", stem)
-    print(f"Wrote data/{stem}.html")
+    print(f"Wrote data/auction/{stem}.html")
 
     s = solved[default_w][2]
     print(
