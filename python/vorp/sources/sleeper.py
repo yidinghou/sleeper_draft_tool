@@ -61,6 +61,10 @@ def fetch_draft_picks(draft_id: str) -> List[Dict[str, Any]]:
     return _get(f"/draft/{draft_id}/picks")
 
 
+def fetch_league(league_id: str) -> Dict[str, Any]:
+    return _get(f"/league/{league_id}")
+
+
 def fetch_league_users(league_id: str) -> List[Dict[str, Any]]:
     return _get(f"/league/{league_id}/users")
 
@@ -74,6 +78,30 @@ def fetch_trending_adds(lookback_hours: int = 48, limit: int = 50) -> List[Dict[
     in the lookback window, i.e. "hot" waiver-wire players. Public, no auth.
     """
     return _get(f"/players/nfl/trending/add?lookback_hours={lookback_hours}&limit={limit}")
+
+
+def fetch_weekly_projections(season: str, week: int) -> Dict[str, Dict[str, Any]]:
+    """`{player_id: projection}` for one week. Not file-cached like
+    fetch_players_nfl -- projections shift through the week as injury news
+    and lines move, so a caller that wants a snapshot in time saves the
+    result itself (see scripts/save_weekly_projections.py).
+    """
+    return _get(f"/projections/nfl/regular/{season}/{week}")
+
+
+def score_projection(projection: Dict[str, Any], scoring: Dict[str, float]) -> float:
+    """Dot product of a projection's stat line against a league's own
+    `scoring_settings` -- name-for-name port of `scoreProjection` in
+    `src/sleeper.ts`. Needed because Sleeper's own `pts_half_ppr` bakes in
+    Sleeper's default scoring (6 pts/passing TD), not this league's (4),
+    which inflates every QB by roughly half a point per projected TD.
+    """
+    points = 0.0
+    for stat, per_unit in scoring.items():
+        value = projection.get(stat)
+        if isinstance(value, (int, float)):
+            points += value * per_unit
+    return points
 
 
 def fetch_players_nfl() -> Dict[str, Dict[str, Any]]:
