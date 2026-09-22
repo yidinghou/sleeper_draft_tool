@@ -23,6 +23,15 @@ different real league with its own roster and waivers. If it isn't obvious
 from context (e.g. the user names a player who's only rostered in one of
 them), ask.
 
+## Checking existing pending claims
+
+`GET /league/{id}/transactions/{week}` (the public v1 API) never returns
+`pending` transactions, only resolved ones (`complete`/`failed`) — it will
+silently look like "no waivers in" even when the league's "My Waivers" panel
+shows several. Use `python3 scripts/check_waivers.py` instead (read-only, no
+token-mutation risk, still needs `~/.sleeper_token`/`$SLEEPER_TOKEN` since
+it's the same private GraphQL endpoint) — defaults to both leagues.
+
 ## Step 1: figure out who to add (and drop)
 
 - Trending adds, public and read-only: `GET https://api.sleeper.app/v1/players/nfl/trending/add?lookback_hours=48&limit=50`.
