@@ -18,7 +18,8 @@ _no note yet — what's your read on this player?_
 _no note yet — what's your read on this player?_
 
 ## Jalen Coker (WR, CAR)
-_no note yet — what's your read on this player?_
+_wk4_: NON-DROPPABLE. Same as auction league — top WR in CAR's passing
+revolution.
 
 ## Terrance Ferguson (TE, LAR)
 _no note yet — what's your read on this player?_
@@ -27,7 +28,7 @@ _no note yet — what's your read on this player?_
 _no note yet — what's your read on this player?_
 
 ## Derrick Henry (RB, BAL)
-_no note yet — what's your read on this player?_
+_wk4_: NON-DROPPABLE. Still elite RB1 when healthy, workhorse role.
 
 ## Alvin Kamara (RB, NO)
 _no note yet — what's your read on this player?_
@@ -39,22 +40,23 @@ _no note yet — what's your read on this player?_
 _no note yet — what's your read on this player?_
 
 ## D'Andre Swift (RB, CHI)
-_no note yet — what's your read on this player?_
+_wk4_: NON-DROPPABLE. Lead back for CHI, good volume share.
 
 ## J.K. Dobbins (RB, DEN)
 _no note yet — what's your read on this player?_
 
 ## Chris Olave (WR, NO)
-_no note yet — what's your read on this player?_
+_wk4_: NON-DROPPABLE. WR1 target share in NO.
 
 ## Garrett Wilson (WR, NYJ)
-_no note yet — what's your read on this player?_
+_wk4_: NON-DROPPABLE. WR1 target share in NYJ, still elite talent. May be
+injured — check status before assuming he's active for a given week.
 
 ## Kenneth Walker (RB, KC)
-_no note yet — what's your read on this player?_
+_wk4_: NON-DROPPABLE. Lead back for KC, workhorse role.
 
 ## Chase Brown (RB, CIN)
-_no note yet — what's your read on this player?_
+_wk4_: NON-DROPPABLE. Lead back for CIN, workhorse role.
 
 ## Tank Dell (WR, HOU)
 _no note yet — what's your read on this player?_
