@@ -146,10 +146,15 @@ After submitting (or deciding to hold/pass), update the relevant player
 notes one more time with the outcome and why — that's next week's starting
 point.
 
+## Cancelling claims
+
+`python3 scripts/cancel_waivers.py [--league-id ID]` lists (dry run) or, with
+`--confirm`, cancels every pending claim of mine in that ONE league (mutation
+`cancel_waiver_claim(league_id, leg, transaction_id)`). To rebuild a chain in
+a clean order, cancel and resubmit.
+
 ## Not built yet
 
-Cancelling a pending claim (`cancel_waiver_claim` mutation — the query shape
-is already documented in `waiver_claim.py`'s module docstring, just not
-wired into the script), and updating one already submitted
-(`update_waiver_claim`, for changing the bid/settings). Add these the same
-way if asked.
+Updating one claim in place (`update_waiver_claim`, for changing the bid),
+and setting claim order explicitly (claims process in the order shown in
+Sleeper's "My Waivers" panel). Add these the same way if asked.

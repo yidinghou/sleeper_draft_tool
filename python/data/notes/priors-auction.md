@@ -60,3 +60,8 @@ _wk4_: NON-DROPPABLE. Same as Jordan Love — starting QB in a 2-QB
 ## Seattle Seahawks (DEF, SEA)
 _wk4_: Top-3 DEF. Droppable if needed — it's a streaming position, not a
 hold-at-all-costs slot.
+
+## J.J. McCarthy (QB, NYG)
+_wk4_: PASS, not bidding. Free agent, traded to NYG after Dart's season-ending
+injury but behind Jameis Winston on the depth chart. Revisit only if Winston
+is benched.
