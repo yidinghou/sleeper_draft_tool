@@ -3,6 +3,9 @@
 One section per player. Update in place each week — git history is the
 changelog, don't keep old versions inline.
 
+**Keeper cost rule:** round drafted − 1 (e.g. drafted round 6 → keeper cost
+round 5 next year).
+
 ## Ollie Gordon II (RB, MIA — FA)
 _wk4_: Breakout watch behind Achane's ACL (out for season) — 17 carries/3
 targets in immediate relief, TD + 14.5 pts vs. KC. Consensus top waiver
@@ -20,13 +23,15 @@ leaning toward letting him go.
 
 ## Jalen Coker (WR, CAR)
 _wk4_: NON-DROPPABLE. Same as auction league — top WR in CAR's passing
-revolution.
+revolution. Keeper value: drafted R14 → costs only R13 to keep, great
+value given the role.
 
 ## Terrance Ferguson (TE, LAR)
 _wk4_: Deep bench stash. Droppable if needed.
 
 ## Kyle Monangai (RB, CHI)
-_wk4_: High-value handcuff to D'Andre Swift.
+_wk4_: High-value handcuff to D'Andre Swift. Keeper value: drafted R8 →
+costs only R7 to keep, good value if he keeps carving out a role.
 
 ## Derrick Henry (RB, BAL)
 _wk4_: NON-DROPPABLE. Still elite RB1 when healthy, workhorse role.
@@ -57,7 +62,9 @@ _wk4_: NON-DROPPABLE. WR1 target share in NYJ, still elite talent. May be
 injured — check status before assuming he's active for a given week.
 
 ## Kenneth Walker (RB, KC)
-_wk4_: NON-DROPPABLE. Lead back for KC, workhorse role.
+_wk4_: NON-DROPPABLE. Lead back for KC, workhorse role. Keeper value:
+drafted R2 → costs R1 to keep — a first-round RB1 for a first-round price,
+honestly good value.
 
 ## Chase Brown (RB, CIN)
 _wk4_: NON-DROPPABLE. Lead back for CIN, workhorse role.
