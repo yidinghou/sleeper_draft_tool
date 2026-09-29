@@ -24,6 +24,7 @@ from snake.queue_export import team_byes  # noqa: E402
 from vorp.league.config import LEAGUE_CONFIG, SNAKE_CONFIG, LeagueConfig  # noqa: E402
 from vorp.sources.rotowire import fetch_headlines  # noqa: E402
 from vorp.sources.sleeper import (  # noqa: E402
+    fetch_league,
     fetch_league_rosters,
     fetch_players_nfl,
     fetch_trending_adds,
@@ -110,12 +111,17 @@ def main() -> None:
     config = config_for_league_id(args.league_id)
     my_roster_size = None
     my_players = []
+    faab_left = None
     if config is not None:
         my_roster_id = resolve_my_roster_id(args.league_id)
         my_roster = next((r for r in rosters if r.get("roster_id") == my_roster_id), None)
         my_player_ids = my_roster.get("players") or [] if my_roster else []
         my_roster_size = len(my_player_ids)
         open_slot = my_roster_size is not None and my_roster_size < config.roster_size
+        faab_total = (fetch_league(args.league_id).get("settings") or {}).get("waiver_budget")
+        if faab_total is not None and my_roster is not None:
+            used = (my_roster.get("settings") or {}).get("waiver_budget_used", 0) or 0
+            faab_left = faab_total - used
         for pid in my_player_ids:
             p = players.get(pid)
             if p:
@@ -141,6 +147,8 @@ def main() -> None:
     if my_roster_size is not None:
         print(f"\nYour roster: {my_roster_size}/{config.roster_size} spots filled.", end=" ")
         print("Open bench spot." if open_slot else "Full -- adding means dropping someone.")
+        if faab_left is not None:
+            print(f"FAAB left: ${faab_left}")
     else:
         print("\n(--league-id doesn't match a known LeagueConfig, skipping roster-fit check)")
 
