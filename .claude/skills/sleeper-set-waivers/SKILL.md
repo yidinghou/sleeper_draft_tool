@@ -12,8 +12,12 @@ See that script's docstring for how the mutations were reverse-engineered
 (downloading Sleeper's own public JS bundle and grepping it, never by
 submitting a live request).
 
-Work the week in this order: **identify players → identify drops → find the
-edge → set prices → submit.**
+**This skill's job is to help the user work through their own opinions on
+players, never to compute a recommendation for them.** The only mechanical
+signal it uses is raw facts (who's a free agent, bye weeks, depth-chart
+order, FAAB left) — no scoring, no tags, no ranked list claiming to know
+who's worth adding or dropping. The actual judgment lives in the user's own
+notes, which this skill helps them keep current.
 
 ## Step 0: identify the league
 
@@ -26,6 +30,14 @@ different real league with its own roster and waivers. If it isn't obvious
 from context (e.g. the user names a player who's only rostered in one of
 them), ask.
 
+This also picks which notes file the rest of the session reads/writes:
+- `python/data/notes/priors-auction.md` for `LEAGUE_CONFIG`
+- `python/data/notes/priors-snake.md` for `SNAKE_CONFIG`
+
+A session that touches both leagues just moves between the two files as it
+moves between leagues — there's no cross-league sharing, since roster needs
+and FAAB differ.
+
 Then check what's already in flight: `python3 scripts/check_waivers.py`
 (read-only, needs `~/.sleeper_token`/`$SLEEPER_TOKEN`, defaults to both
 leagues). The public v1 `GET /league/{id}/transactions/{week}` never returns
@@ -36,54 +48,54 @@ soft preference, not a locked decision — surfacing a better candidate that
 would replace it is fine, just say so and confirm before submitting a claim
 that supersedes it.
 
-## Step 1: identify players
+## Step 1: load priors and see what changed
 
-`python3 scripts/waiver_targets.py --league-id LEAGUE_ID --week CURRENT_WEEK`
-does this: pulls Sleeper's trending-add list, filters to actual free agents
-in this league (cross-referenced against every roster's `players` list), and
-prints a ranked table. `--week` is optional but enables the bye-based
-INSURANCE tag in Step 2.
+`Read` that league's notes file. It's one `##` section per player, freeform
+prose, the user's own running thesis — e.g. "TD threat even as volume dips,
+buy the touchdown regression" for a player they're holding, or "breakout
+watch behind an injury, want to see next week's volume before committing
+FAAB" for a free agent they're tracking.
 
-## Step 2: find the edge
+For every player the user names this session (someone they're weighing
+whether to drop, hold, or pick up), show them their existing note if one
+exists, and ask directly: **has anything changed since last time?** This is
+a conversation, not a form — let them talk through it in their own words.
+A player with no existing section is just a new one to add.
 
-`waiver_targets.py`'s table already tags each candidate — this *is* the
-"why," don't re-derive it by eyeballing trending-add counts:
-- **INSURANCE** — handcuffs one of your rostered players (same team/position,
-  worse depth-chart slot), or covers an upcoming bye at a position you start.
-- **STARTER** — real standalone role on their own team (depth-chart order 1
-  or 2), independent of your roster.
-- A candidate can carry both tags, one, or neither (a bare trending-add count
-  with no tag is a speculative/momentum play, not a confirmed edge).
+As soon as the user gives you something new for a player, **update that
+`##` section in place right away** (`Edit`) rather than waiting until the
+end of the session — git history on the file is the changelog, so there's
+no need to keep old text inline or version anything by hand.
 
-The `WHY` column also carries a Rotowire headline when one exists — read it,
-but the tag + reason is the primary signal since it's computed straight from
-Sleeper's own depth chart data, not just discourse. Depth-chart data can lag
-real news (a promotion the beat writers know about before Sleeper updates
-`depth_chart_order`); if the user flags a specific case where their own
-knowledge disagrees with the tag, say so and treat their read as an
-override rather than trusting the field blindly — but don't build a
-standing override table for a case that hasn't come up.
+## Step 2 (optional): discover fresh candidates
 
-## Step 3: identify drops
+If the user wants to see what's out there rather than just discuss players
+they already have opinions on:
 
-The end of `waiver_targets.py`'s output shows your roster fullness. If it's
-full, **always ask the user which player to drop** — that's their call, not
-one to make unilaterally, even when the add is obvious. Good drop candidates
-tend to be the same shape as bad INSURANCE/STARTER hits on your own bench:
-low depth-chart order on their own team, no bye-week or handcuff relevance to
-anyone else on the roster.
+```
+python3 scripts/waiver_targets.py --league-id LEAGUE_ID
+```
 
-## Step 4: set prices
+This pulls Sleeper's trending-add list, filters to actual free agents in
+this league, and prints **facts only** — position, team, bye week, Sleeper's
+own depth-chart order, and any Rotowire headline — plus your current bench
+(also facts only) and FAAB left. There is no tag or ranking column anymore;
+treat this purely as a prompt for "does anything here deserve a note?", not
+a recommendation. If the user wants outside intel on a specific name (a
+podcast take, a beat-writer report), that's fine to go dig up, but fold what
+you find straight into that player's note in Step 1 rather than keeping a
+separate sourced-research document.
 
-`waiver_targets.py`'s output also prints `FAAB left: $N` for your roster
-(from the league's real `settings.waiver_budget` minus your
-`settings.waiver_budget_used` — the live FAAB pool, not
-`LeagueConfig.budget`, which is that league's auction *draft* budget and
-doesn't apply here). There's no bid-suggestion formula — sizing the bid
-relative to that number and how much you want the player is the user's
-judgment call, not something to compute for them.
+## Step 3: talk it through
 
-## Step 5: submit
+With notes current for everyone in play, walk through the actual decision
+with the user in plain language — what their note says, what's changed,
+what the tradeoff is between the players they're weighing. **Always let the
+user land on the add, the drop, and the bid themselves** — present the
+considerations, don't collapse them to a pick on their behalf, even when the
+choice looks obvious.
+
+## Step 4: submit
 
 ```bash
 cd python
@@ -129,6 +141,10 @@ A successful `submit_waiver_claim` response comes back `"status": "pending"`
 with a `transaction_id` — it processes at the league's next waiver run, not
 instantly. `league_create_transaction` (pass `--free-agent`) is instant
 instead, for a player who has already cleared waivers.
+
+After submitting (or deciding to hold/pass), update the relevant player
+notes one more time with the outcome and why — that's next week's starting
+point.
 
 ## Not built yet
 
