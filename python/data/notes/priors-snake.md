@@ -11,8 +11,9 @@ _wk4_: Breakout watch behind Achane's ACL (out for season) — 17 carries/3
 targets in immediate relief, TD + 14.5 pts vs. KC. Consensus top waiver
 priority (Yahoo, Bleacher Report), low-end RB2/high-end RB3 range. Bear
 case: MIA game script may not stay run-positive, and Jaylen Wright is
-still on the roster contesting early-down work. Watching wk5 volume before
-committing FAAB.
+still on the roster contesting early-down work. Bidding $30 (down from an earlier $45), dropping
+Emanuel Wilson — RB is already deep, so this is insurance/upside. Questionable
+at claim time.
 
 ## Emanuel Wilson (RB, SEA)
 _wk4_: Deep bench stash. Droppable if needed.
@@ -74,3 +75,13 @@ _wk4_: IR stash with keeper value.
 
 ## Kansas City Chiefs (DEF, KC)
 _wk4_: Streaming DEF — not a hold-at-all-costs slot.
+
+## Kalif Raymond (WR, CHI — FA) / Keenan Allen (WR, IND — FA)
+_wk4_: WR is thin here (Coker, Olave, G. Wilson), so both claimed at $8, Raymond
+first, dropping Ferguson. Backup TE claims behind them: Darren Waller $3,
+Tyler Higbee $2 (only run if both WR claims fail, same drop).
+
+## QB replacement for Drake Maye
+_wk4_: Claims at $0, ordered by Week 4 matchup: C.J. Stroud (vs. DAL, allows
+23.5 pts/g to QBs), Kyler Murray (vs. MIA), Bo Nix (@ SF). DEF (PIT, then BAL)
+and K (Loop, then Shrader) claims also $0.

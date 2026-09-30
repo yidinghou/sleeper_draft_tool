@@ -65,3 +65,21 @@ hold-at-all-costs slot.
 _wk4_: PASS, not bidding. Free agent, traded to NYG after Dart's season-ending
 injury but behind Jameis Winston on the depth chart. Revisit only if Winston
 is benched.
+
+## Ollie Gordon II (RB, MIA — FA)
+_wk4_: Top target, $49 bid (record vs. last year's $47 high in this league),
+dropping Holani. Questionable (undisclosed) at claim time — knowingly bidding
+anyway. Fallbacks in the RB chain: Mitchell $12, then Isaiah Davis $3.
+
+## Keaton Mitchell (RB, LAC — FA)
+_wk4_: RB-chain fallback ($12) and flex-chain first choice ($12, drop Mac Jones).
+
+## Kalif Raymond (WR, CHI — FA)
+_wk4_: First WR choice ($12, drop Andrews): 23% target share, ~10% rostered.
+Also flex fallback ($8). Fallbacks: Keenan Allen $10, Malik Washington $5.
+
+## Keenan Allen (WR, IND — FA)
+_wk4_: WR fallback ($10) — useful while Pierce is on IR.
+
+## Tyler Higbee (TE, LAR — FA)
+_wk4_: Last flex fallback ($3). Fill-in for Ferguson, likely temporary.
