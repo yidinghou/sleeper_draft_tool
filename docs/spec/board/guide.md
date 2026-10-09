@@ -18,7 +18,7 @@ then add the six layers below in order. Each depends only on the ones before it.
 5. **The slide template** — the deck that renders the payload.
 6. **Scrubber + frame cache** — historical frames, memoized on disk.
 
-## Step 1 — `python/vorp/sleeper_client.py`
+## Step 1 — `python/vorp/sources/sleeper.py`
 
 The Python half of `src/sleeper.ts`, name-for-name, so the pricing process needs
 no second language runtime. See [01 · Live data ingestion](01-live-data-ingestion.md).

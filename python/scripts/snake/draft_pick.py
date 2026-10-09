@@ -39,7 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from vorp.sleeper_client import fetch_draft_picks  # noqa: E402
+from vorp.sources.sleeper import fetch_draft_picks  # noqa: E402
 
 GRAPHQL = "https://sleeper.com/graphql"
 

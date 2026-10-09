@@ -3,7 +3,7 @@
 > **Work in progress.** The pricing core this board would run on,
 > `python/vorp/board.py` (`price_board`), is implemented — see
 > [`../vorp/07-live-draft-board.md`](../vorp/07-live-draft-board.md). The
-> **server** itself is not: none of `python/vorp/sleeper_client.py`,
+> **server** itself is not: none of `python/vorp/sources/sleeper.py`,
 > `python/scripts/auction/draft_board.py`, or the `board_slides.html` deck exist in
 > this repo yet, on any branch. Expect this whole spec directory to be
 > revised as the server gets built.

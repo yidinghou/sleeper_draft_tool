@@ -46,7 +46,7 @@ from draft_watch import CAPPED, load_queue  # noqa: E402
 from keeper_vorp import pick_schedule  # noqa: E402
 from mock_draft import lineup_gaps  # noqa: E402
 from vorp.league.config import MY_USERNAME, SNAKE_CONFIG  # noqa: E402
-from vorp.sleeper_client import (  # noqa: E402
+from vorp.sources.sleeper import (  # noqa: E402
     API_BASE,
     draft_fingerprint,
     fetch_draft,

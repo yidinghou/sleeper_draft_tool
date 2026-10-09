@@ -4,10 +4,11 @@ Mirrors src/sleeper.test.ts's coverage for the ported functions, plus
 seat_identity, which has no TypeScript counterpart.
 """
 
-from vorp.sleeper_client import (
+from vorp.sources.sleeper import (
     cache_busted_url,
     draft_fingerprint,
     parse_nomination,
+    score_projection,
     seat_identity,
     sleeper_player_full_name,
 )
@@ -125,3 +126,15 @@ def test_seat_identity_picks_never_override_draft_order():
     picks = [{"draft_slot": 3, "picked_by": "u2"}]
     identity = seat_identity(draft, USERS, raw_picks=picks)
     assert identity[2]["user_id"] == "u1"
+
+
+def test_score_projection_is_a_dot_product_over_shared_keys():
+    projection = {"pass_td": 2, "pass_yd": 250, "rush_td": 1}
+    scoring = {"pass_td": 4.0, "pass_yd": 0.04, "rush_td": 6.0}
+    assert score_projection(projection, scoring) == 2 * 4.0 + 250 * 0.04 + 1 * 6.0
+
+
+def test_score_projection_ignores_stats_the_league_does_not_score():
+    projection = {"pass_td": 1, "made_up_stat": 999}
+    scoring = {"pass_td": 4.0}
+    assert score_projection(projection, scoring) == 4.0

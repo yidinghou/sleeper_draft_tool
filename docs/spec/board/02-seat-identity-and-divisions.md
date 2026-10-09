@@ -21,7 +21,7 @@ render.
 
 Two joins plus a deterministic fill.
 
-`seat_identity` (in `sleeper_client.py`) maps each 0-indexed `seat_id` to a
+`seat_identity` (in `sources/sleeper.py`) maps each 0-indexed `seat_id` to a
 manager from two sources, joined against the league `users` list:
 
 ```
@@ -110,7 +110,7 @@ manager changes their handle.
 
 ## Reference
 
-**Depends on:** `python/vorp/sleeper_client.py`'s `seat_identity`;
+**Depends on:** `python/vorp/sources/sleeper.py`'s `seat_identity`;
 `python/vorp/league/config.py` for `DIVISIONS`, `MY_USERNAME`, `MOCK_SEED`,
 `all_members`, and `division_index_for`. **Implemented in:**
 `python/scripts/auction/draft_board.py` — `random_fill`, `build_divisions`,

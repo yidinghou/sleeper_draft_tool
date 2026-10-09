@@ -1,0 +1,128 @@
+<title>NFL TD Scorers</title>
+<style>
+  :root {
+    --bg: #05091a;
+    --surface: #0f1730;
+    --surface-raised: #182144;
+    --border-soft: #1c2547;
+    --text-primary: #f5f7ff;
+    --text-secondary: #93a3c9;
+    --text-faint: #5c6790;
+    --fav: #34d399;
+    --long: #fb7185;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+  }
+  .app { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--text-faint); font-size: 12px; margin-bottom: 20px; }
+  input[type="search"] {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font: inherit;
+    padding: 6px 12px;
+    margin-bottom: 18px;
+    min-width: 220px;
+  }
+  .game {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .game h2 {
+    font-size: 14px;
+    margin: 0;
+    padding: 10px 14px;
+    background: var(--surface-raised);
+    color: var(--text-secondary);
+  }
+  table { border-collapse: collapse; width: 100%; }
+  thead th {
+    text-align: right;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-faint);
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  thead th.left { text-align: left; }
+  tbody td {
+    padding: 6px 14px;
+    text-align: right;
+    font-family: monospace;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  tbody td.name { text-align: left; font-family: inherit; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface-raised); }
+  .odds.fav { color: var(--fav); }
+  .odds.long { color: var(--long); }
+  .odds.empty { color: var(--text-faint); }
+</style>
+
+<div class="app">
+  <h1>NFL TD Scorers</h1>
+  <div class="sub" id="sub"></div>
+  <input type="search" id="q" placeholder="Search player or team" />
+  <div id="games"></div>
+</div>
+
+<script>
+  const DATA = __DATA__;
+
+  function fmtOdds(v) {
+    if (v == null) return '<span class="odds empty">&mdash;</span>';
+    const cls = v < 0 ? 'fav' : 'long';
+    return `<span class="odds ${cls}">${v > 0 ? '+' : ''}${v}</span>`;
+  }
+
+  function render() {
+    const q = document.getElementById('q').value.trim().toLowerCase();
+    const games = DATA.games
+      .map(g => ({ ...g, players: g.players.filter(p =>
+        !q || p.name.toLowerCase().includes(q) ||
+        g.away.toLowerCase().includes(q) || g.home.toLowerCase().includes(q)) }))
+      .filter(g => g.players.length);
+
+    document.getElementById('games').innerHTML = games.map(g => `
+      <div class="game">
+        <h2>${g.away} at ${g.home}</h2>
+        <table>
+          <thead>
+            <tr>
+              <th class="left">Player</th>
+              <th>Anytime TD</th>
+              <th>First TD</th>
+              <th>2+ TDs</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${g.players.map(p => `
+              <tr>
+                <td class="name">${p.name}</td>
+                <td>${fmtOdds(p.anytime)}</td>
+                <td>${fmtOdds(p.first)}</td>
+                <td>${fmtOdds(p.two_plus)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`).join('') || '<p class="sub">No players match.</p>';
+  }
+
+  document.getElementById('sub').textContent =
+    `${DATA.games.length} games, ${DATA.games.reduce((n, g) => n + g.players.length, 0)} player props`;
+  document.getElementById('q').addEventListener('input', render);
+  render();
+</script>
