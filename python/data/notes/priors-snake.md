@@ -16,7 +16,8 @@ Emanuel Wilson — RB is already deep, so this is insurance/upside. Questionable
 at claim time.
 
 ## Emanuel Wilson (RB, SEA)
-_wk4_: Deep bench stash. Droppable if needed.
+_wk5_: STARTER now — Jadarian Price went on IR, Wilson took over SEA's
+backfield (21 carries, 81 yds, TD in wk4). No longer a droppable stash.
 
 ## Drake Maye (QB, NE)
 _wk4_: Was a high-draft-capital QB2 last year, but 3 bad weeks in a row —
@@ -80,6 +81,11 @@ _wk4_: Streaming DEF — not a hold-at-all-costs slot.
 _wk4_: WR is thin here (Coker, Olave, G. Wilson), so both claimed at $8, Raymond
 first, dropping Ferguson. Backup TE claims behind them: Darren Waller $3,
 Tyler Higbee $2 (only run if both WR claims fail, same drop).
+
+## wk5 claims (Waller + Dobbins + Young cut)
+_wk5_: WR: Doubs $6 (drop Waller), Coleman $6 (drop Dobbins), fallback R. Wilson
+$4 (drop either). Doubs tied/above Coleman on purpose: DK anytime-TD odds +175
+vs +265. QB chain, all $0, each dropping Young: Daniels, Stroud, Rodgers.
 
 ## QB replacement for Drake Maye
 _wk4_: Claims at $0, ordered by Week 4 matchup: C.J. Stroud (vs. DAL, allows

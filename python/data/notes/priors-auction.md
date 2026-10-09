@@ -83,3 +83,12 @@ _wk4_: WR fallback ($10) — useful while Pierce is on IR.
 
 ## Tyler Higbee (TE, LAR — FA)
 _wk4_: Last flex fallback ($3). Fill-in for Ferguson, likely temporary.
+
+## wk5 claims (McCarthy, Jennings, Raymond cut)
+_wk5_: Huntley QB $6 (drop McCarthy) -- need a QB for Young's bye (CAR wk5);
+McCarthy sits behind Winston. Hockenson TE $5 (drop Jennings), Higbee TE $4
+(drop Raymond). Chose TEs over the receivers on DK anytime-TD odds:
+Hockenson +165, Higbee +180, Gesicki +210, vs. Coleman/R. Wilson +265. Cancelled
+the earlier $0 claims (R. Wilson, Gesicki).
+_wk5 fallbacks_: Gesicki TE $2 (drop Jennings, only if Hockenson fails), R. Wilson
+WR $1 (drop Raymond, only if Higbee fails).
